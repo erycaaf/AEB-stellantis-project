@@ -22,16 +22,16 @@ Safety is our top priority. Our CI/CD pipeline enforces:
 *   **Coverage:** 100% Statement and Branch Coverage, with **MC/DC (Modified Condition/Decision Coverage)** applied to safety-critical decision logic (ASIL B adherence).
 
 ## 📚 Documentation
-All detailed engineering artifacts are documented in our[Project Wiki](https://github.com/seu-usuario/aeb-project/wiki). 
+All detailed engineering artifacts are documented in our [Project Wiki](https://github.com/jessica-leoa/aeb-project/wiki). 
 
-*[System Requirements & Traceability Matrix](https://github.com/seu-usuario/aeb-project/wiki/System-Requirements)
-*   [Software Architecture & Stateflow](https://github.com/seu-usuario/aeb-project/wiki/Architecture)
-*   [Verification & Validation Plan (Testing Scenarios)](https://github.com/seu-usuario/aeb-project/wiki/Validation-Plan)
+* [System Requirements & Traceability Matrix](https://github.com/jessica-leoa/aeb-project/wiki/System-Requirements)
+* [Software Architecture & Stateflow](https://github.com/jessica-leoa/aeb-project/wiki/Architecture)
+* [Verification & Validation Plan (Testing Scenarios)](https://github.com/jessica-leoa/aeb-project/wiki/Validation-Plan)
 
 ## 🚀 How to Build and Run Tests
 ```bash
 # Clone the repository
-git clone https://github.com/seu-usuario/aeb-project.git
+git clone https://github.com/jessica-leoa/aeb-project.git
 cd aeb-project
 
 # Compile the tests (Requires GCC)
