@@ -52,7 +52,6 @@ The AEB baseline documented in this repository is defined by the following chara
 - adverse weather and complex road geometries beyond straight longitudinal scenarios
 
 ---
-
 ## Operational States
 
 The validated AEB state machine contains seven states:
@@ -69,29 +68,29 @@ The validated AEB state machine contains seven states:
 flowchart LR
     OFF(["OFF"])
     STANDBY(["STANDBY"])
-    WARNING(["WARNING<br/>alerta visual+sonoro"])
+    WARNING(["WARNING<br/>visual + audible alert"])
     L1(["BRAKE_L1<br/>−2 m/s²"])
     L2(["BRAKE_L2<br/>−4 m/s²"])
     L3(["BRAKE_L3<br/>−6 m/s²"])
     PB(["POST_BRAKE<br/>−6 m/s² · 2 s"])
 
-    OFF -->|"falha limpa"| STANDBY
-    STANDBY -->|"falha sensor"| OFF
-    STANDBY -->|"TTC ≤ 4,0 s"| WARNING
-    WARNING -->|"TTC > 4,0 s + 200 ms"| STANDBY
-    WARNING -->|"TTC ≤ 3,0 s + 0,8 s alerta"| L1
-    WARNING -->|"TTC ≤ 2,2 s + 0,8 s alerta"| L2
-    WARNING -->|"TTC ≤ 1,8 s + 0,8 s alerta"| L3
-    L1 -->|"TTC ≤ 2,2 s"| L2
-    L1 -->|"TTC ≤ 1,8 s"| L3
-    L1 -->|"TTC > 3,0 s + 200 ms"| WARNING
-    L1 -->|"v = 0"| PB
-    L2 -->|"TTC ≤ 1,8 s"| L3
-    L2 -->|"TTC > 2,2 s + 200 ms"| L1
-    L2 -->|"v = 0"| PB
-    L3 -->|"TTC > 1,8 s + 200 ms"| L2
-    L3 -->|"v = 0"| PB
-    PB -->|"2,0 s"| STANDBY
+    OFF -->|"clean system status"| STANDBY
+    STANDBY -->|"sensor fault"| OFF
+    STANDBY -->|"TTC ≤ 4.0 s"| WARNING
+    WARNING -->|"TTC > 4.0 s for 200 ms"| STANDBY
+    WARNING -->|"TTC ≤ 3.0 s + 0.8 s warning"| L1
+    WARNING -->|"TTC ≤ 2.2 s + 0.8 s warning"| L2
+    WARNING -->|"TTC ≤ 1.8 s + 0.8 s warning"| L3
+    L1 -->|"TTC ≤ 2.2 s"| L2
+    L1 -->|"TTC ≤ 1.8 s"| L3
+    L1 -->|"TTC > 3.0 s for 200 ms"| WARNING
+    L1 -->|"vehicle speed = 0"| PB
+    L2 -->|"TTC ≤ 1.8 s"| L3
+    L2 -->|"TTC > 2.2 s for 200 ms"| L1
+    L2 -->|"vehicle speed = 0"| PB
+    L3 -->|"TTC > 1.8 s for 200 ms"| L2
+    L3 -->|"vehicle speed = 0"| PB
+    PB -->|"2.0 s elapsed"| STANDBY
 ```
 
 **Floor distance** (prevent premature de-climbing while braking):
@@ -171,55 +170,3 @@ This modular structure supports portability, maintainability, and bidirectional 
 - Lourenço Jamba Mphili
 - Renato Silva Fagundes
 - Rian Ithalo da Costa Linhares
-
-## Repository Contents
-
-The repository is organized to keep requirements, modeling artefacts, software implementation, simulation assets, and validation evidence under version control.
-
-```text
-.
-├── .github/                          # GitHub configuration
-│   ├── pull_request_template.md      # Default pull request template
-│   └── workflows/                    # CI workflows and automation
-├── docs/                             # Project documentation
-│   ├── requirements/                 # Software requirements specification and traceability artefacts
-│   ├── modeling/                     # MIL modeling documentation and subsystem traceability
-│   ├── tests/                        # Test strategy, validation evidence, and reports
-│   └── scm/                          # Configuration management documentation
-├── modeling/                         # Main modeling workspace
-│   ├── c_embedded/                   # Embedded C implementation baseline
-│   │   ├── include/                  # Header files and public interfaces
-│   │   │   ├── aeb_config.h          # Calibratable parameters and system constants
-│   │   │   ├── aeb_types.h           # Shared data types and structures
-│   │   │   └── aeb_*.h               # Interfaces for AEB software modules
-│   │   ├── src/                      # C source files
-│   │   │   ├── aeb_main.c            # 10 ms control-cycle orchestration
-│   │   │   ├── aeb_fsm.c             # 7-state finite state machine
-│   │   │   ├── aeb_ttc.c             # TTC and braking-distance calculations
-│   │   │   ├── aeb_perception.c      # Input validation and fault handling
-│   │   │   ├── aeb_pid.c             # Braking-control logic
-│   │   │   └── aeb_alert.c           # Driver alert generation
-│   │   └── test/                     # Unit-test sources for embedded modules
-│   │       └── test_aeb.c            # Unit-test entry point / test harness
-│   ├── AEB_Controller.slx            # Controller model
-│   ├── AEB_Perception.slx            # Perception model
-│   ├── AEB_CAN.slx                   # CAN communication model
-│   ├── AEB_UDS.slx                   # UDS diagnostics model
-│   ├── AEB_Plant.slx                 # Vehicle / actuator plant model
-│   └── AEB_Integration.slx           # Closed-loop integration model
-├── gazebo_sim/                       # Simulation-oriented environment
-│   └── aeb_gazebo/                   # ROS2 / Gazebo package
-│       ├── src/                      # Simulation and integration nodes
-│       │   ├── aeb_controller_node.cpp
-│       │   ├── perception_node.py
-│       │   ├── scenario_controller.py
-│       │   └── dashboard_node.py
-│       ├── msg/                      # Structured ROS2 messages aligned with CAN concepts
-│       ├── launch/                   # Launch files for scenario execution
-│       ├── worlds/                   # Gazebo worlds
-│       ├── models/                   # 3D vehicle and environment models
-│       └── run.sh                    # Quick execution script
-├── Dockerfile                        # Reproducible development environment
-├── docker-compose.yml                # Optional local orchestration
-├── README.md                         # Repository overview
-└── CHANGELOG.md                      # Version and release history
