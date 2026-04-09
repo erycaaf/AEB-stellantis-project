@@ -1,0 +1,15 @@
+# Build artefacts
+*.o
+*.exe
+test_smoke
+test_can
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+Thumbs.db
+.DS_Store
