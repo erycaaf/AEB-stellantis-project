@@ -23,8 +23,11 @@ SRC_ALL = src/communication/aeb_can.c \
 # Smoke test (baseline — always present)
 SRC_SMOKE = src/communication/aeb_can.c stubs/can_hal.c tests/test_smoke.c
 
+# CAN module tests (Task D)
+SRC_CAN_TEST = src/communication/aeb_can.c stubs/can_hal.c tests/test_can.c
+
 # Real module sources for MISRA check (add files here as stubs are replaced)
-SRC_MISRA =
+SRC_MISRA = src/communication/aeb_can.c
 
 .PHONY: build test misra clean
 
@@ -32,10 +35,14 @@ build:
 	$(CC) $(CFLAGS) -c $(SRC_ALL)
 	@echo "=== Build OK: zero warnings ==="
 
-test: test_smoke
+test: test_smoke test_can
 	./test_smoke
+	./test_can
 
 test_smoke: $(SRC_SMOKE)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+test_can: $(SRC_CAN_TEST)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 misra:
@@ -47,3 +54,5 @@ endif
 
 clean:
 	rm -f test_smoke test_can *.o
+
+.PHONY: test_can
