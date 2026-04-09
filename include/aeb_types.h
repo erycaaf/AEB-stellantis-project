@@ -61,10 +61,7 @@ typedef struct
     float32_t state_timer;    /**< s                       */
 } fsm_output_t;
 
-/**
- * @brief PID brake output (Task C -> Task D TX).
- * @req FR-BRK-007
- */
+/** @brief PID brake output (Task C -> Task D TX). */
 typedef struct
 {
     float32_t brake_pct;      /**< [0, 100] %              */
@@ -82,10 +79,7 @@ typedef struct
     uint8_t   buzzer_cmd;     /**< 0..4 (beep pattern)     */
 } alert_output_t;
 
-/**
- * @brief Driver inputs (Task D RX -> Tasks B, C).
- * @req FR-PER-004, FR-PER-005, FR-PER-008
- */
+/** @brief Driver inputs (Task D RX -> Tasks B, C). */
 typedef struct
 {
     uint8_t   brake_pedal;    /**< boolean                 */
