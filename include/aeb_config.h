@@ -2,7 +2,7 @@
  * @file  aeb_config.h
  * @brief Calibration parameters for the AEB system (NFR-POR-002).
  *
- * Only the CAN-relevant subset is included here for Task D compilation.
+ * CAN-relevant subset of calibration parameters.
  * Full file maintained by Task E (Rian).
  */
 

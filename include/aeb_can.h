@@ -5,7 +5,7 @@
  * Implements FR-CAN-001..004 from the AEB SRS v2.0.
  * Designed for Zephyr RTOS CAN driver; MISRA C:2012 compliant.
  *
- * @author  Renato Fagundes (Task D)
+ * @author  Renato Fagundes
  * @date    2026-04-07
  */
 

@@ -43,7 +43,7 @@ typedef struct
     float32_t state_timer;    /**< s                       */
 } fsm_output_t;
 
-/** @brief PID brake output (Task C -> Task D TX). */
+/** @brief PID brake output (PID brake -> CAN TX). */
 typedef struct
 {
     float32_t brake_pct;      /**< [0, 100] %              */
@@ -58,7 +58,7 @@ typedef struct
     uint8_t   buzzer_cmd;     /**< 0..4 (beep pattern)     */
 } alert_output_t;
 
-/** @brief Driver inputs (Task D RX -> Tasks B, C). */
+/** @brief Driver inputs (CAN RX -> Decision, Execution). */
 typedef struct
 {
     uint8_t   brake_pedal;    /**< boolean                 */
