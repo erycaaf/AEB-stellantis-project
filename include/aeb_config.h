@@ -2,8 +2,17 @@
  * @file  aeb_config.h
  * @brief Calibration parameters for the AEB system (NFR-POR-002).
  *
- * Only the CAN-relevant subset is included here for Task D compilation.
- * Full file maintained by Task E (Rian).
+<<<<<<< HEAD
+ * All tuneable parameters centralised here, enabling independent
+ * calibration without modifying source code.
+ *
+ * Based on AEB_Tasks v1.0 Section 3.2.
+ *
+ * @req NFR-POR-002 Calibration separated from code.
+ * @req FR-COD-001 Structural correspondence with Simulink model.
+ *
+ * @version 2.0 — Integration
+ * @date 2026-04
  */
 
 #ifndef AEB_CONFIG_H

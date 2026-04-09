@@ -5,8 +5,6 @@
  * Implements the UDS server: live data access (SID 0x22), DTC management
  * (SID 0x14), fault monitoring, and AEB enable/disable (SID 0x31).
  *
- * Structural correspondence: Simulink chart_117 (UDS_Server).
- *
  * @req FR-UDS-001 ReadDataByIdentifier (SID 0x22).
  * @req FR-UDS-002 DTC storage (C1001, C1004, C1006).
  * @req FR-UDS-003 ClearDiagnosticInformation (SID 0x14).
@@ -14,6 +12,7 @@
  * @req FR-UDS-005 UDS request/response via CAN within one cycle.
  * @req FR-COD-001 Structural correspondence with Simulink model.
  *
+ * @author  Rian Linhares
  * @version 1.0
  * @date 2026-04
  */

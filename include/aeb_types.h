@@ -6,7 +6,6 @@
  * All modules communicate through typed structs passed by pointer.
  * No global mutable state except where Zephyr kernel objects require it.
  *
- * Based on AEB_Tasks v1.0 Section 3.1.
  *
  * @req FR-COD-001 Structural correspondence with Simulink model.
  * @req NFR-COD-005 Exclusive use of fixed-width types.
