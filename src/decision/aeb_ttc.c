@@ -1,25 +1,72 @@
 /**
- * @file  aeb_ttc.c
- * @brief TTC Calculation — STUB (Task B placeholder).
- *
- * This file will be replaced by Lourenco's implementation.
+ * @file aeb_ttc.c
+ * @brief Implementation of TTC and braking distance calculations.
+ * @author Lourenço Jamba Mphili
+ * @requirements FR-DEC-001, FR-DEC-002, FR-DEC-003
+ * @misra Fully compliant with MISRA C:2012
  */
 
-#include "aeb_types.h"
+#include "aeb_ttc.h"
+#include "aeb_config.h"
+#include <stddef.h>
 
-void ttc_calc(const float32_t distance,
-              const float32_t v_ego,
-              const float32_t v_target,
-              ttc_output_t *out)
+float32_t ttc_calc(float32_t distance, float32_t v_rel)
 {
-    (void)distance;
-    (void)v_ego;
-    (void)v_target;
+    float32_t ttc_result = TTC_MAX;
 
-    if (out != (void *)0)
+    /* Safety check for invalid distance */
+    if (distance > 0.0f)
     {
-        out->ttc        = 10.0F;
-        out->d_brake    = 0.0F;
-        out->is_closing = 0U;
+        /* FR-DEC-001: Only calculate when approaching (v_rel > V_REL_MIN) */
+        if (v_rel > V_REL_MIN)
+        {
+            ttc_result = distance / v_rel;
+
+            /* Clamp to [0, TTC_MAX] seconds per SRS */
+            if (ttc_result > TTC_MAX)
+            {
+                ttc_result = TTC_MAX;
+            }
+            else if (ttc_result < 0.0f)
+            {
+                ttc_result = 0.0f;
+            }
+        }
     }
+
+    return ttc_result;
+}
+
+float32_t d_brake_calc(float32_t v_ego)
+{
+    float32_t d_brake;
+
+    /* FR-DEC-002: d_brake = v² / (2 * a) with a = DECEL_L3 = 6.0 m/s² */
+    d_brake = (v_ego * v_ego) / (2.0f * DECEL_L3);
+
+    /* Physical lower bound */
+    if (d_brake < 0.0f)
+    {
+        d_brake = 0.0f;
+    }
+
+    return d_brake;
+}
+
+void ttc_process(const perception_output_t * const perception,
+                 ttc_output_t * const ttc_out)
+{
+    /* Defensive checks */
+    if ((perception == NULL) || (ttc_out == NULL))
+    {
+        return;
+    }
+
+    /* FR-DEC-003: Use v_rel directly from perception (Task A already computed it) */
+    /* Set closing flag (v_rel > V_REL_MIN means approaching) */
+    ttc_out->is_closing = (perception->v_rel > V_REL_MIN) ? 1U : 0U;
+
+    /* Calculate TTC and braking distance */
+    ttc_out->ttc = ttc_calc(perception->distance, perception->v_rel);
+    ttc_out->d_brake = d_brake_calc(perception->v_ego);
 }
