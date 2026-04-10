@@ -2,7 +2,6 @@
  * @file  aeb_config.h
  * @brief Calibration parameters for the AEB system (NFR-POR-002).
  *
-<<<<<<< HEAD
  * All tuneable parameters centralised here, enabling independent
  * calibration without modifying source code.
  *
