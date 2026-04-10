@@ -167,7 +167,7 @@ This modular structure supports portability, maintainability, and bidirectional 
 
 ## AI-Assisted Development
 
-This project used Large Language Model (LLM) assistants as a development support tool during the embedded C implementation phase. The use of AI was guided by the team's implementation strategy document (AEB_Tasks v1.0) and followed a structured prompt methodology to ensure consistency, traceability, and compliance with project standards.
+This project used Large Language Model (LLM) assistants as a development support tool during the embedded C implementation phase. The use of AI was guided by the team's implementation strategy document and followed a structured prompt methodology to ensure consistency, traceability, and compliance with project standards.
 
 ### Principles
 
