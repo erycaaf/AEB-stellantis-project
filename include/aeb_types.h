@@ -109,4 +109,9 @@ typedef enum
     FSM_POST_BRAKE = 6
 } fsm_state_e;
 
+/* fault_flag bit positions */
+#define AEB_FAULT_LIDAR    ((uint8_t)0x01U)
+#define AEB_FAULT_RADAR    ((uint8_t)0x02U)
+#define AEB_FAULT_CAN_TO   ((uint8_t)0x80U)
+
 #endif /* AEB_TYPES_H */

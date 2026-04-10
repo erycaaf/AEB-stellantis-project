@@ -74,27 +74,27 @@
 #define UDS_DID_BRAKE_PRESS   0xF102U    /**< DID — Brake pressure    */
 #define UDS_ROUTINE_AEB       0x0301U    /**< RID — AEB enable/disable*/
 
-/* Fault detection (FR-PER-006, FR-PER-007) */
+/* ===== Fault detection (FR-PER-006, FR-PER-007) ===== */
 #define RADAR_DIST_MIN      0.5f    /* m                          */
 #define RADAR_DIST_MAX      200.0f  /* m                          */
 #define LIDAR_DIST_MIN      1.0f    /* m                          */
 #define LIDAR_DIST_MAX      100.0f  /* m                          */
 #define MAX_REL_VEL         50.0f   /* m/s                        */
 
-/* Kalman measurement noise (chart_41) */
+/* ===== Kalman measurement noise ===== */
 #define KALMAN_R_LIDAR      0.0025f /* m^2                        */
 #define KALMAN_R_RADAR_D    0.09f   /* m^2                        */
 #define KALMAN_R_RADAR_V    0.01f   /* (m/s)^2                    */
 
-/* Kalman process noise */
+/* ===== Kalman process noise ===== */
 #define KALMAN_Q_D          1e-4f   /* m^2                        */
 #define KALMAN_Q_V          1e-5f   /* (m/s)^2                    */
 
-/* Kalman initial covariance */
+/* ===== Kalman initial covariance ===== */
 #define KALMAN_P0_D         1.0f    /* m^2                        */
 #define KALMAN_P0_V         0.25f   /* (m/s)^2                    */
 
-/* Output clamping */
+/* ===== Output clamping ===== */
 #define DIST_MAX_OUTPUT     300.0f  /* m                          */
 #define DIST_MIN_OUTPUT     0.5f    /* m                          */
 
