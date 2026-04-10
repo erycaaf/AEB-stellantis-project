@@ -6,11 +6,12 @@
  * All modules communicate through typed structs passed by pointer.
  * No global mutable state except where Zephyr kernel objects require it.
  *
+ * Based on AEB_Tasks v1.0 Section 3.1.
  *
  * @req FR-COD-001 Structural correspondence with Simulink model.
  * @req NFR-COD-005 Exclusive use of fixed-width types.
  *
- * @version 2.0 — Integration
+ * @version 2.1 — Review fixes
  * @date 2026-04
  */
 
@@ -23,7 +24,7 @@
 typedef float float32_t;
 
 /**
- * @brief Perception output (Task A -> Task B).
+ * @brief Perception output (Perception -> Decision).
  * @req FR-PER-001..008
  */
 typedef struct
@@ -36,7 +37,7 @@ typedef struct
 } perception_output_t;
 
 /**
- * @brief TTC calculation output (Task B internal).
+ * @brief TTC calculation output (Decision internal).
  * @req FR-DEC-001, FR-DEC-002
  */
 typedef struct
@@ -47,7 +48,7 @@ typedef struct
 } ttc_output_t;
 
 /**
- * @brief FSM output (Task B -> Tasks C, D, E).
+ * @brief FSM output (Decision -> Execution, CAN, UDS).
  * @req FR-FSM-001
  */
 typedef struct
@@ -60,7 +61,10 @@ typedef struct
     float32_t state_timer;    /**< s                       */
 } fsm_output_t;
 
-/** @brief PID brake output (Task C -> Task D TX). */
+/**
+ * @brief PID brake output (PID brake -> CAN TX).
+ * @req FR-BRK-007
+ */
 typedef struct
 {
     float32_t brake_pct;      /**< [0, 100] %              */
@@ -68,7 +72,7 @@ typedef struct
 } pid_output_t;
 
 /**
- * @brief Alert output (Task C -> GPIO).
+ * @brief Alert output (Alert logic -> GPIO).
  * @req FR-ALR-001, FR-ALR-002
  */
 typedef struct
@@ -78,7 +82,10 @@ typedef struct
     uint8_t   buzzer_cmd;     /**< 0..4 (beep pattern)     */
 } alert_output_t;
 
-/** @brief Driver inputs (Task D RX -> Tasks B, C). */
+/**
+ * @brief Driver inputs (CAN RX -> Decision, Execution).
+ * @req FR-PER-004, FR-PER-005, FR-PER-008
+ */
 typedef struct
 {
     uint8_t   brake_pedal;    /**< boolean                 */
