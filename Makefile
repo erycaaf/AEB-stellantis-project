@@ -18,6 +18,7 @@ SRC_ALL = src/communication/aeb_can.c \
           src/decision/aeb_fsm.c \
           src/execution/aeb_pid.c \
           src/execution/aeb_alert.c \
+          src/integration/aeb_core.c \
           stubs/can_hal.c
 
 # ── Test source sets ─────────────────────────────────────────────────────
@@ -37,6 +38,8 @@ SRC_ALERT_TEST = src/execution/aeb_alert.c tests/test_alert.c
 
 SRC_UDS_TEST = src/communication/aeb_uds.c tests/test_uds.c
 
+SRC_INTEGRATION_TEST = $(SRC_ALL) tests/test_integration.c
+
 # ── MISRA — all non-stub sources ────────────────────────────────────────
 
 SRC_MISRA = src/communication/aeb_can.c \
@@ -45,12 +48,13 @@ SRC_MISRA = src/communication/aeb_can.c \
             src/decision/aeb_ttc.c \
             src/decision/aeb_fsm.c \
             src/execution/aeb_pid.c \
-            src/execution/aeb_alert.c
+            src/execution/aeb_alert.c \
+            src/integration/aeb_core.c
 
 # ── Test binaries ────────────────────────────────────────────────────────
 
 TEST_BINS = test_smoke test_can test_perception test_decision \
-            test_pid test_alert test_uds
+            test_pid test_alert test_uds test_integration
 
 .PHONY: build test misra clean
 
@@ -84,6 +88,9 @@ test_alert: $(SRC_ALERT_TEST)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 test_uds: $(SRC_UDS_TEST)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+test_integration: $(SRC_INTEGRATION_TEST)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 misra:
