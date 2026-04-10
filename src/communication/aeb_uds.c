@@ -2,6 +2,7 @@
  * @file aeb_uds.c
  * @brief UDS Diagnostics server — C translation of Simulink UDS_Server.
  *
+ * Direct translation of the MATLAB Function block (chart_117):
  *   - Persistent variables  ->  uds_state_t struct members.
  *   - Immediate DTC latch (DD-UDS-01).
  *   - Scaled integer encoding for DIDs (DD-UDS-03 encoding).
@@ -10,7 +11,6 @@
  *
  * @req FR-UDS-001..005, FR-COD-001, FR-COD-003
  *
- * @author  Rian Linhares
  * @version 1.0
  * @date 2026-04
  */
@@ -70,7 +70,7 @@ static void uds_handle_read_did(const uds_request_t *request,
                                 const ttc_output_t *ttc_out)
 {
     uint16_t requested_id;
-    uint16_t scaled_val;
+    uint16_t scaled_val = 0U;
 
     requested_id = ((uint16_t)request->did_high * 256U)
                  + (uint16_t)request->did_low;
