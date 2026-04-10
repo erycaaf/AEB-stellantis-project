@@ -114,4 +114,19 @@ typedef enum
 #define AEB_FAULT_RADAR    ((uint8_t)0x02U)
 #define AEB_FAULT_CAN_TO   ((uint8_t)0x80U)
 
+
+/**
+ * @brief Raw sensor input (CAN RX / test harness -> Perception).
+ * @req FR-PER-001, FR-PER-002, FR-PER-003
+ */
+typedef struct
+{
+    float32_t radar_d;        /**< Radar distance [m]              */
+    float32_t radar_vr;       /**< Radar relative velocity [m/s]   */
+    float32_t lidar_d;        /**< LiDAR distance [m]              */
+    float32_t v_ego;          /**< Ego vehicle speed [m/s]         */
+    uint8_t   can_timeout;    /**< CAN frame missed deadline       */
+    uint8_t   fi;             /**< Fault injection (V&V only)      */
+} raw_sensor_input_t;
+
 #endif /* AEB_TYPES_H */
