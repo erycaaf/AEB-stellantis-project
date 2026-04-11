@@ -1,0 +1,25 @@
+name: AEB CI — Build, Test & MISRA Check
+
+on:
+  pull_request:
+    branches: [development, main]
+  push:
+    branches: [development, main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+
+      - name: Build (zero-warning gate)
+        run: make build
+
+      - name: Run unit tests
+        run: make test
+
+      - name: MISRA C:2012 check (cppcheck)
+        run: make misra

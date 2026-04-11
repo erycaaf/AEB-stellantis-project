@@ -1,0 +1,21 @@
+# Build artefacts
+*.o
+*.exe
+test_smoke
+test_can
+test_perception
+test_decision
+test_pid
+test_alert
+test_uds
+test_integration
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS
+Thumbs.db
+.DS_Store
