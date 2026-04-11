@@ -164,6 +164,38 @@ This modular structure supports portability, maintainability, and bidirectional 
 | Sensor fusion | ISO 15622 | ✅ Weighted radar + lidar |
 
 ---
+
+## AI-Assisted Development
+
+This project used Large Language Model (LLM) assistants as a development support tool during the embedded C implementation phase. The use of AI was guided by the team's implementation strategy document and followed a structured prompt methodology to ensure consistency, traceability, and compliance with project standards.
+
+### Principles
+
+All AI-generated code was treated as a **draft that requires human validation**. The following principles were applied throughout the project:
+
+1. **Human accountability** — Every team member remains fully responsible for the code submitted under their name. AI output was reviewed, tested, and modified before integration.
+2. **Specification-driven prompts** — Prompts were constructed from authoritative project artefacts: the SRS v2.0, the Simulink model (AEB_Integration.slx), the interface contract (`aeb_types.h`, `aeb_config.h`), and the applicable MISRA C:2012 rules.
+3. **Verification before commit** — All AI-generated code was compiled with strict warnings (`-Wall -Wextra -Wpedantic -std=c99`), validated against unit tests, and checked for MISRA compliance before being committed to the repository.
+4. **Traceability preserved** — AI-generated code follows the same requirement-to-code traceability as manually written code. Every function includes `@requirement` tags linking to SRS identifiers.
+
+### Tools Used
+
+| Tool | Provider | Usage |
+|---|---|---|
+| Claude (Opus / Sonnet) | Anthropic | Code generation, test creation, design documentation, code review preparation |
+| DeepSeek | DeepSeek AI | Code generation support |
+
+### Scope of AI Assistance
+
+| Activity | AI Role | Human Role |
+|---|---|---|
+| C module implementation | Generate initial code from structured prompts containing interface contracts, Simulink logic, and requirements | Review for correctness, MISRA compliance, and architectural consistency |
+| Unit test creation | Generate test cases covering requirement acceptance criteria and boundary conditions | Validate test logic, verify assertion correctness, add domain-specific scenarios |
+| Code review preparation | Draft PR descriptions and design rationale | Review and adjust content for accuracy |
+| MISRA compliance fixes | Suggest restructuring for single exit point, const qualifiers, NULL guards | Verify fix correctness and re-run static analysis |
+
+---
+
 ## Authors
 - Eryca Francyele de Moura e Silva
 - Jéssica Roberta de Souza Santos
