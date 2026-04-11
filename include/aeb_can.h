@@ -48,7 +48,7 @@
  * @brief Raw sensor data decoded from CAN RX frames.
  *
  * Populated by can_rx_process() from AEB_EgoVehicle (0x100) and
- * AEB_RadarTarget (0x120).  Consumed by Task A (Perception).
+ * AEB_RadarTarget (0x120).  Consumed by the Perception module.
  */
 typedef struct
 {
@@ -135,8 +135,8 @@ void can_check_timeout(can_state_t *state);
  * @brief Transmit AEB_BrakeCmd (0x080) — every 10 ms cycle.
  *
  * @param[in,out] state    Module state (alive counter incremented).
- * @param[in]     pid_out  PID brake output from Task C.
- * @param[in]     fsm_out  FSM output from Task B.
+ * @param[in]     pid_out  PID brake output from the PID module.
+ * @param[in]     fsm_out  FSM output from the FSM module.
  * @return CAN_OK on success, CAN_ERR_TX on failure.
  *
  * @req FR-CAN-003  DBC signal encoding.
@@ -149,7 +149,7 @@ int32_t can_tx_brake_cmd(can_state_t       *state,
  * @brief Transmit AEB_FSMState (0x200) — every 50 ms (5 × 10 ms ticks).
  *
  * @param[in,out] state    Module state (cycle counter checked).
- * @param[in]     fsm_out  FSM output from Task B.
+ * @param[in]     fsm_out  FSM output from the FSM module.
  * @return CAN_OK if transmitted, 1 if not yet due, CAN_ERR_TX on failure.
  *
  * @req FR-CAN-001  Transmit ego dynamics at fixed cycle.
@@ -160,7 +160,7 @@ int32_t can_tx_fsm_state(can_state_t       *state,
 /**
  * @brief Transmit AEB_Alert (0x300) — event-driven, call when alert changes.
  *
- * @param[in] alert_out  Alert output from Task C.
+ * @param[in] alert_out  Alert output from the Alert module.
  * @return CAN_OK on success, CAN_ERR_TX on failure.
  *
  * @req FR-CAN-003  DBC signal encoding.
