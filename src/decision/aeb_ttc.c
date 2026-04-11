@@ -62,7 +62,7 @@ void ttc_process(const perception_output_t * const perception,
         return;
     }
 
-    /* FR-DEC-003: Use v_rel directly from perception (Task A already computed it) */
+    /* FR-DEC-003: Use v_rel directly from perception (the Perception module already computed it) */
     /* Set closing flag (v_rel > V_REL_MIN means approaching) */
     ttc_out->is_closing = (perception->v_rel > V_REL_MIN) ? 1U : 0U;
 

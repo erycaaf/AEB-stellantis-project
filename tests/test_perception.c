@@ -1,6 +1,6 @@
 /**
  * @file    test_perception.c
- * @brief   Unit tests for the AEB Perception module (Task A).
+ * @brief   Unit tests for the AEB Perception module.
  *
  * Compile and run on PC (no Zephyr / hardware dependency):
  *
