@@ -1,0 +1,246 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <world name="aeb_highway">
+
+    <!-- Physics -->
+    <physics type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+      <ode>
+        <solver>
+          <type>quick</type>
+          <iters>50</iters>
+        </solver>
+      </ode>
+    </physics>
+
+    <!-- Sun -->
+    <light name="sun" type="directional">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 100 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <direction>-0.3 0.2 -1.0</direction>
+    </light>
+
+    <!-- Ambient light -->
+    <light name="ambient" type="directional">
+      <cast_shadows>false</cast_shadows>
+      <pose>0 0 50 0 0 0</pose>
+      <diffuse>0.4 0.4 0.5 1</diffuse>
+      <specular>0.0 0.0 0.0 1</specular>
+      <direction>0.1 -0.3 -1.0</direction>
+    </light>
+
+    <!-- Ground plane -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>500 100</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.8</mu>
+                <mu2>0.8</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>500 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.3 0.5 0.3 1</ambient>
+            <diffuse>0.3 0.5 0.3 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Asphalt road: 300m long, 2 lanes (7.4m wide) -->
+    <road name="highway">
+      <width>7.4</width>
+      <point>-50 0 0.01</point>
+      <point>300 0 0.01</point>
+      <material>
+        <script>
+          <uri>file://media/materials/scripts/gazebo.material</uri>
+          <name>Gazebo/Road</name>
+        </script>
+      </material>
+    </road>
+
+    <!-- Center lane marking -->
+    <road name="center_line">
+      <width>0.15</width>
+      <point>-50 0 0.02</point>
+      <point>300 0 0.02</point>
+      <material>
+        <script>
+          <uri>file://media/materials/scripts/gazebo.material</uri>
+          <name>Gazebo/White</name>
+        </script>
+      </material>
+    </road>
+
+    <!-- Right lane marking -->
+    <road name="right_line">
+      <width>0.15</width>
+      <point>-50 -3.7 0.02</point>
+      <point>300 -3.7 0.02</point>
+      <material>
+        <script>
+          <uri>file://media/materials/scripts/gazebo.material</uri>
+          <name>Gazebo/White</name>
+        </script>
+      </material>
+    </road>
+
+    <!-- Left lane marking -->
+    <road name="left_line">
+      <width>0.15</width>
+      <point>-50 3.7 0.02</point>
+      <point>300 3.7 0.02</point>
+      <material>
+        <script>
+          <uri>file://media/materials/scripts/gazebo.material</uri>
+          <name>Gazebo/White</name>
+        </script>
+      </material>
+    </road>
+
+    <!-- ============ EGO VEHICLE (hatchback_blue) ============ -->
+    <model name="ego_vehicle">
+      <pose>0 -1.85 0 0 0 0</pose>
+      <link name="chassis">
+        <inertial>
+          <mass>1500.0</mass>
+          <inertia>
+            <ixx>500</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>1500</iyy><iyz>0</iyz><izz>1500</izz>
+          </inertia>
+        </inertial>
+        <visual name="body">
+          <pose>0 0 0 0 0 1.5708</pose>
+          <geometry>
+            <mesh>
+              <scale>0.0254 0.0254 0.0254</scale>
+              <uri>model://hatchback_blue/meshes/hatchback.obj</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <collision name="collision">
+          <pose>0 0 0.7 0 0 0</pose>
+          <geometry><box><size>4.5 1.8 1.4</size></box></geometry>
+        </collision>
+
+        <!-- Front lidar (radar approximation) -->
+        <sensor name="front_lidar" type="ray">
+          <pose>2.2 0 0.2 0 0 0</pose>
+          <always_on>true</always_on>
+          <update_rate>50</update_rate>
+          <visualize>true</visualize>
+          <ray>
+            <scan>
+              <horizontal>
+                <samples>180</samples>
+                <resolution>1</resolution>
+                <min_angle>-0.2618</min_angle>
+                <max_angle>0.2618</max_angle>
+              </horizontal>
+            </scan>
+            <range>
+              <min>0.5</min>
+              <max>260.0</max>
+              <resolution>0.01</resolution>
+            </range>
+            <noise><type>gaussian</type><mean>0</mean><stddev>0.15</stddev></noise>
+          </ray>
+          <plugin name="lidar_ros" filename="libgazebo_ros_ray_sensor.so">
+            <ros><namespace>/aeb</namespace><remapping>~/out:=scan</remapping></ros>
+            <output_type>sensor_msgs/LaserScan</output_type>
+            <frame_name>ego_lidar</frame_name>
+          </plugin>
+        </sensor>
+
+      </link>
+
+      <plugin name="ego_move" filename="libgazebo_ros_planar_move.so">
+        <ros><namespace>/aeb/ego</namespace></ros>
+        <command_topic>cmd_vel</command_topic>
+        <odometry_topic>odom</odometry_topic>
+        <odometry_frame>odom</odometry_frame>
+        <robot_base_frame>ego_vehicle</robot_base_frame>
+        <odometry_rate>100.0</odometry_rate>
+        <publish_odom>true</publish_odom>
+        <publish_odom_tf>true</publish_odom_tf>
+      </plugin>
+    </model>
+
+    <!-- ============ TARGET VEHICLE (suv) ============ -->
+    <model name="target_vehicle">
+      <pose>100 -1.85 0 0 0 0</pose>
+      <link name="chassis">
+        <inertial>
+          <mass>2000.0</mass>
+          <inertia>
+            <ixx>700</ixx><ixy>0</ixy><ixz>0</ixz>
+            <iyy>2000</iyy><iyz>0</iyz><izz>2000</izz>
+          </inertia>
+        </inertial>
+        <visual name="body">
+          <pose>0 0 0 0 0 -1.5708</pose>
+          <geometry>
+            <mesh>
+              <scale>0.06 0.06 0.06</scale>
+              <uri>model://suv/meshes/suv.obj</uri>
+            </mesh>
+          </geometry>
+        </visual>
+        <collision name="collision">
+          <pose>0 0 0.9 0 0 0</pose>
+          <geometry><box><size>4.8 2.0 1.8</size></box></geometry>
+        </collision>
+      </link>
+
+      <plugin name="target_move" filename="libgazebo_ros_planar_move.so">
+        <ros><namespace>/aeb/target</namespace></ros>
+        <command_topic>cmd_vel</command_topic>
+        <odometry_topic>odom</odometry_topic>
+        <odometry_frame>odom_target</odometry_frame>
+        <robot_base_frame>target_vehicle</robot_base_frame>
+        <odometry_rate>100.0</odometry_rate>
+        <publish_odom>true</publish_odom>
+        <publish_odom_tf>true</publish_odom_tf>
+      </plugin>
+    </model>
+
+    <!-- Camera: user-defined view showing both vehicles -->
+    <gui fullscreen="0">
+      <camera name="user_camera">
+        <pose>1.687 -45.415 35.389 0.0 0.526 0.9428</pose>
+        <view_controller>orbit</view_controller>
+      </camera>
+    </gui>
+
+    <!-- ROS2 Gazebo bridge plugin -->
+    <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so">
+      <ros>
+        <namespace>/aeb</namespace>
+      </ros>
+      <update_rate>100.0</update_rate>
+    </plugin>
+
+  </world>
+</sdf>
