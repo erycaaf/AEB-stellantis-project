@@ -1,0 +1,25 @@
+##############################################################################
+# Dockerfile — ROS 2 ↔ SocketCAN bridge
+#
+# Runs ros2_socketcan to translate between ROS 2 CAN frame topics
+# and raw CAN frames on vcan0.
+##############################################################################
+FROM osrf/ros:humble-desktop
+
+ENV DEBIAN_FRONTEND=noninteractive
+SHELL ["/bin/bash", "-c"]
+
+RUN apt-get update && apt-get install -y \
+    ros-humble-ros2-socketcan \
+    ros-humble-can-msgs \
+    can-utils \
+    iproute2 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the bridge launch script
+COPY docker/canbridge /app
+
+RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc
+
+WORKDIR /app
