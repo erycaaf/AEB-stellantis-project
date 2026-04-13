@@ -1,0 +1,46 @@
+##############################################################################
+# Dockerfile — Zephyr AEB ECU (native_sim + SocketCAN)
+#
+# Uses the Zephyr CI image (has west + SDK toolchain).
+# Fetches Zephyr kernel sources via west init/update.
+# Builds the AEB app targeting native_sim with CAN.
+##############################################################################
+FROM ghcr.io/zephyrproject-rtos/ci:v0.26.13
+
+ENV DEBIAN_FRONTEND=noninteractive
+SHELL ["/bin/bash", "-c"]
+
+RUN apt-get update && apt-get install -y \
+    can-utils \
+    iproute2 \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Fetch Zephyr kernel ────────────────────────────────────────────────────
+WORKDIR /opt/zephyrproject
+RUN west init -m https://github.com/zephyrproject-rtos/zephyr --mr v3.6.0 && \
+    west update --narrow -o=--depth=1
+
+ENV ZEPHYR_BASE=/opt/zephyrproject/zephyr
+
+# Install Zephyr's Python deps
+RUN pip3 install -r ${ZEPHYR_BASE}/scripts/requirements.txt
+
+# ── Copy AEB application ─────────────────────────────────────────────────
+WORKDIR /app
+COPY zephyr_aeb /app/zephyr_aeb
+
+# Clone the repo C sources
+RUN git clone --depth 1 https://github.com/erycaaf/AEB-stellantis-project.git /app/zephyr_aeb/repo
+
+# Patch FSM: continue braking below V_EGO_MIN (distance floors apply)
+RUN python3 /app/zephyr_aeb/patch_fsm.py /app/zephyr_aeb/repo/src/decision/aeb_fsm.c
+
+# ── Build ─────────────────────────────────────────────────────────────────
+RUN west build /app/zephyr_aeb \
+        -b native_sim \
+        -d /app/build \
+    2>&1 || { echo "=== BUILD FAILED ==="; \
+              cat /app/build/CMakeFiles/CMakeError.log 2>/dev/null | tail -80; \
+              cat /app/build/CMakeFiles/CMakeOutput.log 2>/dev/null | tail -20; \
+              exit 1; }

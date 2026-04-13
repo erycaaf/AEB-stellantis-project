@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEB Simulation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0d1117;
+            color: #e0e0e0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* ── Layout: simulation top, dashboard bottom ─────── */
+        .layout {
+            display: grid;
+            grid-template-rows: 1fr auto;
+            height: 100vh;
+        }
+
+        /* ── Gazebo 3D (top) ──────────────────────────────── */
+        .sim-view {
+            position: relative;
+            background: #000;
+        }
+        .sim-view iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* ── Scenario controls (floating over sim) ────────── */
+        .scenario-bar {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 6px 12px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            z-index: 10;
+        }
+        .scenario-bar select {
+            padding: 5px 8px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-size: 12px;
+        }
+        .scenario-bar .btn {
+            padding: 5px 14px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-go   { background: #198754; color: white; }
+        .btn-halt { background: #dc3545; color: white; }
+        .btn-redo { background: #fd7e14; color: white; }
+        .btn:hover { opacity: 0.85; }
+
+        .scenario-bar .info {
+            font-size: 11px;
+            color: #888;
+            max-width: 200px;
+        }
+
+        .status-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: #555;
+            display: inline-block;
+        }
+        .status-dot.running  { background: #4CAF50; box-shadow: 0 0 6px #4CAF50; }
+        .status-dot.stopped  { background: #dc3545; }
+        .status-dot.starting { background: #ffc107; }
+
+        /* ── Car Dashboard (bottom) ───────────────────────── */
+        .dashboard {
+            background: linear-gradient(180deg, #16213e 0%, #0f0f23 100%);
+            border-top: 2px solid #0f3460;
+            height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            padding: 0 20px;
+        }
+
+        /* ── Speedometer (left) ───────────────────────────── */
+        .speedo {
+            width: 200px;
+            height: 200px;
+            position: relative;
+        }
+        .speedo canvas { width: 200px; height: 200px; }
+
+        /* ── Center cluster ───────────────────────────────── */
+        .cluster {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 420px;
+            padding: 0 20px;
+        }
+
+        /* FSM state bar */
+        .fsm-row {
+            display: flex;
+            gap: 3px;
+            height: 32px;
+        }
+        .fsm-cell {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: bold;
+            background: #1a1a2e;
+            color: #444;
+            border: 1px solid #222;
+            transition: all 0.3s;
+        }
+        .fsm-cell.on { color: white; border-color: transparent; }
+        .fsm-off.on      { background: #6c757d; }
+        .fsm-stby.on     { background: #198754; }
+        .fsm-warn.on     { background: #ffc107; color: #000; }
+        .fsm-l1.on       { background: #fd7e14; }
+        .fsm-l2.on       { background: #dc3545; }
+        .fsm-l3.on       { background: #9b0000; }
+        .fsm-post.on     { background: #6f42c1; }
+
+        /* TTC bar */
+        .ttc-box {
+            background: #1a1a2e;
+            border-radius: 6px;
+            padding: 6px 10px;
+            border: 1px solid #222;
+            position: relative;
+            height: 40px;
+            overflow: hidden;
+        }
+        .ttc-fill {
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            border-radius: 6px;
+            transition: width 0.15s, background 0.3s;
+        }
+        .ttc-text {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 100%;
+        }
+        .ttc-text .lbl { font-size: 10px; color: #888; text-transform: uppercase; }
+        .ttc-text .val { font-size: 20px; font-weight: bold; font-family: 'Courier New', monospace; }
+
+        /* Info row: distance + target speed */
+        .info-row {
+            display: flex;
+            gap: 6px;
+        }
+        .info-cell {
+            flex: 1;
+            background: #1a1a2e;
+            border-radius: 6px;
+            padding: 6px 10px;
+            border: 1px solid #222;
+            text-align: center;
+        }
+        .info-cell .val {
+            font-size: 22px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+        }
+        .info-cell .lbl { font-size: 9px; color: #666; text-transform: uppercase; }
+        .dist-val { color: #75b798; }
+        .tgt-val  { color: #6ea8fe; }
+
+        /* ── Alert indicators (right of cluster) ──────────── */
+        .alerts {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 80px;
+        }
+        .alert-lamp {
+            width: 70px;
+            height: 44px;
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #1a1a2e;
+            border: 2px solid #222;
+            transition: all 0.3s;
+        }
+        .alert-lamp .icon { font-size: 18px; }
+        .alert-lamp .lbl  { font-size: 8px; color: #555; text-transform: uppercase; }
+        .alert-lamp.on-vis  { background: #FFD600; border-color: #FFD600; }
+        .alert-lamp.on-vis .icon { color: #333; }
+        .alert-lamp.on-vis .lbl  { color: #333; }
+        .alert-lamp.on-aud  { background: #FF5722; border-color: #FF5722; }
+        .alert-lamp.on-aud .icon, .alert-lamp.on-aud .lbl { color: white; }
+
+        /* ── Brake bar (far right) ────────────────────────── */
+        .brake-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            width: 60px;
+        }
+        .brake-bar-outer {
+            width: 36px;
+            height: 150px;
+            background: #1a1a2e;
+            border: 1px solid #333;
+            border-radius: 6px;
+            position: relative;
+            overflow: hidden;
+        }
+        .brake-bar-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            border-radius: 0 0 5px 5px;
+            transition: height 0.15s, background 0.2s;
+        }
+        .brake-pct {
+            font-size: 16px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            color: #e94560;
+        }
+        .brake-lbl { font-size: 9px; color: #666; text-transform: uppercase; }
+
+        /* ── Scenario result overlay ──────────────────────── */
+        .result-overlay {
+            position: absolute;
+            bottom: 230px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 8px 24px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            z-index: 20;
+            display: none;
+        }
+        .result-pass { background: rgba(25,135,84,0.9); color: white; display: block; }
+        .result-fail { background: rgba(220,53,69,0.9); color: white; display: block; }
+    </style>
+</head>
+<body>
+
+<div class="layout">
+
+    <!-- ── Top: Gazebo 3D ──────────────────────────────────────────────── -->
+    <div class="sim-view">
+        <iframe id="gazeboFrame" src="/novnc/vnc_lite.html?autoconnect=true&resize=remote&host=localhost&port=6080"></iframe>
+
+        <!-- Floating scenario controls -->
+        <div class="scenario-bar">
+            <span class="status-dot" id="statusDot"></span>
+            <select id="scenarioSelect"><option>Loading...</option></select>
+            <button class="btn btn-go" onclick="startScenario()">Start</button>
+            <button class="btn btn-halt" onclick="stopScenario()">Stop</button>
+            <button class="btn btn-redo" onclick="restartScenario()">Reset</button>
+            <span class="info" id="scenarioInfo"></span>
+        </div>
+
+        <div class="result-overlay" id="resultOverlay"></div>
+    </div>
+
+    <!-- ── Bottom: Car Dashboard ───────────────────────────────────────── -->
+    <div class="dashboard">
+
+        <!-- Speedometer -->
+        <div class="speedo">
+            <canvas id="speedoCanvas" width="200" height="200"></canvas>
+        </div>
+
+        <!-- Center cluster -->
+        <div class="cluster">
+            <!-- FSM state -->
+            <div class="fsm-row">
+                <div class="fsm-cell fsm-off"  id="f0">OFF</div>
+                <div class="fsm-cell fsm-stby on" id="f1">STBY</div>
+                <div class="fsm-cell fsm-warn" id="f2">WARN</div>
+                <div class="fsm-cell fsm-l1"   id="f3">L1</div>
+                <div class="fsm-cell fsm-l2"   id="f4">L2</div>
+                <div class="fsm-cell fsm-l3"   id="f5">L3</div>
+                <div class="fsm-cell fsm-post" id="f6">POST</div>
+            </div>
+
+            <!-- TTC bar -->
+            <div class="ttc-box">
+                <div class="ttc-fill" id="ttcFill"></div>
+                <div class="ttc-text">
+                    <span class="lbl">Time to Collision</span>
+                    <span class="val" id="ttcVal">-- s</span>
+                </div>
+            </div>
+
+            <!-- Distance + target speed -->
+            <div class="info-row">
+                <div class="info-cell">
+                    <div class="val dist-val" id="distVal">--</div>
+                    <div class="lbl">Distance (m)</div>
+                </div>
+                <div class="info-cell">
+                    <div class="val tgt-val" id="tgtVal">--</div>
+                    <div class="lbl">Target (km/h)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert lamps -->
+        <div class="alerts">
+            <div class="alert-lamp" id="lampVis">
+                <span class="icon">&#9888;</span>
+                <span class="lbl">Visual</span>
+            </div>
+            <div class="alert-lamp" id="lampAud">
+                <span class="icon">&#9835;</span>
+                <span class="lbl">Buzzer</span>
+            </div>
+        </div>
+
+        <!-- Brake bar -->
+        <div class="brake-col">
+            <div class="brake-lbl">Brake</div>
+            <div class="brake-bar-outer">
+                <div class="brake-bar-fill" id="brakeFill"></div>
+            </div>
+            <div class="brake-pct" id="brakePct">0%</div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// ═════════════════════════════════════════════════════════════════════════
+//  Speedometer (canvas arc gauge)
+// ═════════════════════════════════════════════════════════════════════════
+
+const speedoCtx = document.getElementById('speedoCanvas').getContext('2d');
+
+function drawSpeedo(speed, maxSpeed) {
+    const W = 200, H = 200, cx = W/2, cy = H/2 + 10, R = 80;
+    const ms = maxSpeed || 80;
+    speedoCtx.clearRect(0, 0, W, H);
+
+    // Arc background
+    speedoCtx.beginPath();
+    speedoCtx.arc(cx, cy, R, Math.PI, 0, false);
+    speedoCtx.lineWidth = 12;
+    speedoCtx.strokeStyle = '#333';
+    speedoCtx.stroke();
+
+    // Arc filled
+    const frac = Math.min(1, Math.max(0, speed / ms));
+    if (frac > 0.01) {
+        const endAngle = Math.PI + Math.PI * frac;
+        const color = frac < 0.5 ? '#4CAF50' : (frac < 0.75 ? '#FF9800' : '#F44336');
+        speedoCtx.beginPath();
+        speedoCtx.arc(cx, cy, R, Math.PI, endAngle, false);
+        speedoCtx.lineWidth = 14;
+        speedoCtx.strokeStyle = color;
+        speedoCtx.lineCap = 'round';
+        speedoCtx.stroke();
+    }
+
+    // Tick marks
+    speedoCtx.lineWidth = 1.5;
+    speedoCtx.strokeStyle = '#666';
+    speedoCtx.fillStyle = '#aaa';
+    speedoCtx.font = '9px sans-serif';
+    speedoCtx.textAlign = 'center';
+    speedoCtx.textBaseline = 'middle';
+    for (let i = 0; i <= ms; i += 10) {
+        const a = Math.PI * (1 - i / ms);
+        const x1 = cx + (R - 12) * Math.cos(a), y1 = cy - (R - 12) * Math.sin(a);
+        const x2 = cx + R * Math.cos(a), y2 = cy - R * Math.sin(a);
+        speedoCtx.beginPath(); speedoCtx.moveTo(x1, y1); speedoCtx.lineTo(x2, y2); speedoCtx.stroke();
+        const tx = cx + (R - 24) * Math.cos(a), ty = cy - (R - 24) * Math.sin(a);
+        speedoCtx.fillText(String(i), tx, ty);
+    }
+
+    // Needle
+    const na = Math.PI * (1 - frac);
+    speedoCtx.beginPath();
+    speedoCtx.moveTo(cx, cy);
+    speedoCtx.lineTo(cx + 60 * Math.cos(na), cy - 60 * Math.sin(na));
+    speedoCtx.lineWidth = 3;
+    speedoCtx.strokeStyle = '#FF1744';
+    speedoCtx.lineCap = 'round';
+    speedoCtx.stroke();
+
+    // Center dot
+    speedoCtx.beginPath();
+    speedoCtx.arc(cx, cy, 5, 0, 2 * Math.PI);
+    speedoCtx.fillStyle = '#FF1744';
+    speedoCtx.fill();
+
+    // Digital readout
+    speedoCtx.fillStyle = 'white';
+    speedoCtx.font = 'bold 28px Courier New';
+    speedoCtx.textAlign = 'center';
+    speedoCtx.fillText(speed.toFixed(0), cx, cy + 24);
+    speedoCtx.fillStyle = '#888';
+    speedoCtx.font = '11px sans-serif';
+    speedoCtx.fillText('km/h', cx, cy + 40);
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  Dashboard update functions
+// ═════════════════════════════════════════════════════════════════════════
+
+function updateFSM(state) {
+    for (let i = 0; i <= 6; i++) {
+        const el = document.getElementById('f' + i);
+        el.classList.toggle('on', i === state);
+    }
+}
+
+function updateTTC(ttc) {
+    const fill = document.getElementById('ttcFill');
+    const val = document.getElementById('ttcVal');
+    const frac = Math.min(1, Math.max(0, ttc / 6));
+    const color = ttc > 4 ? '#4CAF50' : (ttc > 3 ? '#FF9800' : (ttc > 2 ? '#FF5722' : '#D50000'));
+    fill.style.width = (frac * 100) + '%';
+    fill.style.background = color;
+    val.textContent = ttc < 10 ? ttc.toFixed(1) + ' s' : '> 10 s';
+    val.style.color = color;
+}
+
+function updateAlerts(vis, aud) {
+    document.getElementById('lampVis').className = 'alert-lamp' + (vis ? ' on-vis' : '');
+    document.getElementById('lampAud').className = 'alert-lamp' + (aud ? ' on-aud' : '');
+}
+
+function updateBrake(pct) {
+    const fill = document.getElementById('brakeFill');
+    const label = document.getElementById('brakePct');
+    const f = Math.min(100, Math.max(0, pct));
+    fill.style.height = f + '%';
+    fill.style.background = f < 50 ? '#FF9800' : '#F44336';
+    label.textContent = f.toFixed(0) + '%';
+}
+
+function showResult(text) {
+    const el = document.getElementById('resultOverlay');
+    if (!text) { el.style.display = 'none'; return; }
+    const pass = text.includes('STOPPED');
+    el.textContent = text;
+    el.className = 'result-overlay ' + (pass ? 'result-pass' : 'result-fail');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  API
+// ═════════════════════════════════════════════════════════════════════════
+
+const API = '/api';
+
+async function loadScenarios() {
+    try {
+        const r = await fetch(API + '/scenarios');
+        const d = await r.json();
+        const sel = document.getElementById('scenarioSelect');
+        sel.innerHTML = '';
+        d.scenarios.forEach(s => {
+            const o = document.createElement('option');
+            o.value = s.id;
+            o.textContent = s.name;
+            o.dataset.info = `Ego ${s.ego_speed_kmh} km/h | Gap ${s.initial_gap_m} m`;
+            sel.appendChild(o);
+        });
+        sel.onchange = () => {
+            const opt = sel.options[sel.selectedIndex];
+            document.getElementById('scenarioInfo').textContent = opt.dataset.info || '';
+        };
+        sel.onchange();
+    } catch(e) { console.warn('API not ready'); }
+}
+
+async function startScenario() {
+    const id = document.getElementById('scenarioSelect').value;
+    if (!id) return;
+    resetDashboard();
+    setDot('starting');
+    await fetch(API + '/scenarios/start', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({scenario: id})
+    });
+    setDot('running');
+}
+
+async function stopScenario() {
+    await fetch(API + '/scenarios/stop', {method: 'POST'});
+    setDot('stopped');
+}
+
+async function restartScenario() {
+    resetDashboard();
+    await fetch(API + '/scenarios/restart', {method: 'POST'});
+    setDot('running');
+}
+
+function resetDashboard() {
+    t = 0;
+    showResult('');
+    drawSpeedo(0, 80);
+    updateFSM(1);
+    updateTTC(10);
+    updateBrake(0);
+    updateAlerts(false, false);
+    document.getElementById('distVal').textContent = '--';
+    document.getElementById('tgtVal').textContent = '--';
+}
+
+function setDot(status) {
+    const d = document.getElementById('statusDot');
+    d.className = 'status-dot ' + status;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  Live data from Zephyr ECU via API
+// ═════════════════════════════════════════════════════════════════════════
+
+const FSM_MAP = {
+    'OFF': 0, 'STANDBY': 1, 'WARNING': 2,
+    'BRAKE_L1': 3, 'BRAKE_L2': 4, 'BRAKE_L3': 5, 'POST_BRAKE': 6
+};
+
+let t = 0;
+async function tick() {
+    try {
+        const resp = await fetch(API + '/live');
+        const d = await resp.json();
+
+        const speed = d.speed_kmh || 0;
+        const dist  = d.distance || 0;
+        const brake = d.brake_pct || 0;
+        const ttc   = d.ttc || 10;
+        const fsm   = FSM_MAP[d.fsm_state] || 0;
+        const vis   = fsm >= 2 && fsm <= 5;
+        const aud   = fsm >= 2 && fsm <= 5;
+
+        drawSpeedo(speed, 80);
+        updateFSM(fsm);
+        updateTTC(ttc);
+        updateBrake(brake);
+        updateAlerts(vis, aud);
+        document.getElementById('distVal').textContent = dist.toFixed(1);
+        document.getElementById('tgtVal').textContent = '0';
+
+        // Update status dot based on FSM
+        if (speed < 0.5 && dist > 0 && dist < 100 && d.fsm_state === 'POST_BRAKE') {
+            showResult('STOPPED: gap=' + dist.toFixed(1) + 'm');
+        }
+
+        // Set running dot if we have real data
+        if (speed > 0.5 || brake > 0) {
+            setDot('running');
+        }
+
+    } catch (e) {
+        drawSpeedo(0, 80);
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  Init
+// ═════════════════════════════════════════════════════════════════════════
+
+loadScenarios();
+drawSpeedo(0, 80);
+setInterval(tick, 100);
+</script>
+
+</body>
+</html>

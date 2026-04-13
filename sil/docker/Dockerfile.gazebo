@@ -1,0 +1,51 @@
+##############################################################################
+# Dockerfile — Gazebo + ROS 2 Humble + AEB Gazebo package
+##############################################################################
+FROM osrf/ros:humble-desktop
+
+ENV DEBIAN_FRONTEND=noninteractive
+SHELL ["/bin/bash", "-c"]
+
+# Install Gazebo + tools
+RUN apt-get update && apt-get install -y \
+    ros-humble-ros-gz \
+    ros-humble-gazebo-ros-pkgs \
+    ros-humble-rosbridge-server \
+    x11vnc \
+    xvfb \
+    novnc \
+    websockify \
+    can-utils \
+    iproute2 \
+    python3-pip \
+    python3-colcon-common-extensions \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install pyyaml python-can
+
+# Create colcon workspace and copy package
+RUN mkdir -p /ws/src
+COPY aeb_gazebo /ws/src/aeb_gazebo
+
+# Build the ROS 2 package (generates custom messages + installs launch files)
+WORKDIR /ws
+RUN source /opt/ros/humble/setup.bash && \
+    colcon build --symlink-install
+
+# Source both ROS and workspace on every shell
+RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc && \
+    echo "source /ws/install/setup.bash" >> /root/.bashrc
+
+# Install xdotool to auto-maximize and hide Gazebo panels
+RUN apt-get update && apt-get install -y xdotool && rm -rf /var/lib/apt/lists/*
+
+# Gazebo GUI config: start maximized, hide left panel
+RUN mkdir -p /root/.gazebo/gui/default && printf '\
+[geometry]\n\
+x=0\n\
+y=0\n\
+width=1280\n\
+height=720\n\
+' > /root/.gazebo/gui.ini
+
+EXPOSE 5900 6080 9090
