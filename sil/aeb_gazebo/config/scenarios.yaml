@@ -1,0 +1,87 @@
+# Euro NCAP CCR Test Scenarios
+# All speeds in km/h, distances in meters, decelerations in m/s^2
+
+scenarios:
+  # CCRs: Car-to-Car Rear Stationary
+  ccrs_20:
+    name: "CCRs - Ego 20 km/h"
+    ego_speed_kmh: 20.0
+    target_speed_kmh: 0.0
+    initial_gap_m: 100.0
+    target_decel: 0.0
+    target_brake_time: 0.0
+    pass_criterion: "v_impact < 5 km/h"
+
+  ccrs_30:
+    name: "CCRs - Ego 30 km/h"
+    ego_speed_kmh: 30.0
+    target_speed_kmh: 0.0
+    initial_gap_m: 100.0
+    target_decel: 0.0
+    target_brake_time: 0.0
+    pass_criterion: "v_impact < 5 km/h"
+
+  ccrs_40:
+    name: "CCRs - Ego 40 km/h"
+    ego_speed_kmh: 40.0
+    target_speed_kmh: 0.0
+    initial_gap_m: 100.0
+    target_decel: 0.0
+    target_brake_time: 0.0
+    pass_criterion: "v_impact < 5 km/h"
+
+  ccrs_50:
+    name: "CCRs - Ego 50 km/h"
+    ego_speed_kmh: 50.0
+    target_speed_kmh: 0.0
+    initial_gap_m: 100.0
+    target_decel: 0.0
+    target_brake_time: 0.0
+    pass_criterion: "v_impact < 5 km/h"
+
+  # CCRm: Car-to-Car Rear Moving
+  ccrm:
+    name: "CCRm - Ego 50 km/h, Target 20 km/h"
+    ego_speed_kmh: 50.0
+    target_speed_kmh: 20.0
+    initial_gap_m: 100.0
+    target_decel: 0.0
+    target_brake_time: 0.0
+    pass_criterion: "delta_v >= 20 km/h"
+
+  # CCRb: Car-to-Car Rear Braking
+  ccrb_d2_g12:
+    name: "CCRb - Decel 2 m/s2, Gap 12m"
+    ego_speed_kmh: 50.0
+    target_speed_kmh: 50.0
+    initial_gap_m: 12.0
+    target_decel: -2.0
+    target_brake_time: 2.0
+    pass_criterion: "v_impact < 15 km/h"
+
+  ccrb_d2_g40:
+    name: "CCRb - Decel 2 m/s2, Gap 40m"
+    ego_speed_kmh: 50.0
+    target_speed_kmh: 50.0
+    initial_gap_m: 40.0
+    target_decel: -2.0
+    target_brake_time: 2.0
+    pass_criterion: "v_impact < 15 km/h"
+
+  ccrb_d6_g12:
+    name: "CCRb - Decel 6 m/s2, Gap 12m"
+    ego_speed_kmh: 50.0
+    target_speed_kmh: 50.0
+    initial_gap_m: 12.0
+    target_decel: -6.0
+    target_brake_time: 2.0
+    pass_criterion: "v_impact < 15 km/h"
+
+  ccrb_d6_g40:
+    name: "CCRb - Decel 6 m/s2, Gap 40m"
+    ego_speed_kmh: 50.0
+    target_speed_kmh: 50.0
+    initial_gap_m: 40.0
+    target_decel: -6.0
+    target_brake_time: 2.0
+    pass_criterion: "v_impact < 15 km/h"
