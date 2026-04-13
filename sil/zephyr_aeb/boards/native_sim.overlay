@@ -1,0 +1,1 @@
+/* DTS overlay for native_sim — no SocketCAN needed (using TCP CAN bus) */
