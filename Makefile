@@ -100,3 +100,151 @@ misra:
 
 clean:
 	rm -f $(TEST_BINS) *.o
+
+
+# ==========================================================================
+# MC/DC Coverage (ASIL-D) — PID + Alert
+# ==========================================================================
+# Requisitos (uma vez):
+#   sudo apt install -y gcc-14
+#   pip install gcovr --break-system-packages
+#
+# Uso:
+#   make mcdc        — rodar cobertura MC/DC e gerar relatório HTML
+#   make mcdc-clean  — limpar artefatos MC/DC
+# ==========================================================================
+
+MCDC_CC       = gcc-14
+MCDC_CFLAGS   = --coverage -fcondition-coverage -std=c99 \
+                -Wall -Wextra -Wpedantic -Iinclude -Istubs
+MCDC_LDFLAGS  = -lm
+MCDC_DIR      = coverage_mcdc
+
+.PHONY: mcdc mcdc-clean
+
+mcdc:
+	@echo "=== Building MC/DC test binaries (gcc-14 -fcondition-coverage) ==="
+	@rm -rf $(MCDC_DIR) && mkdir -p $(MCDC_DIR)
+	$(MCDC_CC) $(MCDC_CFLAGS) -c src/execution/aeb_pid.c   -o $(MCDC_DIR)/aeb_pid.o
+	$(MCDC_CC) $(MCDC_CFLAGS) -c src/execution/aeb_alert.c -o $(MCDC_DIR)/aeb_alert.o
+	$(MCDC_CC) $(MCDC_CFLAGS) $(MCDC_DIR)/aeb_pid.o   tests/test_pid.c        $(MCDC_LDFLAGS) -o $(MCDC_DIR)/test_pid
+	$(MCDC_CC) $(MCDC_CFLAGS) $(MCDC_DIR)/aeb_pid.o   tests/test_pid_mcdc.c   $(MCDC_LDFLAGS) -o $(MCDC_DIR)/test_pid_mcdc
+	$(MCDC_CC) $(MCDC_CFLAGS) $(MCDC_DIR)/aeb_alert.o tests/test_alert.c      $(MCDC_LDFLAGS) -o $(MCDC_DIR)/test_alert
+	$(MCDC_CC) $(MCDC_CFLAGS) $(MCDC_DIR)/aeb_alert.o tests/test_alert_mcdc.c $(MCDC_LDFLAGS) -o $(MCDC_DIR)/test_alert_mcdc
+	@echo "=== Running tests ==="
+	cd $(MCDC_DIR) && ./test_pid        > /dev/null
+	cd $(MCDC_DIR) && ./test_pid_mcdc   > /dev/null
+	cd $(MCDC_DIR) && ./test_alert      > /dev/null
+	cd $(MCDC_DIR) && ./test_alert_mcdc > /dev/null
+	@echo ""
+	@echo "=== MC/DC Summary (gcov-14 native) ==="
+	@cd $(MCDC_DIR) && gcov-14 --conditions -b -c aeb_pid.gcda   2>/dev/null | head -10
+	@cd $(MCDC_DIR) && gcov-14 --conditions -b -c aeb_alert.gcda 2>/dev/null | head -10
+	@echo ""
+	@echo "=== Generating HTML report (gcovr) ==="
+	cd $(MCDC_DIR) && gcovr --gcov-executable='gcov-14 --conditions' \
+	                         --root=.. \
+	                         --filter='.*/src/execution/.*' \
+	                         --html-details report.html \
+	                         --xml coverage.xml \
+	                         --txt-summary
+	@echo ""
+	@echo "=== DONE ==="
+	@echo "Open: $(MCDC_DIR)/report.html"
+
+mcdc-clean:
+	rm -rf $(MCDC_DIR)
+
+# ==========================================================================
+# Fault Injection Tests (ASIL-D Robustness)
+# ==========================================================================
+
+FAULT_DIR = fault_tests
+
+.PHONY: fault fault-clean
+
+fault:
+	@echo "=== Building fault injection tests ==="
+	@rm -rf $(FAULT_DIR) && mkdir -p $(FAULT_DIR)
+	$(CC) $(CFLAGS) src/execution/aeb_pid.c   tests/test_pid_fault.c   $(LDFLAGS) -o $(FAULT_DIR)/test_pid_fault
+	$(CC) $(CFLAGS) src/execution/aeb_alert.c tests/test_alert_fault.c $(LDFLAGS) -o $(FAULT_DIR)/test_alert_fault
+	@echo ""
+	@echo "=== Running PID fault tests ==="
+	-./$(FAULT_DIR)/test_pid_fault   | tee $(FAULT_DIR)/pid_fault.log
+	@echo ""
+	@echo "=== Running Alert fault tests ==="
+	-./$(FAULT_DIR)/test_alert_fault | tee $(FAULT_DIR)/alert_fault.log
+	@echo ""
+	@echo "=== Logs saved in $(FAULT_DIR)/ ==="
+
+fault-clean:
+	rm -rf $(FAULT_DIR)
+
+
+# ==========================================================================
+# Memory Safety Verification (ASIL-D)
+# ==========================================================================
+# Requisitos (uma vez):
+#   sudo apt install -y valgrind
+#
+# Uso:
+#   make memory          — roda Valgrind + ASan + UBSan em toda a suíte
+#   make memory-valgrind — só Valgrind
+#   make memory-asan     — só AddressSanitizer + UBSan
+#   make memory-clean    — limpa artefatos
+# ==========================================================================
+
+MEM_DIR      = memory_safety
+SAN_CFLAGS   = -fsanitize=address,undefined -fno-omit-frame-pointer -g -O1 \
+               -std=c99 -Wall -Wextra -Iinclude -Istubs
+
+.PHONY: memory memory-valgrind memory-asan memory-clean
+
+memory: memory-valgrind memory-asan
+	@echo ""
+	@echo "=== Memory Safety: todos os checks concluídos ==="
+	@echo "Logs: $(MEM_DIR)/valgrind/  e  $(MEM_DIR)/sanitizers/"
+
+memory-valgrind: $(TEST_BINS)
+	@mkdir -p $(MEM_DIR)/valgrind
+	@echo "=== Valgrind (leak-check=full) ==="
+	@for t in $(TEST_BINS); do \
+		valgrind --leak-check=full \
+		         --show-leak-kinds=all \
+		         --errors-for-leak-kinds=all \
+		         --error-exitcode=1 \
+		         --track-origins=yes \
+		         --log-file=$(MEM_DIR)/valgrind/$$t.log \
+		         ./$$t > /dev/null 2>&1; \
+		ec=$$?; \
+		sum=$$(grep "ERROR SUMMARY" $(MEM_DIR)/valgrind/$$t.log | head -1); \
+		if [ $$ec -eq 0 ]; then \
+			printf "  OK  %-20s  %s\n" $$t "$$sum"; \
+		else \
+			printf "  FAIL %-20s  %s\n" $$t "$$sum"; \
+		fi; \
+	done
+
+memory-asan:
+	@mkdir -p $(MEM_DIR)/bin $(MEM_DIR)/sanitizers
+	@echo "=== AddressSanitizer + UBSan ==="
+	$(CC) $(SAN_CFLAGS) $(SRC_SMOKE)        -lm -o $(MEM_DIR)/bin/san_smoke
+	$(CC) $(SAN_CFLAGS) $(SRC_CAN_TEST)     -lm -o $(MEM_DIR)/bin/san_can
+	$(CC) $(SAN_CFLAGS) $(SRC_PERCEPTION_TEST)  -lm -o $(MEM_DIR)/bin/san_perception
+	$(CC) $(SAN_CFLAGS) $(SRC_DECISION_TEST)    -lm -o $(MEM_DIR)/bin/san_decision
+	$(CC) $(SAN_CFLAGS) $(SRC_PID_TEST)         -lm -o $(MEM_DIR)/bin/san_pid
+	$(CC) $(SAN_CFLAGS) $(SRC_ALERT_TEST)       -lm -o $(MEM_DIR)/bin/san_alert
+	$(CC) $(SAN_CFLAGS) $(SRC_UDS_TEST)         -lm -o $(MEM_DIR)/bin/san_uds
+	$(CC) $(SAN_CFLAGS) $(SRC_INTEGRATION_TEST) -lm -o $(MEM_DIR)/bin/san_integration
+	@for t in smoke can perception decision pid alert uds integration; do \
+		$(MEM_DIR)/bin/san_$$t > $(MEM_DIR)/sanitizers/$$t.log 2>&1; \
+		ec=$$?; \
+		if [ $$ec -eq 0 ]; then \
+			printf "  OK  san_test_%-15s  PASS (0 errors)\n" $$t; \
+		else \
+			printf "  FAIL san_test_%-15s  exit=%d — ver %s.log\n" $$t $$ec $$t; \
+		fi; \
+	done
+
+memory-clean:
+	rm -rf $(MEM_DIR)
