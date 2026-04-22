@@ -132,9 +132,8 @@ misra:
 
 # ── ASIL-D V&V targets (Decision: TTC + FSM) ───────────────────────────
 #
-# Mirrors the convention established in reports/vv_uds/ (Renato). Binaries
-# and intermediates land inside reports/vv_decision/; only text/XML/CSV
-# evidence is committed to git (see .gitignore).
+# Binaries and intermediate coverage files land inside reports/vv_decision/;
+# only text/XML/CSV evidence is committed to git (see .gitignore).
 
 mcdc-decision:
 	@rm -rf $(VV_REPORT_DIR)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR)/coverage_mcdc

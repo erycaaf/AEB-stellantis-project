@@ -7,9 +7,8 @@ Reproducible evidence for the independent cross-validation of
 Aligned to the ISO 26262-6:2018 ASIL-D.
 
 The consolidated V&V report (`Consolidated_Report_VV_Decision.pdf` and its
-`.tex` source) lives in the team documentation area, **outside this repo**,
-alongside the equivalent reports for PID/Alert and UDS. Only the
-machine-generated evidence (logs, XML, gcov output, CSV) and the
+`.tex` source) lives in the team documentation area, **outside this repo**.
+Only the machine-generated evidence (logs, XML, gcov output, CSV) and the
 reproducibility build targets live here.
 
 ## Reproduce everything
@@ -31,18 +30,18 @@ This runs:
 
 ## Artefact map (current)
 
-| File | Source activity | What it is |
+| File | Produced by | What it is |
 |---|---|---|
-| `coverage_mcdc/run.log` | 1 — coverage | Test execution log (9 nominal + 36 MC/DC = 45 PASS) |
-| `coverage_mcdc/coverage_summary.txt` | 1 — coverage | gcovr merged summary (aggregate across both binaries) |
-| `coverage_mcdc/coverage.xml` | 1 — coverage | gcovr Cobertura XML for CI consumption |
-| `coverage_mcdc/gcov_summary.txt` | 1 — coverage | gcov-14 per-binary metrics (MCDC binary only) |
-| `coverage_mcdc/aeb_ttc.c.gcov` | 1 — coverage | Line-by-line annotated source (TTC) |
-| `coverage_mcdc/aeb_fsm.c.gcov` | 1 — coverage | Line-by-line annotated source (FSM) |
-| `fault_injection/run.log` | 3 — fault | Fault-injection test execution log (32 assertions, 21 PASS, 11 FAIL) |
-| `memory_safety/run.log` | 4 — memory | Consolidated `make memory-decision` execution log |
-| `memory_safety/valgrind_*.log` (×3) | 4 — memory | Per-binary Valgrind stderr (empty file ⇔ 0 errors) |
-| `memory_safety/ubsan_*.log` (×3) | 4 — memory | Per-binary ASan + UBSan stderr (empty file ⇔ 0 errors) |
+| `coverage_mcdc/run.log` | MC/DC coverage | Test execution log (9 nominal + 36 MC/DC = 45 PASS) |
+| `coverage_mcdc/coverage_summary.txt` | MC/DC coverage | gcovr merged summary (aggregate across both binaries) |
+| `coverage_mcdc/coverage.xml` | MC/DC coverage | gcovr Cobertura XML for CI consumption |
+| `coverage_mcdc/gcov_summary.txt` | MC/DC coverage | gcov-14 per-binary metrics (MCDC binary only) |
+| `coverage_mcdc/aeb_ttc.c.gcov` | MC/DC coverage | Line-by-line annotated source (TTC) |
+| `coverage_mcdc/aeb_fsm.c.gcov` | MC/DC coverage | Line-by-line annotated source (FSM) |
+| `fault_injection/run.log` | Fault injection | Fault-injection test execution log (32 assertions, 21 PASS, 11 FAIL) |
+| `memory_safety/run.log` | Memory safety | Consolidated `make memory-decision` execution log |
+| `memory_safety/valgrind_*.log` (×3) | Memory safety | Per-binary Valgrind stderr (empty file ⇔ 0 errors) |
+| `memory_safety/ubsan_*.log` (×3) | Memory safety | Per-binary ASan + UBSan stderr (empty file ⇔ 0 errors) |
 
 The HTML report (`report.html` + `report.*.html` + `report.css` + `report.js`)
 is regenerated locally by `make mcdc-decision` but **not committed** — browse
@@ -128,20 +127,21 @@ that the tool ran to completion with zero diagnostics — the Makefile
 target echoes `(clean)` into `run.log` whenever a per-tool log is zero
 bytes. See `run.log` for the full step-by-step execution trace.
 
-### Why no UB reports from the fault suite
+### Why the fault-injection suite produces no UB reports
 
-UBSan flagged two `float-cast-overflow`
-sites when NaN/±Inf reached `(uint16_t)(ttc * 100.0f)` scaled casts — the
-decision module keeps all calculations in `float32_t` end to end. No
-float→integer conversions means no `float-cast-overflow` triggers,
-regardless of the inputs thrown at it.
+UBSan's `-fsanitize=float-cast-overflow` only fires on implicit
+`float → integer` conversions whose operand is outside the target type's
+representable range (NaN, ±Inf, values beyond `INT_MAX`, etc.). The
+decision module holds every calculation in `float32_t` from input to
+output — there is no `(uint16_t)` or `(int32_t)` cast on the data path,
+and therefore no cast for NaN/±Inf to turn into undefined behaviour.
 
 The four vulnerabilities catalogued by the fault-injection suite are
 therefore **semantic defects** (NaN/±Inf propagation, SEU interpretation,
 guard bypass via NaN comparison) rather than memory-safety violations or
 IEEE 754 undefined behaviour. This is exactly the split that ISO 26262-6
-anticipates by requiring Tab. 8 item 1d (memory safety) and Tab. 11 item
-1e (fault injection) as separate ++ techniques.
+anticipates by requiring Table 8 item 1d (memory safety) and Table 11
+item 1e (fault injection) as separate ++ techniques for ASIL-D.
 
 ## Functional Test Excel
 

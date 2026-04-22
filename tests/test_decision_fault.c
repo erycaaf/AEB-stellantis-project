@@ -282,8 +282,7 @@ static void fault_c2_fsm_state_255(void)
  *  Code checks (driver->aeb_enabled == 0U); any non-zero bit pattern —
  *  including a SEU-corrupted 0xAA — is interpreted as "enabled". A fail-safe
  *  design should treat any non-canonical Boolean as disabled. Expected to
- *  FAIL until driver->aeb_enabled is normalized to {0,1} on entry
- *  (Bug candidate #2, analogous to Rian's UDS Bug #2). */
+ *  FAIL until driver->aeb_enabled is normalized to {0,1} on entry. */
 static void fault_c3_aeb_enabled_0xAA(void)
 {
     fault_reset();
