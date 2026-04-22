@@ -50,13 +50,13 @@ Standard: ISO 26262-6 Table 12 item 1c (ASIL-D)
 
 --- Group C: evaluate_desired_state bands ---
   ✅ PASS: C1: WARNING → STANDBY when is_closing=0 (FR-DEC-004)
-  ✅ PASS: C2: WARNING → BRAKE_L3 when d_brake ≥ distance (FR-DEC-005)
-  ✅ PASS: C3: distance ≤ 5 m → BRAKE_L3 (FR-DEC-005 floor)
-  ✅ PASS: C4: 5 < distance ≤ 10 m → BRAKE_L2 (FR-DEC-006)
-  ✅ PASS: C5: 10 < distance ≤ 20 m → BRAKE_L1 (FR-DEC-007)
-  ✅ PASS: C6: ttc ≤ TTC_BRAKE_L3 → BRAKE_L3 (FR-DEC-008)
-  ✅ PASS: C7: TTC_BRAKE_L3 < ttc ≤ TTC_BRAKE_L2 → BRAKE_L2 (FR-DEC-009)
-  ✅ PASS: C8: TTC_BRAKE_L2 < ttc ≤ TTC_BRAKE_L1 → BRAKE_L1 (FR-DEC-010)
+  ✅ PASS: C2: WARNING → BRAKE_L3 when d_brake ≥ distance (FR-DEC-003)
+  ✅ PASS: C3: distance ≤ 5 m → BRAKE_L3 (FR-DEC-004 + Table 10)
+  ✅ PASS: C4: 5 < distance ≤ 10 m → BRAKE_L2 (FR-DEC-004 + Table 10)
+  ✅ PASS: C5: 10 < distance ≤ 20 m → BRAKE_L1 (FR-DEC-004 + Table 10)
+  ✅ PASS: C6: ttc ≤ TTC_BRAKE_L3 → BRAKE_L3 (FR-DEC-004 + Table 10)
+  ✅ PASS: C7: TTC_BRAKE_L3 < ttc ≤ TTC_BRAKE_L2 → BRAKE_L2 (FR-DEC-004 + Table 10)
+  ✅ PASS: C8: TTC_BRAKE_L2 < ttc ≤ TTC_BRAKE_L1 → BRAKE_L1 (FR-DEC-004 + Table 10)
   ✅ PASS: C9: TTC_BRAKE_L1 < ttc ≤ TTC_WARNING → stays WARNING
   ✅ PASS: C10: ttc > TTC_WARNING → STANDBY (else branch in evaluate_desired_state)
 
@@ -65,16 +65,15 @@ Standard: ISO 26262-6 Table 12 item 1c (ASIL-D)
   ✅ PASS: D2: v_ego > V_EGO_MAX forces STANDBY
   ✅ PASS: D3: BRAKE_L3 with v_ego≈0 transitions to POST_BRAKE (speed-guard branch)
 
---- Group E: POST_BRAKE transitions (FR-FSM-005) ---
-  ✅ PASS: E1: POST_BRAKE → STANDBY after 2 s timeout (FR-FSM-005)
-  ✅ PASS: E2: POST_BRAKE → STANDBY on accel_pedal (FR-FSM-005)
+--- Group E: POST_BRAKE transitions (FR-FSM-006 + FR-BRK-005/006) ---
+  ✅ PASS: E1: POST_BRAKE → STANDBY after 2 s timeout (FR-FSM-006 + FR-BRK-005)
+  ✅ PASS: E2: POST_BRAKE → STANDBY on accel_pedal (FR-FSM-006 + FR-BRK-006)
   ✅ PASS: E3: POST_BRAKE holds for < 2 s without accel input
 
 --- Group F: WARNING debounce ---
   ✅ PASS: F1: WARNING holds during debounce (< 0.2 s)
 
 --- Group G: BRAKE transitions ---
-  ✅ PASS: G1: BRAKE_L1 with v_ego≈0 reaches POST_BRAKE (speed-guard path)
   ✅ PASS: G2: BRAKE_L1 → BRAKE_L3 on escalation (immediate, no debounce)
   ✅ PASS: G3: BRAKE_L3 → BRAKE_L1 after 0.2 s debounce (de-escalation)
 
@@ -82,13 +81,19 @@ Standard: ISO 26262-6 Table 12 item 1c (ASIL-D)
   ✅ PASS: H1: STANDBY → WARNING on desired=WARNING
   ✅ PASS: H2: STANDBY with desired=BRAKE forced to WARNING first (FR-DEC-011)
 
---- Group I: steering override (FR-FSM-006) ---
-  ✅ PASS: I1: steering > +5° forces STANDBY (FR-FSM-006)
-  ✅ PASS: I2: steering < -5° forces STANDBY (FR-FSM-006)
+--- Group I: steering override (FR-DEC-007) ---
+  ✅ PASS: I1: steering > +5° forces STANDBY (FR-DEC-007)
+  ✅ PASS: I2: steering < -5° forces STANDBY (FR-DEC-007)
 
---- Group J: AEB disabled (FR-FSM-003) ---
-  ✅ PASS: J1: aeb_enabled=0 forces FSM_OFF (FR-FSM-003)
+--- Group J: AEB disabled (FR-FSM-002) ---
+  ✅ PASS: J1: aeb_enabled=0 forces FSM_OFF (FR-FSM-002)
+
+--- Group K: complementary requirement-based cases ---
+  ✅ PASS: K1: POST_BRAKE ignores brake pedal (FR-FSM-006)
+  ✅ PASS: K2: POST_BRAKE ignores steering override (FR-FSM-006)
+  ✅ PASS: K3: v_ego < V_STOP_THRESHOLD in STANDBY stays STANDBY (FR-DEC-008)
+  ✅ PASS: K4: STANDBY with desired=BRAKE_L1 forced to WARNING (FR-DEC-011)
 
 ========================================
-RESULTS: 36 passed, 0 failed
+RESULTS: 39 passed, 0 failed
 ========================================

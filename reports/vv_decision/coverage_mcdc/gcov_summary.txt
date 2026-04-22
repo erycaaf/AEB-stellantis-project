@@ -11,7 +11,7 @@ Lines executed:52.38% of 21
 File 'src/decision/aeb_fsm.c'
 Lines executed:98.72% of 156
 Branches executed:100.00% of 108
-Taken at least once:91.67% of 108
+Taken at least once:95.37% of 108
 Calls executed:100.00% of 3
 Creating 'aeb_fsm.c.gcov'
 

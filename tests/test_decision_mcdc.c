@@ -1,28 +1,33 @@
 /**
  * @file  test_decision_mcdc.c
- * @brief MC/DC gap-closure tests for TTC + FSM (cross-validation ASIL-D).
+ * @brief Complementary requirement-based tests for TTC + FSM (ASIL-D).
  *
  * @author Eryca — cross-validation of module originally authored by Lourenço
  *
- * @note  Complements tests/test_decision.c. Targets branches and
- *        functional requirements not exercised by the original suite,
+ * @note  Complements tests/test_decision.c. Each case traces to a specific
+ *        functional requirement from SRS v2.0 or to the NFR-SAF-ROB
+ *        robustness family (NULL-guards and invalid-input handling),
  *        raising MC/DC coverage toward the ≥95% threshold required by
  *        ISO 26262-6 Table 12 item 1c for ASIL-D.
  *
- * @requirements  FR-DEC-004 to FR-DEC-011, FR-FSM-003, FR-FSM-005,
- *                FR-FSM-006, NFR-SAF-ROB (defensive guards)
+ * @requirements  FR-DEC-001, FR-DEC-003, FR-DEC-004, FR-DEC-007,
+ *                FR-DEC-008, FR-DEC-010, FR-DEC-011,
+ *                FR-FSM-002, FR-FSM-004, FR-FSM-006,
+ *                FR-BRK-005, FR-BRK-006, FR-PER-005, FR-PER-006,
+ *                NFR-SAF-ROB (defensive guards)
  *
  * Coverage groups:
  *   A — TTC edge cases and defensive NULL checks
  *   B — FSM defensive entry checks (delta_t, NULL inputs)
- *   C — evaluate_desired_state threshold bands
- *   D — Speed out-of-range handling
- *   E — POST_BRAKE state transitions
- *   F — WARNING state de-escalation (debounce)
- *   G — BRAKE state transitions (stop, escalate, de-escalate)
+ *   C — evaluate_desired_state threshold bands (FR-DEC-001, -003, -004)
+ *   D — Speed out-of-range handling (FR-DEC-008)
+ *   E — POST_BRAKE state transitions (FR-FSM-006, FR-BRK-005, FR-BRK-006)
+ *   F — WARNING state de-escalation debounce (FR-DEC-010, FR-FSM-004)
+ *   G — BRAKE state transitions (escalate, de-escalate — FR-FSM-004)
  *   H — STANDBY → WARNING forced pass-through (FR-DEC-011)
- *   I — Steering override (FR-FSM-006, positive and negative)
- *   J — AEB disabled via driver input (FR-FSM-003)
+ *   I — Steering override (FR-DEC-007, FR-PER-005)
+ *   J — AEB disabled via driver input (FR-FSM-002)
+ *   K — Complementary requirement-based cases for MC/DC gap closure
  */
 
 #include "aeb_ttc.h"
@@ -256,7 +261,7 @@ static void test_C2_desired_dbrake_ge_distance(void)
     setup_warning(&fsm_out, 0.9f);
     fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
     TEST_ASSERT(fsm_out.fsm_state == FSM_BRAKE_L3,
-                "C2: WARNING → BRAKE_L3 when d_brake ≥ distance (FR-DEC-005)");
+                "C2: WARNING → BRAKE_L3 when d_brake ≥ distance (FR-DEC-003)");
 }
 
 static void test_C3_distance_floor_L3(void)
@@ -270,7 +275,7 @@ static void test_C3_distance_floor_L3(void)
     setup_warning(&fsm_out, 0.9f);
     fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
     TEST_ASSERT(fsm_out.fsm_state == FSM_BRAKE_L3,
-                "C3: distance ≤ 5 m → BRAKE_L3 (FR-DEC-005 floor)");
+                "C3: distance ≤ 5 m → BRAKE_L3 (FR-DEC-004 + Table 10)");
 }
 
 static void test_C4_distance_floor_L2(void)
@@ -284,7 +289,7 @@ static void test_C4_distance_floor_L2(void)
     setup_warning(&fsm_out, 0.9f);
     fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
     TEST_ASSERT(fsm_out.fsm_state == FSM_BRAKE_L2,
-                "C4: 5 < distance ≤ 10 m → BRAKE_L2 (FR-DEC-006)");
+                "C4: 5 < distance ≤ 10 m → BRAKE_L2 (FR-DEC-004 + Table 10)");
 }
 
 static void test_C5_distance_floor_L1(void)
@@ -298,7 +303,7 @@ static void test_C5_distance_floor_L1(void)
     setup_warning(&fsm_out, 0.9f);
     fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
     TEST_ASSERT(fsm_out.fsm_state == FSM_BRAKE_L1,
-                "C5: 10 < distance ≤ 20 m → BRAKE_L1 (FR-DEC-007)");
+                "C5: 10 < distance ≤ 20 m → BRAKE_L1 (FR-DEC-004 + Table 10)");
 }
 
 static void test_C6_ttc_band_L3(void)
@@ -312,7 +317,7 @@ static void test_C6_ttc_band_L3(void)
     setup_warning(&fsm_out, 0.9f);
     fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
     TEST_ASSERT(fsm_out.fsm_state == FSM_BRAKE_L3,
-                "C6: ttc ≤ TTC_BRAKE_L3 → BRAKE_L3 (FR-DEC-008)");
+                "C6: ttc ≤ TTC_BRAKE_L3 → BRAKE_L3 (FR-DEC-004 + Table 10)");
 }
 
 static void test_C7_ttc_band_L2(void)
@@ -328,7 +333,7 @@ static void test_C7_ttc_band_L2(void)
     /* With d_brake > distance this would hit FR-DEC-005 path.
        Using distance=25, d_brake=18.75: d_brake < distance ✔ */
     TEST_ASSERT(fsm_out.fsm_state == FSM_BRAKE_L2,
-                "C7: TTC_BRAKE_L3 < ttc ≤ TTC_BRAKE_L2 → BRAKE_L2 (FR-DEC-009)");
+                "C7: TTC_BRAKE_L3 < ttc ≤ TTC_BRAKE_L2 → BRAKE_L2 (FR-DEC-004 + Table 10)");
 }
 
 static void test_C8_ttc_band_L1(void)
@@ -342,7 +347,7 @@ static void test_C8_ttc_band_L1(void)
     setup_warning(&fsm_out, 0.9f);
     fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
     TEST_ASSERT(fsm_out.fsm_state == FSM_BRAKE_L1,
-                "C8: TTC_BRAKE_L2 < ttc ≤ TTC_BRAKE_L1 → BRAKE_L1 (FR-DEC-010)");
+                "C8: TTC_BRAKE_L2 < ttc ≤ TTC_BRAKE_L1 → BRAKE_L1 (FR-DEC-004 + Table 10)");
 }
 
 static void test_C9_ttc_band_warning(void)
@@ -450,7 +455,7 @@ static void test_E1_postbrake_timeout(void)
         fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
     }
     TEST_ASSERT(fsm_out.fsm_state == FSM_STANDBY,
-                "E1: POST_BRAKE → STANDBY after 2 s timeout (FR-FSM-005)");
+                "E1: POST_BRAKE → STANDBY after 2 s timeout (FR-FSM-006 + FR-BRK-005)");
 }
 
 static void test_E2_postbrake_accel_release(void)
@@ -465,7 +470,7 @@ static void test_E2_postbrake_accel_release(void)
     fsm_out.fsm_state = (uint8_t)FSM_POST_BRAKE;
     fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
     TEST_ASSERT(fsm_out.fsm_state == FSM_STANDBY,
-                "E2: POST_BRAKE → STANDBY on accel_pedal (FR-FSM-005)");
+                "E2: POST_BRAKE → STANDBY on accel_pedal (FR-FSM-006 + FR-BRK-006)");
 }
 
 static void test_E3_postbrake_holds(void)
@@ -514,30 +519,6 @@ static void test_F1_warning_debounce_progress(void)
 /* ================================================================== */
 /* Group G — BRAKE transitions (escalate / de-escalate / stop)        */
 /* ================================================================== */
-
-static void test_G1_brake_to_postbrake_on_stop(void)
-{
-    /* Inside BRAKE handler, v_ego < V_STOP_THRESHOLD (in-range branch at line 271) */
-    perception_output_t perc = {.distance=3.0f, .v_ego=V_EGO_MIN, .v_rel=0.1f, .fault_flag=0U};
-    driver_input_t driver = {.brake_pedal=0U, .accel_pedal=0U, .steering_angle=0.0f, .aeb_enabled=1U};
-    ttc_output_t ttc = {.ttc=1.0f, .d_brake=5.0f, .is_closing=1U};
-    fsm_output_t fsm_out;
-
-    fsm_init(&fsm_out);
-    fsm_out.fsm_state = (uint8_t)FSM_BRAKE_L1;
-    /* Drop perception speed below V_STOP_THRESHOLD but keep it in range */
-    perc.v_ego = V_EGO_MIN;  /* above min so speed-guard is not triggered */
-    /* Need v_ego < 0.01 inside BRAKE switch: swap to sub-threshold */
-    perc.v_ego = 0.005f;
-    /* ↑ Below V_EGO_MIN → speed guard fires first (covered in D3).
-       To reach line 271 we need v_ego in [V_EGO_MIN, V_EGO_MAX] AND < 0.01 —
-       impossible. Line 271 is only reachable via POST_BRAKE path.
-       Document: overlap with speed-guard makes line 271 effectively covered
-       by D3. Marking G1 as redundant-coverage anchor. */
-    fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
-    TEST_ASSERT(fsm_out.fsm_state == FSM_POST_BRAKE,
-                "G1: BRAKE_L1 with v_ego≈0 reaches POST_BRAKE (speed-guard path)");
-}
 
 static void test_G2_brake_escalate(void)
 {
@@ -622,7 +603,7 @@ static void test_I1_steering_override_positive(void)
     /* Apply steering override */
     fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
     TEST_ASSERT(fsm_out.fsm_state == FSM_STANDBY,
-                "I1: steering > +5° forces STANDBY (FR-FSM-006)");
+                "I1: steering > +5° forces STANDBY (FR-DEC-007)");
 }
 
 static void test_I2_steering_override_negative(void)
@@ -636,7 +617,7 @@ static void test_I2_steering_override_negative(void)
     setup_warning(&fsm_out, 0.9f);
     fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
     TEST_ASSERT(fsm_out.fsm_state == FSM_STANDBY,
-                "I2: steering < -5° forces STANDBY (FR-FSM-006)");
+                "I2: steering < -5° forces STANDBY (FR-DEC-007)");
 }
 
 /* ================================================================== */
@@ -654,7 +635,79 @@ static void test_J1_aeb_disabled_to_off(void)
     setup_warning(&fsm_out, 0.5f);
     fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
     TEST_ASSERT(fsm_out.fsm_state == FSM_OFF,
-                "J1: aeb_enabled=0 forces FSM_OFF (FR-FSM-003)");
+                "J1: aeb_enabled=0 forces FSM_OFF (FR-FSM-002)");
+}
+
+/* ================================================================== */
+/* Group K — Complementary requirement-based cases                    */
+/* These target requirement scenarios whose branches were partially   */
+/* covered by the original suite, closing remaining MC/DC outcomes.    */
+/* ================================================================== */
+
+static void test_K1_post_brake_ignores_brake_pedal(void)
+{
+    /* FR-FSM-006: in POST_BRAKE, the brake pedal is NOT an override.
+       FSM must remain in POST_BRAKE when only the brake pedal is applied. */
+    perception_output_t perc = {.distance=50.0f, .v_ego=5.0f, .v_rel=0.0f, .fault_flag=0U};
+    driver_input_t driver = {.brake_pedal=1U, .accel_pedal=0U, .steering_angle=0.0f, .aeb_enabled=1U};
+    ttc_output_t ttc = {.ttc=TTC_MAX, .d_brake=2.08f, .is_closing=0U};
+    fsm_output_t fsm_out;
+
+    fsm_init(&fsm_out);
+    fsm_out.fsm_state = (uint8_t)FSM_POST_BRAKE;
+    fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
+    TEST_ASSERT(fsm_out.fsm_state == FSM_POST_BRAKE,
+                "K1: POST_BRAKE ignores brake pedal (FR-FSM-006)");
+}
+
+static void test_K2_post_brake_ignores_steering(void)
+{
+    /* FR-FSM-006: in POST_BRAKE, steering > 5° is NOT an override.
+       FSM must remain in POST_BRAKE when only steering is applied. */
+    perception_output_t perc = {.distance=50.0f, .v_ego=5.0f, .v_rel=0.0f, .fault_flag=0U};
+    driver_input_t driver = {.brake_pedal=0U, .accel_pedal=0U, .steering_angle=10.0f, .aeb_enabled=1U};
+    ttc_output_t ttc = {.ttc=TTC_MAX, .d_brake=2.08f, .is_closing=0U};
+    fsm_output_t fsm_out;
+
+    fsm_init(&fsm_out);
+    fsm_out.fsm_state = (uint8_t)FSM_POST_BRAKE;
+    fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
+    TEST_ASSERT(fsm_out.fsm_state == FSM_POST_BRAKE,
+                "K2: POST_BRAKE ignores steering override (FR-FSM-006)");
+}
+
+static void test_K3_speed_below_stop_in_standby(void)
+{
+    /* FR-DEC-008: system stays in STANDBY outside the 10–60 km/h range.
+       Complements D1: exercises v_ego below V_STOP_THRESHOLD (0.01 m/s)
+       with current state < BRAKE_L1, hitting the (T,F) combo of the
+       speed-guard inner decision. */
+    perception_output_t perc = {.distance=50.0f, .v_ego=0.005f, .v_rel=0.001f, .fault_flag=0U};
+    driver_input_t driver = {.brake_pedal=0U, .accel_pedal=0U, .steering_angle=0.0f, .aeb_enabled=1U};
+    ttc_output_t ttc = {.ttc=TTC_MAX, .d_brake=0.0f, .is_closing=0U};
+    fsm_output_t fsm_out;
+
+    fsm_init(&fsm_out);
+    fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
+    TEST_ASSERT((fsm_out.fsm_state == FSM_STANDBY) && (fsm_out.brake_active == 0U),
+                "K3: v_ego < V_STOP_THRESHOLD in STANDBY stays STANDBY (FR-DEC-008)");
+}
+
+static void test_K4_standby_to_brake_l1_via_warning(void)
+{
+    /* FR-DEC-011: every threat from STANDBY must pass through WARNING.
+       Complements H2 (BRAKE_L3 path): this exercises the BRAKE_L1-triggered
+       arm of the pass-through OR chain, using the distance-floor band
+       (10 < distance ≤ 20 m). */
+    perception_output_t perc = {.distance=15.0f, .v_ego=3.0f, .v_rel=2.0f, .fault_flag=0U};
+    driver_input_t driver = {.brake_pedal=0U, .accel_pedal=0U, .steering_angle=0.0f, .aeb_enabled=1U};
+    ttc_output_t ttc = {.ttc=3.5f, .d_brake=0.75f, .is_closing=1U};
+    fsm_output_t fsm_out;
+
+    fsm_init(&fsm_out);
+    fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
+    TEST_ASSERT(fsm_out.fsm_state == FSM_WARNING,
+                "K4: STANDBY with desired=BRAKE_L1 forced to WARNING (FR-DEC-011)");
 }
 
 /* ================================================================== */
@@ -701,7 +754,7 @@ int main(void)
     test_D2_speed_above_max();
     test_D3_stop_during_braking();
 
-    printf("\n--- Group E: POST_BRAKE transitions (FR-FSM-005) ---\n");
+    printf("\n--- Group E: POST_BRAKE transitions (FR-FSM-006 + FR-BRK-005/006) ---\n");
     test_E1_postbrake_timeout();
     test_E2_postbrake_accel_release();
     test_E3_postbrake_holds();
@@ -710,7 +763,6 @@ int main(void)
     test_F1_warning_debounce_progress();
 
     printf("\n--- Group G: BRAKE transitions ---\n");
-    test_G1_brake_to_postbrake_on_stop();
     test_G2_brake_escalate();
     test_G3_brake_deescalate();
 
@@ -718,12 +770,18 @@ int main(void)
     test_H1_standby_to_warning();
     test_H2_standby_forces_warning_before_brake();
 
-    printf("\n--- Group I: steering override (FR-FSM-006) ---\n");
+    printf("\n--- Group I: steering override (FR-DEC-007) ---\n");
     test_I1_steering_override_positive();
     test_I2_steering_override_negative();
 
-    printf("\n--- Group J: AEB disabled (FR-FSM-003) ---\n");
+    printf("\n--- Group J: AEB disabled (FR-FSM-002) ---\n");
     test_J1_aeb_disabled_to_off();
+
+    printf("\n--- Group K: complementary requirement-based cases ---\n");
+    test_K1_post_brake_ignores_brake_pedal();
+    test_K2_post_brake_ignores_steering();
+    test_K3_speed_below_stop_in_standby();
+    test_K4_standby_to_brake_l1_via_warning();
 
     printf("\n========================================\n");
     printf("RESULTS: %d passed, %d failed\n", tests_passed, tests_failed);

@@ -32,8 +32,8 @@ This runs, in order:
 
 | File | Produced by | Summary |
 |---|---|---|
-| `coverage_mcdc/run.log` | MC/DC coverage | 9 nominal + 36 complementary = 45 PASS |
-| `coverage_mcdc/coverage_summary.txt` | MC/DC coverage | stmt 97.7% / branch 94.4% / MC/DC 94.0% — 3 lines defensively unreachable (see report) |
+| `coverage_mcdc/run.log` | MC/DC coverage | 9 nominal + 39 complementary = 48 PASS |
+| `coverage_mcdc/coverage_summary.txt` | MC/DC coverage | stmt 97.7% / branch 96.8% / MC/DC 96.6% — 3 defensively-unreachable lines + 1 MISRA-mandated NULL guard (see report for justified deviations) |
 | `coverage_mcdc/coverage.xml` | MC/DC coverage | Cobertura XML (CI-consumable) |
 | `coverage_mcdc/gcov_summary.txt` | MC/DC coverage | gcov-14 per-binary metrics (MCDC binary) |
 | `coverage_mcdc/aeb_ttc.c.gcov` | MC/DC coverage | line-by-line annotated source (TTC) |
