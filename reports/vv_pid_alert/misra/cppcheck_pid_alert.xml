@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<results version="2">
+    <cppcheck version="2.13.0"/>
+    <errors>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;error&apos; can be reduced." verbose="The scope of the variable &apos;error&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/execution/aeb_pid.c">
+            <location file="src/execution/aeb_pid.c" line="90" column="15"/>
+            <symbol>error</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;p_term&apos; can be reduced." verbose="The scope of the variable &apos;p_term&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/execution/aeb_pid.c">
+            <location file="src/execution/aeb_pid.c" line="91" column="15"/>
+            <symbol>p_term</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;raw_output&apos; can be reduced." verbose="The scope of the variable &apos;raw_output&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/execution/aeb_pid.c">
+            <location file="src/execution/aeb_pid.c" line="92" column="15"/>
+            <symbol>raw_output</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;max_delta&apos; can be reduced." verbose="The scope of the variable &apos;max_delta&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/execution/aeb_pid.c">
+            <location file="src/execution/aeb_pid.c" line="93" column="15"/>
+            <symbol>max_delta</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;delta&apos; can be reduced." verbose="The scope of the variable &apos;delta&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/execution/aeb_pid.c">
+            <location file="src/execution/aeb_pid.c" line="94" column="15"/>
+            <symbol>delta</symbol>
+        </error>
+        <error id="variableScope" severity="style" msg="The scope of the variable &apos;brake_pct&apos; can be reduced." verbose="The scope of the variable &apos;brake_pct&apos; can be reduced. Warning: Be careful when fixing this message, especially when there are inner loops. Here is an example where cppcheck will write that the scope for &apos;i&apos; can be reduced:\012void f(int x)\012{\012    int i = 0;\012    if (x) {\012        // it&apos;s safe to move &apos;int i = 0;&apos; here\012        for (int n = 0; n &lt; 10; ++n) {\012            // it is possible but not safe to move &apos;int i = 0;&apos; here\012            do_something(&amp;i);\012        }\012    }\012}\012When you see this message it is always safe to reduce the variable scope 1 level." cwe="398" file0="src/execution/aeb_pid.c">
+            <location file="src/execution/aeb_pid.c" line="95" column="15"/>
+            <symbol>brake_pct</symbol>
+        </error>
+        <error id="unreadVariable" severity="style" msg="Variable &apos;error&apos; is assigned a value that is never used." verbose="Variable &apos;error&apos; is assigned a value that is never used." cwe="563" file0="src/execution/aeb_pid.c">
+            <location file="src/execution/aeb_pid.c" line="90" column="27"/>
+            <symbol>error</symbol>
+        </error>
+        <error id="unreadVariable" severity="style" msg="Variable &apos;p_term&apos; is assigned a value that is never used." verbose="Variable &apos;p_term&apos; is assigned a value that is never used." cwe="563" file0="src/execution/aeb_pid.c">
+            <location file="src/execution/aeb_pid.c" line="91" column="27"/>
+            <symbol>p_term</symbol>
+        </error>
+        <error id="unreadVariable" severity="style" msg="Variable &apos;raw_output&apos; is assigned a value that is never used." verbose="Variable &apos;raw_output&apos; is assigned a value that is never used." cwe="563" file0="src/execution/aeb_pid.c">
+            <location file="src/execution/aeb_pid.c" line="92" column="27"/>
+            <symbol>raw_output</symbol>
+        </error>
+        <error id="unreadVariable" severity="style" msg="Variable &apos;max_delta&apos; is assigned a value that is never used." verbose="Variable &apos;max_delta&apos; is assigned a value that is never used." cwe="563" file0="src/execution/aeb_pid.c">
+            <location file="src/execution/aeb_pid.c" line="93" column="27"/>
+            <symbol>max_delta</symbol>
+        </error>
+        <error id="unreadVariable" severity="style" msg="Variable &apos;delta&apos; is assigned a value that is never used." verbose="Variable &apos;delta&apos; is assigned a value that is never used." cwe="563" file0="src/execution/aeb_pid.c">
+            <location file="src/execution/aeb_pid.c" line="94" column="27"/>
+            <symbol>delta</symbol>
+        </error>
+    </errors>
+</results>

@@ -1,0 +1,103 @@
+==============================================
+  PID Fault Injection Test Suite
+==============================================
+========================================
+  AEB PID — Fault Injection Tests
+  (ASIL-D Robustness — ISO 26262-6 §9.4.2)
+========================================
+
+[FAULT-A1] a_ego = NaN (faulty accelerometer)
+  FAIL: brake_pct stays in [0,100] (no NaN propagation) [tests/test_pid_fault.c:49]
+  FAIL: brake_bar stays in [0,10] (no NaN propagation) [tests/test_pid_fault.c:51]
+
+[FAULT-A2] a_ego = +Infinity (saturated sensor)
+  PASS: brake_pct stays in [0,100] with a_ego=+Inf
+  PASS: brake_bar stays in [0,10] with a_ego=+Inf
+
+[FAULT-A3] a_ego = -Infinity (sensor stuck low)
+  PASS: brake_pct stays in [0,100] with a_ego=-Inf
+  PASS: brake_bar stays in [0,10] with a_ego=-Inf
+
+[FAULT-A4] decel_target = NaN (corrupted FSM output)
+  FAIL: brake_pct stays in [0,100] with decel_target=NaN [tests/test_pid_fault.c:85]
+
+[FAULT-B1] a_ego = 100 m/s^2 (impossible but finite)
+  PASS: brake_pct clamped to [0,100] under extreme a_ego
+
+[FAULT-B2] decel_target = 1000 m/s^2 (impossible command)
+  PASS: brake_pct saturates at 100 under extreme demand
+  PASS: brake_pct never exceeds BRAKE_OUT_MAX
+
+[FAULT-B3] a_ego = FLT_MAX (numerical overflow test)
+  PASS: brake_pct stays in [0,100] with a_ego=FLT_MAX
+
+[FAULT-C1] fsm_state = 99 (invalid state)
+  FAIL: invalid fsm_state produces zero braking (fail-safe) [tests/test_pid_fault.c:132]
+  FAIL: invalid fsm_state produces zero pressure [tests/test_pid_fault.c:134]
+
+[FAULT-C2] fsm_state = 255 (UINT8_MAX, bit-flip scenario)
+  FAIL: fsm_state=255 produces zero braking (fail-safe) [tests/test_pid_fault.c:144]
+
+[FAULT-D1] integrator reset after invalid-state excursion
+  PASS: precondition: integrator accumulated braking output
+  PASS: invalid state forces reset: brake_pct drops to 0
+  PASS: no stale integrator carry-over after invalid-state excursion
+
+[FAULT-D2] jerk limit holds even with extreme target change
+  PASS: jerk limiter holds even under spike input (FR-BRK-004)
+
+========================================
+  Results: 12/18 passed, 6 failed
+========================================
+
+==============================================
+  Alert Fault Injection Test Suite
+==============================================
+========================================
+  AEB Alert — Fault Injection Tests
+  (ASIL-D Robustness — ISO 26262-6 §9.4.2)
+========================================
+
+[FAULT-A1] alert_map(7) — one past valid range
+  PASS: fsm_state=7 -> ALERT_NONE (silent default)
+  PASS: fsm_state=7 -> alert_active=0
+  PASS: fsm_state=7 -> BUZZER_SILENT
+
+[FAULT-A2] alert_map(99) — grossly out of range
+  PASS: fsm_state=99 -> ALERT_NONE (silent default)
+  PASS: fsm_state=99 -> alert_active=0
+
+[FAULT-A3] alert_map(255) — UINT8_MAX (bit-flip scenario)
+  PASS: fsm_state=255 -> ALERT_NONE (silent default)
+  PASS: fsm_state=255 -> alert_active=0
+  PASS: fsm_state=255 -> BUZZER_SILENT
+
+[FAULT-B1] override_detect(NaN, 0)
+  PASS: override_detect returns valid 0/1 even with NaN input
+
+[FAULT-B2] override_detect(+Inf, 0)
+  PASS: override_detect(+Inf) treats as override
+
+[FAULT-B3] override_detect(-Inf, 0)
+  PASS: override_detect(-Inf) treats as override
+
+[FAULT-C1] override_detect(1e20, 0)
+  PASS: huge positive angle = override
+
+[FAULT-C2] override_detect(-1e20, 0)
+  PASS: huge negative angle = override
+
+[FAULT-C3] override_detect at exact 5.0 deg boundary
+  PASS: steering = +5.0 (exact threshold): no override
+  PASS: steering = -5.0 (exact threshold): no override
+  PASS: steering = 5.01 (just above): override active
+
+[FAULT-D1] override_detect(0, 2) — unexpected pedal value
+  PASS: brake_pedal=2 triggers override (safe default)
+
+[FAULT-D2] override_detect(0, 255) — corrupted pedal signal
+  PASS: brake_pedal=255 triggers override (safe default)
+
+========================================
+  Results: 18/18 passed, 0 failed
+========================================
