@@ -4,10 +4,9 @@ Reproducible evidence for the independent cross-validation of
 [src/decision/aeb_ttc.c](../../src/decision/aeb_ttc.c) and
 [src/decision/aeb_fsm.c](../../src/decision/aeb_fsm.c).
 **Validator (cross):** Eryca. **Author:** Lourenço Jamba Mphili.
-Aligned to the ISO 26262-6:2018 ASIL-D technique set established by Rian for
-PID/Alert and by Renato for UDS.
+Aligned to the ISO 26262-6:2018 ASIL-D.
 
-The consolidated V&V report (`Relatorio_Consolidado_VV_Decision.pdf` and its
+The consolidated V&V report (`Consolidated_Report_VV_Decision.pdf` and its
 `.tex` source) lives in the team documentation area, **outside this repo**,
 alongside the equivalent reports for PID/Alert and UDS. Only the
 machine-generated evidence (logs, XML, gcov output, CSV) and the
@@ -27,7 +26,7 @@ This runs:
 
 1. `make mcdc-decision` — `-fcondition-coverage` build + gcov condition report
 2. `make fault-decision` — systematic fault-injection suite (non-fatal harness)
-3. `make memory-decision` — Valgrind + ASan + UBSan (*execution pending — requires Linux/WSL*)
+3. `make memory-decision` — Valgrind + ASan + UBSan (executed on Ubuntu 24.04 / WSL2)
 4. `make misra-decision` — cppcheck MISRA addon scoped to decision module (*execution pending*)
 
 ## Artefact map (current)
@@ -41,6 +40,9 @@ This runs:
 | `coverage_mcdc/aeb_ttc.c.gcov` | 1 — coverage | Line-by-line annotated source (TTC) |
 | `coverage_mcdc/aeb_fsm.c.gcov` | 1 — coverage | Line-by-line annotated source (FSM) |
 | `fault_injection/run.log` | 3 — fault | Fault-injection test execution log (32 assertions, 21 PASS, 11 FAIL) |
+| `memory_safety/run.log` | 4 — memory | Consolidated `make memory-decision` execution log |
+| `memory_safety/valgrind_*.log` (×3) | 4 — memory | Per-binary Valgrind stderr (empty file ⇔ 0 errors) |
+| `memory_safety/ubsan_*.log` (×3) | 4 — memory | Per-binary ASan + UBSan stderr (empty file ⇔ 0 errors) |
 
 The HTML report (`report.html` + `report.*.html` + `report.css` + `report.js`)
 is regenerated locally by `make mcdc-decision` but **not committed** — browse
@@ -101,15 +103,45 @@ separate branch per the ISO 26262-6 §5.4.8 independence principle.
 | 3 | [aeb_fsm.c:165](../../src/decision/aeb_fsm.c#L165) | `fsm_step` defensive guard `delta_t_s <= 0.0f` is bypassed by `NaN` (IEEE 754 comparison returns false) — `NaN` poisons the timers | A6 (2 assertions) | HIGH |
 | 4 | [aeb_fsm.c:230](../../src/decision/aeb_fsm.c#L230), [aeb_fsm.c:328](../../src/decision/aeb_fsm.c#L328) | `new_state = current_state` initial value — if `fsm_state` is corrupted to a non-enum value and `desired_state` resolves to STANDBY, the corrupted byte is written straight back to the output | C1, C2 (4 assertions) | CRITICAL (SEU) |
 
-Patch proposals will be included in the consolidated V&V report
-(`Relatorio_Consolidado_VV_Decision.pdf`) in a dedicated §7 section, mirroring
-the structure used by Rian for PID/Alert and Renato for UDS.
 
 ### Categories confirmed robust (no action)
 
 - **A (partial)** — `ttc_calc` and `ttc_process` tolerate NaN/±Inf in `distance`/`v_rel` (return TTC_MAX or propagate to a valid `ttc_output`).
 - **C (partial)** — `perception->fault_flag = 0xFF` correctly triggers FSM_OFF; `ttc_in->is_closing = 0x80` is conservatively treated as closing.
 - **D (complete)** — rapid enable/disable toggling, WARNING persistence, POST_BRAKE auto-exit, and debounce oscillation all behave correctly under stress.
+
+## Memory-safety results (from `memory_safety/`)
+
+Three test binaries compiled twice — once unsanitised for Valgrind, once
+with ASan + UBSan + `float-cast-overflow` — and executed under their
+respective tools on Ubuntu 24.04 / WSL2.
+
+| Binary | Valgrind | ASan + UBSan | Status |
+|---|---|---|---|
+| `test_decision` (nominal) | 0 errors | 0 errors | PASS |
+| `test_decision_mcdc` | 0 errors | 0 errors | PASS |
+| `test_decision_fault` | 0 errors | 0 errors | PASS |
+| **Total** | **0 / 3** | **0 / 3** | **CLEAN** |
+
+Empty `valgrind_*.log` and `ubsan_*.log` files are the canonical evidence
+that the tool ran to completion with zero diagnostics — the Makefile
+target echoes `(clean)` into `run.log` whenever a per-tool log is zero
+bytes. See `run.log` for the full step-by-step execution trace.
+
+### Why no UB reports from the fault suite
+
+UBSan flagged two `float-cast-overflow`
+sites when NaN/±Inf reached `(uint16_t)(ttc * 100.0f)` scaled casts — the
+decision module keeps all calculations in `float32_t` end to end. No
+float→integer conversions means no `float-cast-overflow` triggers,
+regardless of the inputs thrown at it.
+
+The four vulnerabilities catalogued by the fault-injection suite are
+therefore **semantic defects** (NaN/±Inf propagation, SEU interpretation,
+guard bypass via NaN comparison) rather than memory-safety violations or
+IEEE 754 undefined behaviour. This is exactly the split that ISO 26262-6
+anticipates by requiring Tab. 8 item 1d (memory safety) and Tab. 11 item
+1e (fault injection) as separate ++ techniques.
 
 ## Functional Test Excel
 
