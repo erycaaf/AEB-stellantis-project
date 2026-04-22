@@ -1,0 +1,16 @@
+MC/DC Coverage Summary — PID + Alert
+Generated: 2026-04-22T00:23:35-03:00
+Toolchain: gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+==============================================
+
+-- aeb_pid.c.gcov --
+        -:    0:Source:src/execution/aeb_pid.c
+        -:    0:Graph:aeb_pid.gcno
+        -:    0:Data:aeb_pid.gcda
+        -:    0:Runs:2
+
+-- aeb_alert.c.gcov --
+        -:    0:Source:src/execution/aeb_alert.c
+        -:    0:Graph:aeb_alert.gcno
+        -:    0:Data:aeb_alert.gcda
+        -:    0:Runs:2

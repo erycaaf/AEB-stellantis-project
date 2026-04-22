@@ -1,4 +1,3 @@
-cat > reports/vv_pid_alert/README.md << 'EOF'
 # PID + Alert V&V — Evidence artefacts
 
 Reproducible evidence for the independent cross-validation of

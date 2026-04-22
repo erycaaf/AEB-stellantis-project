@@ -1,0 +1,31 @@
+========================================
+  AEB Integration Tests
+========================================
+
+[TEST] Init clean state
+  PASS: aeb_core_init returns success
+  PASS: FSM starts in STANDBY after init
+  PASS: brake output is zero after init
+  PASS: no alert active after init
+
+[TEST] CCRs activation sequence
+  PASS: system entered WARNING during closing scenario
+  PASS: system escalated to braking during closing scenario
+  PASS: PID produced positive brake output during scenario
+  PASS: alert was activated during scenario
+
+[TEST] Driver override
+  PASS: system reached WARNING before override
+  PASS: system returned to STANDBY after driver override
+
+[TEST] Sensor fault -> OFF
+  PASS: perception reports fault after fi injection
+  PASS: FSM transitions to OFF on sensor fault
+  PASS: brake output is zero in OFF state
+
+[TEST] Speed out of range
+  PASS: system stays in STANDBY when ego speed below 10 km/h
+
+========================================
+  Results: 14/14 passed, 0 failed
+========================================
