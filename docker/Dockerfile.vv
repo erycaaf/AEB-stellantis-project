@@ -1,0 +1,37 @@
+# AEB V&V toolchain image
+#
+# Provides the ASIL-D verification stack that Rian documented in the PID/Alert
+# consolidated V&V report and that the `make vv-*` targets depend on:
+#
+#   - GCC 14 (for -fcondition-coverage / MC/DC)
+#   - gcov 14 + gcovr
+#   - cppcheck 2.13 with MISRA C:2012 addon
+#   - Valgrind 3.22
+#   - ASan / UBSan runtimes (bundled with GCC 14)
+#   - lcov (for future HTML consolidation)
+#
+# Build:
+#   docker build -t aeb-vv:latest -f docker/Dockerfile.vv .
+#
+# Use:
+#   docker run --rm -v "$(pwd)":/work -w /work aeb-vv:latest make vv-uds
+#
+# Matches the Ubuntu 24.04 environment referenced in the V&V reports.
+
+FROM ubuntu:24.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        gcc-14 g++-14 make libc6-dev \
+        cppcheck valgrind lcov gcovr \
+        python3-minimal \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/gcc-14  /usr/local/bin/gcc  \
+    && ln -sf /usr/bin/g++-14  /usr/local/bin/g++  \
+    && ln -sf /usr/bin/gcov-14 /usr/local/bin/gcov
+
+WORKDIR /work
+CMD ["/bin/bash"]

@@ -8,15 +8,27 @@ test_decision
 test_pid
 test_alert
 test_uds
+test_uds_fault
 test_integration
 
-# V&V intermediate artefacts (binaries, coverage data, HTML bundle)
+# V&V intermediate artefacts — UDS
+reports/vv_uds/**/test_uds*
+reports/vv_uds/**/*.gcda
+reports/vv_uds/**/*.gcno
+
+# V&V intermediate artefacts — Decision
 # Only text/XML/CSV/gcov evidence under reports/vv_decision/ is committed.
 # The gcovr HTML bundle is regenerated locally by `make mcdc-decision`.
 reports/vv_decision/**/test_decision*
 reports/vv_decision/**/*.gcda
 reports/vv_decision/**/*.gcno
 reports/vv_decision/coverage_mcdc/report.*
+
+# Consolidated V&V reports live in the team docs area, not in the repo
+reports/vv_uds/*.tex
+reports/vv_uds/*.pdf
+reports/vv_decision/*.tex
+reports/vv_decision/*.pdf
 
 # Legacy top-level V&V directories (pre-refactor — root-anchored)
 /coverage_mcdc/
@@ -31,6 +43,18 @@ test_decision_fault
 
 # Python venv (local verification toolchain)
 venv/
+
+# LaTeX build artefacts (NOT *.log here — our V&V artefacts include run.log files)
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.out
+*.synctex.gz
+*.toc
+*.nav
+*.snm
 
 # IDE
 .vscode/
