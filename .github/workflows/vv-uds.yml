@@ -66,14 +66,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             gcc-14 g++-14 make libc6-dev \
-            cppcheck cppcheck-htmlreport \
+            cppcheck python3-pygments \
             valgrind lcov gcovr python3-minimal bc
           sudo ln -sf /usr/bin/gcc-14  /usr/local/bin/gcc
           sudo ln -sf /usr/bin/g++-14  /usr/local/bin/g++
           sudo ln -sf /usr/bin/gcov-14 /usr/local/bin/gcov
+          # cppcheck-htmlreport is no longer packaged on Ubuntu 24.04 — fetch
+          # the upstream script from the cppcheck repository (pinned to the
+          # tag matching the apt-installed cppcheck version when possible).
+          sudo curl -fsSL \
+            https://raw.githubusercontent.com/danmar/cppcheck/main/htmlreport/cppcheck-htmlreport \
+            -o /usr/local/bin/cppcheck-htmlreport
+          sudo chmod +x /usr/local/bin/cppcheck-htmlreport
           gcc --version | head -1
           gcov --version | head -1
           cppcheck --version
+          cppcheck-htmlreport --help | head -1
           valgrind --version
 
       # ─── Blocking gate 1: structural coverage ─────────────────────────────
