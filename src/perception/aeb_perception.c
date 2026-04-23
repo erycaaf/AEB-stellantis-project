@@ -51,11 +51,10 @@ static uint8_t lidar_fault_detect(float32_t d_l)
     if (bad != 0U) {
         if (s_lidar.ctr < 255U) { s_lidar.ctr++; }
     } else {
-        s_lidar.ctr = 0U;
+        s_lidar.ctr      = 0U;
+        s_lidar.prev_d   = d_l;
+        s_lidar.is_first = 0U;
     }
-
-    s_lidar.prev_d   = d_l;
-    s_lidar.is_first = 0U;
 
     fault = (s_lidar.ctr >= (uint8_t)SENSOR_FAULT_CYCLES) ? 1U : 0U;
     return fault;
@@ -99,12 +98,11 @@ static uint8_t radar_fault_detect(float32_t d_r, float32_t vr_r)
     if (bad != 0U) {
         if (s_radar.ctr < 255U) { s_radar.ctr++; }
     } else {
-        s_radar.ctr = 0U;
+        s_radar.ctr      = 0U;
+        s_radar.prev_d   = d_r;
+        s_radar.prev_vr  = vr_r;
+        s_radar.is_first = 0U;
     }
-
-    s_radar.prev_d   = d_r;
-    s_radar.prev_vr  = vr_r;
-    s_radar.is_first = 0U;
 
     fault = (s_radar.ctr >= (uint8_t)SENSOR_FAULT_CYCLES) ? 1U : 0U;
     return fault;
