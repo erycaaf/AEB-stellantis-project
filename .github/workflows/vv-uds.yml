@@ -9,10 +9,11 @@ name: UDS V&V
 # are patched on fix/uds-robustness. After that PR lands, flip
 # `continue-on-error` on the fault-injection step to `false`.
 #
-# On push to development/main (post-merge), the job additionally refreshes
-# the committed reports under reports/vv_uds/** as the bot
-# github-actions[bot], using a commit message that does not touch
-# UDS-relevant paths, so the workflow does not re-trigger.
+# Reports are published in two layers:
+#   1. Workflow Artifacts on every run (PR or push), retention 30 days.
+#   2. GitHub Pages (gh-pages branch) on push to development/main —
+#      navigable HTML reports under
+#      https://erycaaf.github.io/AEB-stellantis-project/vv_uds/<branch>/.
 
 on:
   pull_request:
@@ -25,6 +26,8 @@ on:
       - 'tests/test_uds.c'
       - 'tests/test_uds_fault.c'
       - 'Makefile'
+      - 'scripts/wrap_memory.sh'
+      - 'scripts/wrap_fault.py'
       - 'docker/Dockerfile.vv'
       - '.github/workflows/vv-uds.yml'
   push:
@@ -37,16 +40,16 @@ on:
       - 'tests/test_uds.c'
       - 'tests/test_uds_fault.c'
       - 'Makefile'
+      - 'scripts/wrap_memory.sh'
+      - 'scripts/wrap_fault.py'
       - 'docker/Dockerfile.vv'
       - '.github/workflows/vv-uds.yml'
 
 permissions:
-  contents: write       # needed to commit refreshed reports on push
+  contents: read
   pull-requests: read
 
 concurrency:
-  # Avoid overlapping runs on the same branch (the refresh-push step can
-  # race with itself if two pushes land quickly).
   group: vv-uds-${{ github.ref }}
   cancel-in-progress: false
 
@@ -57,16 +60,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          # Full history needed so we can push back on development/main
-          fetch-depth: 0
 
       - name: Install V&V toolchain (matches docker/Dockerfile.vv)
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             gcc-14 g++-14 make libc6-dev \
-            cppcheck valgrind lcov gcovr python3-minimal bc
+            cppcheck cppcheck-htmlreport \
+            valgrind lcov gcovr python3-minimal bc
           sudo ln -sf /usr/bin/gcc-14  /usr/local/bin/gcc
           sudo ln -sf /usr/bin/g++-14  /usr/local/bin/g++
           sudo ln -sf /usr/bin/gcov-14 /usr/local/bin/gcov
@@ -138,6 +139,11 @@ jobs:
         continue-on-error: true
         run: make fault-uds
 
+      # ─── Generate navigable HTML reports ──────────────────────────────────
+      - name: Generate HTML reports
+        if: always()
+        run: make html-uds
+
       # ─── Summary for the PR/commit checks UI ──────────────────────────────
       - name: Step summary
         if: always()
@@ -145,6 +151,10 @@ jobs:
           {
             echo "## UDS V&V — run #${{ github.run_number }}"
             echo ""
+            if [ "${{ github.event_name }}" = "push" ]; then
+              echo "📊 **Browse reports:** https://erycaaf.github.io/AEB-stellantis-project/vv_uds/${{ github.ref_name }}/"
+              echo ""
+            fi
             echo "### Structural coverage"
             echo '```'
             cat reports/vv_uds/coverage_mcdc/gcov_summary.txt
@@ -177,47 +187,31 @@ jobs:
           path: reports/vv_uds/
           retention-days: 30
 
-      # ─── Commit refreshed reports back (push to dev/main only) ────────────
-      # The path filter excludes reports/vv_uds/** from the workflow
-      # triggers, so this commit does NOT re-fire the workflow.
-      - name: Commit refreshed reports
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main')
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+  # ───────────────────────────────────────────────────────────────────────
+  # Publish HTML reports to GitHub Pages on push to development/main only.
+  # Each module workflow publishes its own subdirectory under vv_<module>/
+  # on the gh-pages branch; keep_files: true preserves the others.
+  # ───────────────────────────────────────────────────────────────────────
+  publish-pages:
+    needs: vv-uds
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download reports
+        uses: actions/download-artifact@v4
+        with:
+          name: vv-uds-reports-run${{ github.run_number }}
+          path: site/
 
-          git add reports/vv_uds/coverage_mcdc/run.log \
-                  reports/vv_uds/coverage_mcdc/gcov_summary.txt \
-                  reports/vv_uds/coverage_mcdc/aeb_uds.c.gcov \
-                  reports/vv_uds/fault_injection/run.log \
-                  reports/vv_uds/memory_safety/valgrind_test_uds.log \
-                  reports/vv_uds/memory_safety/valgrind_test_uds_fault.log \
-                  reports/vv_uds/memory_safety/ubsan_test_uds.log \
-                  reports/vv_uds/memory_safety/ubsan_test_uds_fault.log \
-                  reports/vv_uds/misra/cppcheck_uds.xml
-
-          # Self-enforcing scope guard: the bot must ONLY ever touch
-          # reports/vv_uds/**. If the staged diff includes anything outside
-          # that tree, abort — this prevents a compromised workflow from
-          # using the branch-protection bypass to modify source/tests.
-          OUT_OF_SCOPE=$(git diff --staged --name-only | grep -v '^reports/vv_uds/' || true)
-          if [ -n "$OUT_OF_SCOPE" ]; then
-            echo "::error title=V&V bot scope violation::Refusing to commit files outside reports/vv_uds/**:"
-            echo "$OUT_OF_SCOPE"
-            exit 1
-          fi
-
-          if git diff --staged --quiet; then
-            echo "No V&V report changes to commit."
-          else
-            git commit -m "chore(vv-uds): refresh reports from run #${{ github.run_number }}"
-            # Push back to the same branch that triggered us.
-            # On protected branches without a bypass rule for
-            # github-actions[bot], this step will fail and the run will be
-            # marked failed. The self-enforcing scope guard above limits the
-            # bot's blast radius to reports/vv_uds/** even when bypass is
-            # granted. See the team CI guide (vv_uds_workflow.pdf in the
-            # shared docs area) for the three configuration options
-            # (self-enforcing bypass / auto-PR / path-scoped ruleset).
-            git push origin "HEAD:${{ github.ref_name }}"
-          fi
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          destination_dir: vv_uds/${{ github.ref_name }}
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: '41898282+github-actions[bot]@users.noreply.github.com'
+          commit_message: 'docs(vv-uds): publish reports from run #${{ github.run_number }} (${{ github.ref_name }})'
