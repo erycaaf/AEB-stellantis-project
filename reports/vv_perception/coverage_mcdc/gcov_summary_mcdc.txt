@@ -1,0 +1,10 @@
+Cannot open source file src/perception/aeb_perception.c
+File 'src/perception/aeb_perception.c'
+Lines executed:96.30% of 162
+Branches executed:95.65% of 92
+Taken at least once:81.52% of 92
+Calls executed:80.00% of 10
+Condition outcomes covered:81.52% of 92
+Creating 'aeb_perception.c.gcov'
+
+Lines executed:96.30% of 162
