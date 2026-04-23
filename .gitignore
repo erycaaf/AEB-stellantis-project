@@ -8,7 +8,29 @@ test_decision
 test_pid
 test_alert
 test_uds
+test_uds_fault
 test_integration
+
+# V&V intermediate artefacts (binaries and coverage intermediates)
+reports/vv_uds/**/test_uds*
+reports/vv_uds/**/*.gcda
+reports/vv_uds/**/*.gcno
+
+# Consolidated V&V report lives in the team docs area, not in the repo
+reports/vv_uds/*.tex
+reports/vv_uds/*.pdf
+
+# LaTeX build artefacts (NOT *.log here — our V&V artefacts include run.log files)
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.out
+*.synctex.gz
+*.toc
+*.nav
+*.snm
 
 # IDE
 .vscode/

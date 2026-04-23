@@ -1,0 +1,9 @@
+Cannot open source file src/communication/aeb_uds.c
+File 'src/communication/aeb_uds.c'
+Lines executed:100.00% of 111
+Branches executed:100.00% of 24
+Taken at least once:100.00% of 24
+Calls executed:100.00% of 8
+Creating 'aeb_uds.c.gcov'
+
+Lines executed:100.00% of 111
