@@ -19,3 +19,11 @@ test_integration
 # OS
 Thumbs.db
 .DS_Store
+
+# V&V Perception
+test_perception_fault
+reports/vv_perception/**/test_perception*
+reports/vv_perception/**/*.gcda
+reports/vv_perception/**/*.gcno
+reports/vv_perception/*.tex
+reports/vv_perception/*.pdf

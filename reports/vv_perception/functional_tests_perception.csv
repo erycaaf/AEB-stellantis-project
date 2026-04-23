@@ -1,0 +1,40 @@
+Requirement,TestFunction,Category,Inputs,ExpectedOutput,PassFail,Evidence
+FR-PER-001,test_kalman_convergence,Nominal,"radar_d=30 lidar_d=30.2 v_rel=5 (50 cycles)","|distance-30| < 0.5 m",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-001,test_output_clamp_min_distance,Nominal,"fused_distance < DIST_MIN_OUTPUT","out.distance >= DIST_MIN_OUTPUT (0.5 m)",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-001,test_output_clamp_max_distance,Nominal,"fused_distance > DIST_MAX_OUTPUT","out.distance <= DIST_MAX_OUTPUT (300 m)",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-002,test_ego_velocity_passthrough,Nominal,"v_ego=42.5 m/s","out.v_ego == 42.5",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-003,test_kalman_convergence,Nominal,"v_rel converges from radar_vr","fused v_rel within tolerance",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-003,test_output_clamp_rel_velocity,Nominal,"fused v_rel out of range","clamped to [-MAX_REL_VEL, +MAX_REL_VEL]",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-006,test_lidar_no_fault_before_latch,Nominal,"lidar_d=999 for SENSOR_FAULT_CYCLES-1 frames","fault_flag & LIDAR == 0",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-006,test_lidar_fault_latches_at_cycle3,Nominal,"lidar_d=999 for SENSOR_FAULT_CYCLES frames","fault_flag & LIDAR != 0",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-006,test_lidar_counter_resets_on_good_frame,Nominal,"2 bad lidar frames + 1 good","ctr resets, no latch",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-006,test_lidar_roc_triggers_counter,Nominal,"lidar_d ROC > DIST_ROC_LIMIT for 3 cycles","fault_flag & LIDAR != 0",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-006,test_radar_roc_triggers_counter,Nominal,"radar_d ROC > DIST_ROC_LIMIT for 3 cycles","fault_flag & RADAR != 0",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-006,test_no_fault_on_good_data,Nominal,"good radar+lidar for 20 cycles","fault_flag == 0",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-006,test_radar_no_fault_single_bad_vr,Nominal,"radar_vr=999 for 1 frame","no latch (single bad)",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-007,test_radar_fault_latches_at_cycle3,Nominal,"radar out of range for 3 frames","fault_flag & RADAR != 0",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-007,test_can_timeout_sets_fault_flags,Nominal,"can_timeout=1","CAN_TO + LIDAR + RADAR bits set, conf=0",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-007,test_init_resets_state,Nominal,"perception_init() after latched fault","fault clears on next good frame",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-007,test_can_timeout_preserves_counters,Nominal,"can_timeout pulse + 1 bad frame","ctr not corrupted by timeout",P,reports/vv_perception/coverage_mcdc/run.log
+NFR-SAF-005,test_fault_injection_disables_sensors,Nominal,"fi=1","both sensor fault bits set, conf=0",P,reports/vv_perception/coverage_mcdc/run.log
+FR-PER-001,test_confidence_both_sensors_gt_one_sensor,Nominal,"both sensors valid vs one sensor only","conf(both) > conf(one)",P,reports/vv_perception/coverage_mcdc/run.log
+NFR-SAF-ROB,FAULT-A1,FaultInj-NaN,"lidar_d=NaN; everything else nominal","fail-safe (fault flag OR finite output with conf=0)",F,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-A2,FaultInj-NaN,"radar_d=NaN; everything else nominal","fail-safe (fault flag OR finite output with conf=0)",F,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-A3,FaultInj-Inf,"lidar_d=+inf","fail-safe predicate satisfied",F,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-A4,FaultInj-Inf,"radar_vr=-inf","fail-safe; v_rel clamped & finite",F,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-A5,FaultInj-NaN,"v_ego=NaN (passthrough field)","out.v_ego sanitised OR fault_flag != 0",F,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-B1,FaultInj-Range,"radar_d=FLT_MAX for SENSOR_FAULT_CYCLES","RADAR fault latched, distance finite",P,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-B2,FaultInj-Range,"lidar_d=-1000 for SENSOR_FAULT_CYCLES","LIDAR fault latched",P,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-B3,FaultInj-Range,"radar_d=FLT_MIN/2 (subnormal)","finite, in-range output",P,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-B4,FaultInj-Range,"radar_vr=1000 for SENSOR_FAULT_CYCLES","RADAR fault latched, v_rel clamped",P,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-B5,FaultInj-Range,"radar_d alternating 30 / 80 m","ROC violation latches RADAR",P,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-C1,FaultInj-SEU,"can_timeout=1 on first frame (no seed)","conf=0, CAN_TO bit set, no spurious distance",P,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-C2,FaultInj-SEU,"fi=0xAA (non-Boolean truthy)","both sensor fault bits propagated",P,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-C3,FaultInj-SEU,"can_timeout=0x80 (high-bit-only)","CAN_TO bit set, conf=0",P,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-D1,FaultInj-Persist,"lidar_d=999 for 300 cycles","fault remains latched (no uint8 wrap)",P,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-D2,FaultInj-Persist,"lidar_d alternating 999 / 30.2 (100 cycles)","no false-positive latch",F,reports/vv_perception/fault_injection/run.log
+NFR-SAF-ROB,FAULT-D3,FaultInj-Persist,"latch fault then 10 good frames","fault clears (non-sticky)",P,reports/vv_perception/fault_injection/run.log
+FR-COD-001,test_init_resets_state,Nominal,"perception_init() resets all internal state","matches Simulink chart_26/33/41 reset",P,reports/vv_perception/coverage_mcdc/run.log
+NFR-COD-005,(static check),Static,"all module signatures use stdint fixed-width types","verified by review + cppcheck",P,reports/vv_perception/misra/cppcheck_perception.xml
+NFR-COD-006,(static check),Static,"no dynamic memory; only static state structs","verified by review + Valgrind 0 heap",P,reports/vv_perception/memory_safety/valgrind_test_perception.log
+NFR-COD-007,(static check),Static,"single-precision (float32_t) throughout","verified by review",P,reports/vv_perception/coverage_mcdc/aeb_perception.c.gcov
