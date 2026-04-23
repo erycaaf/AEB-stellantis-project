@@ -8,6 +8,7 @@
 #   make fault-uds    — run UDS fault-injection suite
 #   make memory-uds   — Valgrind + ASan + UBSan on UDS suites
 #   make misra-uds    — cppcheck MISRA scoped to aeb_uds.{c,h}
+#   make html-uds     — generate navigable HTML reports (lcov genhtml, cppcheck-htmlreport, wrappers)
 #   make vv-uds       — run the full V&V stack for aeb_uds (MC/DC + fault + memory + MISRA)
 #   make clean        — remove build artefacts
 #
@@ -81,7 +82,7 @@ TEST_BINS = test_smoke test_can test_perception test_decision \
             test_pid test_alert test_uds test_integration
 
 .PHONY: build test misra clean \
-        mcdc-uds fault-uds memory-uds misra-uds vv-uds vv-clean
+        mcdc-uds fault-uds memory-uds misra-uds html-uds vv-uds vv-clean
 
 build:
 	$(CC) $(CFLAGS) -c $(SRC_ALL)
@@ -181,11 +182,46 @@ misra-uds:
 		2> $(VV_REPORT_DIR)/misra/cppcheck_uds.xml
 	@echo "cppcheck XML -> $(VV_REPORT_DIR)/misra/cppcheck_uds.xml"
 
-vv-uds: mcdc-uds fault-uds memory-uds misra-uds
+html-uds:
+	@mkdir -p $(VV_REPORT_DIR)/coverage_html $(VV_REPORT_DIR)/misra_html
+	# Coverage HTML — lcov genhtml from the gcov outputs produced by mcdc-uds.
+	@if [ -d $(VV_REPORT_DIR)/coverage_mcdc ]; then \
+		lcov --capture --directory $(VV_REPORT_DIR)/coverage_mcdc \
+			--rc branch_coverage=1 \
+			--output-file $(VV_REPORT_DIR)/coverage_html/coverage.info >/dev/null 2>&1 || true; \
+		if [ -s $(VV_REPORT_DIR)/coverage_html/coverage.info ]; then \
+			lcov --extract $(VV_REPORT_DIR)/coverage_html/coverage.info '*aeb_uds.c' \
+				--rc branch_coverage=1 \
+				--output-file $(VV_REPORT_DIR)/coverage_html/coverage_uds.info >/dev/null 2>&1 || true; \
+			genhtml $(VV_REPORT_DIR)/coverage_html/coverage_uds.info \
+				--branch-coverage \
+				--title "UDS Coverage" \
+				--legend \
+				--output-directory $(VV_REPORT_DIR)/coverage_html >/dev/null 2>&1; \
+		fi; \
+	fi
+	# MISRA HTML — cppcheck-htmlreport from the XML produced by misra-uds.
+	@if [ -s $(VV_REPORT_DIR)/misra/cppcheck_uds.xml ]; then \
+		cppcheck-htmlreport \
+			--file=$(VV_REPORT_DIR)/misra/cppcheck_uds.xml \
+			--report-dir=$(VV_REPORT_DIR)/misra_html \
+			--source-dir=. \
+			--title="UDS MISRA C:2012 Report" >/dev/null 2>&1 || true; \
+	fi
+	# Memory + fault HTML wrappers.
+	@bash scripts/wrap_memory.sh uds $(VV_REPORT_DIR)
+	@python3 scripts/wrap_fault.py uds $(VV_REPORT_DIR)
+	@echo "=== HTML reports in $(VV_REPORT_DIR)/{coverage_html,misra_html,memory_html,fault_html}/ ==="
+
+vv-uds: mcdc-uds fault-uds memory-uds misra-uds html-uds
 	@echo ""
 	@echo "=== UDS V&V stack complete — artefacts in $(VV_REPORT_DIR)/ ==="
 
 vv-clean:
 	rm -rf $(VV_REPORT_DIR)/coverage_mcdc/test_uds* \
 	       $(VV_REPORT_DIR)/fault_injection/test_uds* \
-	       $(VV_REPORT_DIR)/memory_safety/test_uds*
+	       $(VV_REPORT_DIR)/memory_safety/test_uds* \
+	       $(VV_REPORT_DIR)/coverage_html \
+	       $(VV_REPORT_DIR)/misra_html \
+	       $(VV_REPORT_DIR)/memory_html \
+	       $(VV_REPORT_DIR)/fault_html
