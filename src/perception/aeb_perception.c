@@ -6,6 +6,7 @@
 #include "aeb_perception.h"
 #include "aeb_config.h"
 #include <stddef.h>
+#include <math.h>
 
 #define FABSF(x) (((x) < 0.0f) ? -(x) : (x))
 
@@ -38,7 +39,8 @@ static uint8_t lidar_fault_detect(float32_t d_l)
     uint8_t bad;
     uint8_t fault;
 
-    bad = ((d_l < LIDAR_DIST_MIN) || (d_l > LIDAR_DIST_MAX)) ? 1U : 0U;
+    bad = (!isfinite(d_l) ||
+           (d_l < LIDAR_DIST_MIN) || (d_l > LIDAR_DIST_MAX)) ? 1U : 0U;
 
     if ((s_lidar.is_first == 0U) && (bad == 0U)) {
         if (FABSF(d_l - s_lidar.prev_d) > DIST_ROC_LIMIT) {
@@ -83,7 +85,8 @@ static uint8_t radar_fault_detect(float32_t d_r, float32_t vr_r)
     uint8_t bad;
     uint8_t fault;
 
-    bad = ((d_r < RADAR_DIST_MIN) || (d_r > RADAR_DIST_MAX) ||
+    bad = (!isfinite(d_r) || !isfinite(vr_r) ||
+           (d_r < RADAR_DIST_MIN) || (d_r > RADAR_DIST_MAX) ||
            (FABSF(vr_r) > MAX_REL_VEL)) ? 1U : 0U;
 
     if ((s_radar.is_first == 0U) && (bad == 0U)) {
@@ -143,11 +146,11 @@ static void kalman_fusion(
     uint8_t l_fault, uint8_t r_fault, uint8_t fi,
     float32_t *out_d, float32_t *out_v, float32_t *out_conf)
 {
-    uint8_t l_ok = ((l_fault == 0U) && (fi == 0U)) ? 1U : 0U;
-    uint8_t r_ok = ((r_fault == 0U) && (fi == 0U)) ? 1U : 0U;
+    uint8_t l_ok = ((l_fault == 0U) && (fi == 0U) && isfinite(d_l)) ? 1U : 0U;
+    uint8_t r_ok = ((r_fault == 0U) && (fi == 0U) &&
+                    isfinite(d_r) && isfinite(vr_r)) ? 1U : 0U;
 
-    /* Seed state on first call: x = [d_r, vr_r] */
-    if (s_kalman.initialized == 0U) {
+    if ((s_kalman.initialized == 0U) && isfinite(d_r) && isfinite(vr_r)) {
         s_kalman.x[0] = d_r;
         s_kalman.x[1] = vr_r;
         s_kalman.initialized = 1U;
