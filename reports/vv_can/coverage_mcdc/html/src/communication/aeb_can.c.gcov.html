@@ -1,0 +1,537 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - can.info - src/communication/aeb_can.c</title>
+  <link rel="stylesheet" type="text/css" href="../../gcov.css">
+</head>
+
+<body>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="title">LCOV - code coverage report</td></tr>
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+
+            <tr>
+              <td width="100%">
+                <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="10%" class="headerValue"><a href="../../index.html">top level</a> - <a href="index.html">src/communication</a> - aeb_can.c<span style="font-size: 80%;"> (source / <a href="aeb_can.c.func-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="5%"></td>
+            <td width="5%" class="headerCovTableHead">Coverage</td>
+            <td width="5%" class="headerCovTableHead" title="Covered + Uncovered code">Total</td>
+            <td width="5%" class="headerCovTableHead" title="Exercised code only">Hit</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">can.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntryHi">100.0&nbsp;%</td>
+            <td class="headerCovTableEntry">167</td>
+            <td class="headerCovTableEntry">167</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test Date:</td>
+            <td class="headerValue">2026-04-23 16:55:51</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntryHi">100.0&nbsp;%</td>
+            <td class="headerCovTableEntry">12</td>
+            <td class="headerCovTableEntry">12</td>
+          </tr>
+                  <tr><td><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+          </table>
+
+          <table cellpadding=0 cellspacing=0 border=0>
+            <tr>
+              <td><br></td>
+            </tr>
+            <tr>
+              <td>
+<pre class="sourceHeading">            Line data    Source code</pre>
+<pre class="source">
+<span id="L1"><span class="lineNum">       1</span>              : /**</span>
+<span id="L2"><span class="lineNum">       2</span>              :  * @file  aeb_can.c</span>
+<span id="L3"><span class="lineNum">       3</span>              :  * @brief CAN Bus Communication module — implementation.</span>
+<span id="L4"><span class="lineNum">       4</span>              :  *</span>
+<span id="L5"><span class="lineNum">       5</span>              :  * Covers FR-CAN-001..004 from SRS v2.0.</span>
+<span id="L6"><span class="lineNum">       6</span>              :  * All signal layouts match aeb_system.dbc.</span>
+<span id="L7"><span class="lineNum">       7</span>              :  * MISRA C:2012 compliant: no malloc, no recursion, fixed-width types,</span>
+<span id="L8"><span class="lineNum">       8</span>              :  * all variables initialised, single return per function (preferred),</span>
+<span id="L9"><span class="lineNum">       9</span>              :  * bounded loops, default in every switch.</span>
+<span id="L10"><span class="lineNum">      10</span>              :  *</span>
+<span id="L11"><span class="lineNum">      11</span>              :  * @author  Renato Fagundes</span>
+<span id="L12"><span class="lineNum">      12</span>              :  * @date    2026-04-07</span>
+<span id="L13"><span class="lineNum">      13</span>              :  */</span>
+<span id="L14"><span class="lineNum">      14</span>              : </span>
+<span id="L15"><span class="lineNum">      15</span>              : #include &quot;aeb_can.h&quot;</span>
+<span id="L16"><span class="lineNum">      16</span>              : #include &quot;can_hal.h&quot;   /* Zephyr CAN HAL stub / real driver */</span>
+<span id="L17"><span class="lineNum">      17</span>              : #include &lt;string.h&gt;</span>
+<span id="L18"><span class="lineNum">      18</span>              : </span>
+<span id="L19"><span class="lineNum">      19</span>              : /* ═══════════════════════════════════════════════════════════════════════</span>
+<span id="L20"><span class="lineNum">      20</span>              :  *  PRIVATE HELPERS — Signal pack / unpack  (FR-CAN-003)</span>
+<span id="L21"><span class="lineNum">      21</span>              :  * ═══════════════════════════════════════════════════════════════════════ */</span>
+<span id="L22"><span class="lineNum">      22</span>              : </span>
+<span id="L23"><span class="lineNum">      23</span>              : /**</span>
+<span id="L24"><span class="lineNum">      24</span>              :  * @brief Pack an unsigned raw value into a little-endian CAN payload.</span>
+<span id="L25"><span class="lineNum">      25</span>              :  */</span>
+<span id="L26"><span class="lineNum">      26</span> <span class="tlaGNC tlaBgGNC">         745 : void can_pack_signal(uint8_t *data,</span></span>
+<span id="L27"><span class="lineNum">      27</span>              :                      uint8_t  start_bit,</span>
+<span id="L28"><span class="lineNum">      28</span>              :                      uint8_t  length,</span>
+<span id="L29"><span class="lineNum">      29</span>              :                      uint32_t raw_value)</span>
+<span id="L30"><span class="lineNum">      30</span>              : {</span>
+<span id="L31"><span class="lineNum">      31</span> <span class="tlaGNC">         745 :     uint8_t bit_idx = 0U;</span></span>
+<span id="L32"><span class="lineNum">      32</span>              : </span>
+<span id="L33"><span class="lineNum">      33</span> <span class="tlaGNC">        4756 :     for (bit_idx = 0U; bit_idx &lt; length; bit_idx++)</span></span>
+<span id="L34"><span class="lineNum">      34</span>              :     {</span>
+<span id="L35"><span class="lineNum">      35</span> <span class="tlaGNC">        4011 :         uint8_t  abs_bit  = start_bit + bit_idx;</span></span>
+<span id="L36"><span class="lineNum">      36</span> <span class="tlaGNC">        4011 :         uint8_t  byte_pos = abs_bit / 8U;</span></span>
+<span id="L37"><span class="lineNum">      37</span> <span class="tlaGNC">        4011 :         uint8_t  bit_pos  = abs_bit % 8U;</span></span>
+<span id="L38"><span class="lineNum">      38</span> <span class="tlaGNC">        4011 :         uint8_t  bit_val  = (uint8_t)((raw_value &gt;&gt; bit_idx) &amp; 1U);</span></span>
+<span id="L39"><span class="lineNum">      39</span>              : </span>
+<span id="L40"><span class="lineNum">      40</span>              :         /* Clear then set the target bit */</span>
+<span id="L41"><span class="lineNum">      41</span> <span class="tlaGNC">        4011 :         data[byte_pos] = (uint8_t)(data[byte_pos] &amp; (uint8_t)(~(1U &lt;&lt; bit_pos)));</span></span>
+<span id="L42"><span class="lineNum">      42</span> <span class="tlaGNC">        4011 :         data[byte_pos] = (uint8_t)(data[byte_pos] | (uint8_t)(bit_val &lt;&lt; bit_pos));</span></span>
+<span id="L43"><span class="lineNum">      43</span>              :     }</span>
+<span id="L44"><span class="lineNum">      44</span> <span class="tlaGNC">         745 : }</span></span>
+<span id="L45"><span class="lineNum">      45</span>              : </span>
+<span id="L46"><span class="lineNum">      46</span>              : /**</span>
+<span id="L47"><span class="lineNum">      47</span>              :  * @brief Unpack an unsigned raw value from a little-endian CAN payload.</span>
+<span id="L48"><span class="lineNum">      48</span>              :  */</span>
+<span id="L49"><span class="lineNum">      49</span> <span class="tlaGNC">          40 : uint32_t can_unpack_signal(const uint8_t *data,</span></span>
+<span id="L50"><span class="lineNum">      50</span>              :                            uint8_t        start_bit,</span>
+<span id="L51"><span class="lineNum">      51</span>              :                            uint8_t        length)</span>
+<span id="L52"><span class="lineNum">      52</span>              : {</span>
+<span id="L53"><span class="lineNum">      53</span> <span class="tlaGNC">          40 :     uint32_t result  = 0U;</span></span>
+<span id="L54"><span class="lineNum">      54</span> <span class="tlaGNC">          40 :     uint8_t  bit_idx = 0U;</span></span>
+<span id="L55"><span class="lineNum">      55</span>              : </span>
+<span id="L56"><span class="lineNum">      56</span> <span class="tlaGNC">         444 :     for (bit_idx = 0U; bit_idx &lt; length; bit_idx++)</span></span>
+<span id="L57"><span class="lineNum">      57</span>              :     {</span>
+<span id="L58"><span class="lineNum">      58</span> <span class="tlaGNC">         404 :         uint8_t  abs_bit  = start_bit + bit_idx;</span></span>
+<span id="L59"><span class="lineNum">      59</span> <span class="tlaGNC">         404 :         uint8_t  byte_pos = abs_bit / 8U;</span></span>
+<span id="L60"><span class="lineNum">      60</span> <span class="tlaGNC">         404 :         uint8_t  bit_pos  = abs_bit % 8U;</span></span>
+<span id="L61"><span class="lineNum">      61</span> <span class="tlaGNC">         404 :         uint8_t  bit_val  = (uint8_t)((data[byte_pos] &gt;&gt; bit_pos) &amp; 1U);</span></span>
+<span id="L62"><span class="lineNum">      62</span>              : </span>
+<span id="L63"><span class="lineNum">      63</span> <span class="tlaGNC">         404 :         result |= ((uint32_t)bit_val &lt;&lt; bit_idx);</span></span>
+<span id="L64"><span class="lineNum">      64</span>              :     }</span>
+<span id="L65"><span class="lineNum">      65</span>              : </span>
+<span id="L66"><span class="lineNum">      66</span> <span class="tlaGNC">          40 :     return result;</span></span>
+<span id="L67"><span class="lineNum">      67</span>              : }</span>
+<span id="L68"><span class="lineNum">      68</span>              : </span>
+<span id="L69"><span class="lineNum">      69</span>              : /* ═══════════════════════════════════════════════════════════════════════</span>
+<span id="L70"><span class="lineNum">      70</span>              :  *  PRIVATE — Physical-to-raw / raw-to-physical conversions</span>
+<span id="L71"><span class="lineNum">      71</span>              :  *</span>
+<span id="L72"><span class="lineNum">      72</span>              :  *  DBC formula: physical = raw * factor + offset</span>
+<span id="L73"><span class="lineNum">      73</span>              :  *  Encode:      raw = (physical - offset) / factor</span>
+<span id="L74"><span class="lineNum">      74</span>              :  * ═══════════════════════════════════════════════════════════════════════ */</span>
+<span id="L75"><span class="lineNum">      75</span>              : </span>
+<span id="L76"><span class="lineNum">      76</span> <span class="tlaGNC">         122 : static uint32_t encode_unsigned(float32_t physical,</span></span>
+<span id="L77"><span class="lineNum">      77</span>              :                                 float32_t factor,</span>
+<span id="L78"><span class="lineNum">      78</span>              :                                 float32_t offset)</span>
+<span id="L79"><span class="lineNum">      79</span>              : {</span>
+<span id="L80"><span class="lineNum">      80</span> <span class="tlaGNC">         122 :     float32_t raw_f = (physical - offset) / factor;</span></span>
+<span id="L81"><span class="lineNum">      81</span> <span class="tlaGNC">         122 :     uint32_t  raw   = 0U;</span></span>
+<span id="L82"><span class="lineNum">      82</span>              : </span>
+<span id="L83"><span class="lineNum">      83</span> <span class="tlaGNC">         122 :     if (raw_f &lt; 0.0F)</span></span>
+<span id="L84"><span class="lineNum">      84</span>              :     {</span>
+<span id="L85"><span class="lineNum">      85</span> <span class="tlaGNC">           1 :         raw = 0U;</span></span>
+<span id="L86"><span class="lineNum">      86</span>              :     }</span>
+<span id="L87"><span class="lineNum">      87</span>              :     else</span>
+<span id="L88"><span class="lineNum">      88</span>              :     {</span>
+<span id="L89"><span class="lineNum">      89</span> <span class="tlaGNC">         121 :         raw = (uint32_t)(raw_f + 0.5F);  /* round to nearest */</span></span>
+<span id="L90"><span class="lineNum">      90</span>              :     }</span>
+<span id="L91"><span class="lineNum">      91</span>              : </span>
+<span id="L92"><span class="lineNum">      92</span> <span class="tlaGNC">         122 :     return raw;</span></span>
+<span id="L93"><span class="lineNum">      93</span>              : }</span>
+<span id="L94"><span class="lineNum">      94</span>              : </span>
+<span id="L95"><span class="lineNum">      95</span> <span class="tlaGNC">          17 : static float32_t decode_unsigned(uint32_t  raw,</span></span>
+<span id="L96"><span class="lineNum">      96</span>              :                                  float32_t factor,</span>
+<span id="L97"><span class="lineNum">      97</span>              :                                  float32_t offset)</span>
+<span id="L98"><span class="lineNum">      98</span>              : {</span>
+<span id="L99"><span class="lineNum">      99</span> <span class="tlaGNC">          17 :     return ((float32_t)raw * factor) + offset;</span></span>
+<span id="L100"><span class="lineNum">     100</span>              : }</span>
+<span id="L101"><span class="lineNum">     101</span>              : </span>
+<span id="L102"><span class="lineNum">     102</span>              : /* ═══════════════════════════════════════════════════════════════════════</span>
+<span id="L103"><span class="lineNum">     103</span>              :  *  PRIVATE — CRC-4 computation for BrakeCmd alive monitoring</span>
+<span id="L104"><span class="lineNum">     104</span>              :  * ═══════════════════════════════════════════════════════════════════════ */</span>
+<span id="L105"><span class="lineNum">     105</span>              : </span>
+<span id="L106"><span class="lineNum">     106</span> <span class="tlaGNC">         116 : static uint8_t compute_crc4(const uint8_t *data, uint8_t len)</span></span>
+<span id="L107"><span class="lineNum">     107</span>              : {</span>
+<span id="L108"><span class="lineNum">     108</span> <span class="tlaGNC">         116 :     uint8_t crc = 0x0FU;   /* Initial value, all ones for 4-bit CRC */</span></span>
+<span id="L109"><span class="lineNum">     109</span> <span class="tlaGNC">         116 :     uint8_t i   = 0U;</span></span>
+<span id="L110"><span class="lineNum">     110</span>              : </span>
+<span id="L111"><span class="lineNum">     111</span> <span class="tlaGNC">         464 :     for (i = 0U; i &lt; len; i++)</span></span>
+<span id="L112"><span class="lineNum">     112</span>              :     {</span>
+<span id="L113"><span class="lineNum">     113</span> <span class="tlaGNC">         348 :         uint8_t j = 0U;</span></span>
+<span id="L114"><span class="lineNum">     114</span>              : </span>
+<span id="L115"><span class="lineNum">     115</span> <span class="tlaGNC">         348 :         crc ^= (data[i] &amp; 0x0FU);</span></span>
+<span id="L116"><span class="lineNum">     116</span> <span class="tlaGNC">        1740 :         for (j = 0U; j &lt; 4U; j++)</span></span>
+<span id="L117"><span class="lineNum">     117</span>              :         {</span>
+<span id="L118"><span class="lineNum">     118</span> <span class="tlaGNC">        1392 :             if ((crc &amp; 0x08U) != 0U)</span></span>
+<span id="L119"><span class="lineNum">     119</span>              :             {</span>
+<span id="L120"><span class="lineNum">     120</span> <span class="tlaGNC">         810 :                 crc = (uint8_t)((crc &lt;&lt; 1U) ^ 0x03U);  /* Poly x^4+x+1 */</span></span>
+<span id="L121"><span class="lineNum">     121</span>              :             }</span>
+<span id="L122"><span class="lineNum">     122</span>              :             else</span>
+<span id="L123"><span class="lineNum">     123</span>              :             {</span>
+<span id="L124"><span class="lineNum">     124</span> <span class="tlaGNC">         582 :                 crc = (uint8_t)(crc &lt;&lt; 1U);</span></span>
+<span id="L125"><span class="lineNum">     125</span>              :             }</span>
+<span id="L126"><span class="lineNum">     126</span> <span class="tlaGNC">        1392 :             crc &amp;= 0x0FU;</span></span>
+<span id="L127"><span class="lineNum">     127</span>              :         }</span>
+<span id="L128"><span class="lineNum">     128</span>              : </span>
+<span id="L129"><span class="lineNum">     129</span> <span class="tlaGNC">         348 :         crc ^= ((data[i] &gt;&gt; 4U) &amp; 0x0FU);</span></span>
+<span id="L130"><span class="lineNum">     130</span> <span class="tlaGNC">        1740 :         for (j = 0U; j &lt; 4U; j++)</span></span>
+<span id="L131"><span class="lineNum">     131</span>              :         {</span>
+<span id="L132"><span class="lineNum">     132</span> <span class="tlaGNC">        1392 :             if ((crc &amp; 0x08U) != 0U)</span></span>
+<span id="L133"><span class="lineNum">     133</span>              :             {</span>
+<span id="L134"><span class="lineNum">     134</span> <span class="tlaGNC">         701 :                 crc = (uint8_t)((crc &lt;&lt; 1U) ^ 0x03U);</span></span>
+<span id="L135"><span class="lineNum">     135</span>              :             }</span>
+<span id="L136"><span class="lineNum">     136</span>              :             else</span>
+<span id="L137"><span class="lineNum">     137</span>              :             {</span>
+<span id="L138"><span class="lineNum">     138</span> <span class="tlaGNC">         691 :                 crc = (uint8_t)(crc &lt;&lt; 1U);</span></span>
+<span id="L139"><span class="lineNum">     139</span>              :             }</span>
+<span id="L140"><span class="lineNum">     140</span> <span class="tlaGNC">        1392 :             crc &amp;= 0x0FU;</span></span>
+<span id="L141"><span class="lineNum">     141</span>              :         }</span>
+<span id="L142"><span class="lineNum">     142</span>              :     }</span>
+<span id="L143"><span class="lineNum">     143</span>              : </span>
+<span id="L144"><span class="lineNum">     144</span> <span class="tlaGNC">         116 :     return crc;</span></span>
+<span id="L145"><span class="lineNum">     145</span>              : }</span>
+<span id="L146"><span class="lineNum">     146</span>              : </span>
+<span id="L147"><span class="lineNum">     147</span>              : /* ═══════════════════════════════════════════════════════════════════════</span>
+<span id="L148"><span class="lineNum">     148</span>              :  *  PUBLIC API</span>
+<span id="L149"><span class="lineNum">     149</span>              :  * ═══════════════════════════════════════════════════════════════════════ */</span>
+<span id="L150"><span class="lineNum">     150</span>              : </span>
+<span id="L151"><span class="lineNum">     151</span>              : /**</span>
+<span id="L152"><span class="lineNum">     152</span>              :  * @brief Initialise CAN driver at 500 kbit/s, register RX filters.</span>
+<span id="L153"><span class="lineNum">     153</span>              :  * @req FR-CAN-004</span>
+<span id="L154"><span class="lineNum">     154</span>              :  */</span>
+<span id="L155"><span class="lineNum">     155</span> <span class="tlaGNC">          40 : int32_t can_init(can_state_t *state)</span></span>
+<span id="L156"><span class="lineNum">     156</span>              : {</span>
+<span id="L157"><span class="lineNum">     157</span> <span class="tlaGNC">          40 :     int32_t result = CAN_OK;</span></span>
+<span id="L158"><span class="lineNum">     158</span>              : </span>
+<span id="L159"><span class="lineNum">     159</span>              :     /* Zero the entire state */</span>
+<span id="L160"><span class="lineNum">     160</span> <span class="tlaGNC">          40 :     (void)memset(state, 0, sizeof(can_state_t));</span></span>
+<span id="L161"><span class="lineNum">     161</span>              : </span>
+<span id="L162"><span class="lineNum">     162</span>              :     /* Initialise CAN peripheral via HAL */</span>
+<span id="L163"><span class="lineNum">     163</span> <span class="tlaGNC">          40 :     if (can_hal_init(CAN_BAUD_500K) != 0)</span></span>
+<span id="L164"><span class="lineNum">     164</span>              :     {</span>
+<span id="L165"><span class="lineNum">     165</span> <span class="tlaGNC">           2 :         result = CAN_ERR_INIT;</span></span>
+<span id="L166"><span class="lineNum">     166</span>              :     }</span>
+<span id="L167"><span class="lineNum">     167</span>              :     else</span>
+<span id="L168"><span class="lineNum">     168</span>              :     {</span>
+<span id="L169"><span class="lineNum">     169</span>              :         /* Register RX filters for the three messages we receive */</span>
+<span id="L170"><span class="lineNum">     170</span> <span class="tlaGNC">          38 :         (void)can_hal_add_rx_filter(CAN_ID_EGO_VEHICLE);</span></span>
+<span id="L171"><span class="lineNum">     171</span> <span class="tlaGNC">          38 :         (void)can_hal_add_rx_filter(CAN_ID_DRIVER_INPUT);</span></span>
+<span id="L172"><span class="lineNum">     172</span> <span class="tlaGNC">          38 :         (void)can_hal_add_rx_filter(CAN_ID_RADAR_TARGET);</span></span>
+<span id="L173"><span class="lineNum">     173</span>              : </span>
+<span id="L174"><span class="lineNum">     174</span> <span class="tlaGNC">          38 :         state-&gt;initialised = 1U;</span></span>
+<span id="L175"><span class="lineNum">     175</span>              :     }</span>
+<span id="L176"><span class="lineNum">     176</span>              : </span>
+<span id="L177"><span class="lineNum">     177</span> <span class="tlaGNC">          40 :     return result;</span></span>
+<span id="L178"><span class="lineNum">     178</span>              : }</span>
+<span id="L179"><span class="lineNum">     179</span>              : </span>
+<span id="L180"><span class="lineNum">     180</span>              : /**</span>
+<span id="L181"><span class="lineNum">     181</span>              :  * @brief Decode a received CAN frame into the internal RX struct.</span>
+<span id="L182"><span class="lineNum">     182</span>              :  * @req FR-CAN-002, FR-CAN-003</span>
+<span id="L183"><span class="lineNum">     183</span>              :  */</span>
+<span id="L184"><span class="lineNum">     184</span> <span class="tlaGNC">          12 : void can_rx_process(can_state_t   *state,</span></span>
+<span id="L185"><span class="lineNum">     185</span>              :                     uint32_t       id,</span>
+<span id="L186"><span class="lineNum">     186</span>              :                     const uint8_t *data,</span>
+<span id="L187"><span class="lineNum">     187</span>              :                     uint8_t        dlc)</span>
+<span id="L188"><span class="lineNum">     188</span>              : {</span>
+<span id="L189"><span class="lineNum">     189</span> <span class="tlaGNC">          12 :     if ((state != NULL) &amp;&amp; (data != NULL))</span></span>
+<span id="L190"><span class="lineNum">     190</span>              :     {</span>
+<span id="L191"><span class="lineNum">     191</span> <span class="tlaGNC">          10 :     if (id == CAN_ID_EGO_VEHICLE)</span></span>
+<span id="L192"><span class="lineNum">     192</span>              :     {</span>
+<span id="L193"><span class="lineNum">     193</span> <span class="tlaGNC">           3 :         if (dlc &gt;= CAN_DLC_EGO_VEHICLE)</span></span>
+<span id="L194"><span class="lineNum">     194</span>              :         {</span>
+<span id="L195"><span class="lineNum">     195</span>              :             /* VehicleSpeed:  bits 0..15, factor 0.01, offset 0 */</span>
+<span id="L196"><span class="lineNum">     196</span> <span class="tlaGNC">           2 :             uint32_t raw_spd = can_unpack_signal(data, 0U, 16U);</span></span>
+<span id="L197"><span class="lineNum">     197</span> <span class="tlaGNC">           2 :             state-&gt;last_rx.vehicle_speed = decode_unsigned(raw_spd, 0.01F, 0.0F);</span></span>
+<span id="L198"><span class="lineNum">     198</span>              : </span>
+<span id="L199"><span class="lineNum">     199</span>              :             /* LongAccel:  bits 16..31, factor 0.001, offset -32</span>
+<span id="L200"><span class="lineNum">     200</span>              :              * DBC @1+ = unsigned raw with offset */</span>
+<span id="L201"><span class="lineNum">     201</span> <span class="tlaGNC">           2 :             uint32_t raw_acc = can_unpack_signal(data, 16U, 16U);</span></span>
+<span id="L202"><span class="lineNum">     202</span> <span class="tlaGNC">           2 :             state-&gt;last_rx.long_accel = decode_unsigned(raw_acc, 0.001F, -32.0F);</span></span>
+<span id="L203"><span class="lineNum">     203</span>              : </span>
+<span id="L204"><span class="lineNum">     204</span>              :             /* YawRate:  bits 32..47, factor 0.01, offset -327.68 */</span>
+<span id="L205"><span class="lineNum">     205</span> <span class="tlaGNC">           2 :             uint32_t raw_yaw = can_unpack_signal(data, 32U, 16U);</span></span>
+<span id="L206"><span class="lineNum">     206</span> <span class="tlaGNC">           2 :             state-&gt;last_rx.yaw_rate = decode_unsigned(raw_yaw, 0.01F, -327.68F);</span></span>
+<span id="L207"><span class="lineNum">     207</span>              : </span>
+<span id="L208"><span class="lineNum">     208</span>              :             /* SteeringAngle:  bits 48..63, factor 0.1, offset -3276.8 */</span>
+<span id="L209"><span class="lineNum">     209</span> <span class="tlaGNC">           2 :             uint32_t raw_str = can_unpack_signal(data, 48U, 16U);</span></span>
+<span id="L210"><span class="lineNum">     210</span> <span class="tlaGNC">           2 :             state-&gt;last_rx.steering_angle = decode_unsigned(raw_str, 0.1F, -3276.8F);</span></span>
+<span id="L211"><span class="lineNum">     211</span>              :         }</span>
+<span id="L212"><span class="lineNum">     212</span>              :     }</span>
+<span id="L213"><span class="lineNum">     213</span> <span class="tlaGNC">           7 :     else if (id == CAN_ID_DRIVER_INPUT)</span></span>
+<span id="L214"><span class="lineNum">     214</span>              :     {</span>
+<span id="L215"><span class="lineNum">     215</span> <span class="tlaGNC">           2 :         if (dlc &gt;= CAN_DLC_DRIVER_INPUT)</span></span>
+<span id="L216"><span class="lineNum">     216</span>              :         {</span>
+<span id="L217"><span class="lineNum">     217</span>              :             /* BrakePedal:  bits 0..7, factor 1, offset 0 */</span>
+<span id="L218"><span class="lineNum">     218</span> <span class="tlaGNC">           1 :             uint32_t raw_bp = can_unpack_signal(data, 0U, 8U);</span></span>
+<span id="L219"><span class="lineNum">     219</span> <span class="tlaGNC">           1 :             state-&gt;last_rx.brake_pedal = (uint8_t)raw_bp;</span></span>
+<span id="L220"><span class="lineNum">     220</span>              : </span>
+<span id="L221"><span class="lineNum">     221</span>              :             /* AccelPedal:  bits 8..15, factor 1, offset 0 */</span>
+<span id="L222"><span class="lineNum">     222</span> <span class="tlaGNC">           1 :             uint32_t raw_ap = can_unpack_signal(data, 8U, 8U);</span></span>
+<span id="L223"><span class="lineNum">     223</span> <span class="tlaGNC">           1 :             state-&gt;last_rx.accel_pedal = (uint8_t)raw_ap;</span></span>
+<span id="L224"><span class="lineNum">     224</span>              : </span>
+<span id="L225"><span class="lineNum">     225</span>              :             /* AEB_Enable:  bit 16, 1 bit */</span>
+<span id="L226"><span class="lineNum">     226</span> <span class="tlaGNC">           1 :             uint32_t raw_en = can_unpack_signal(data, 16U, 1U);</span></span>
+<span id="L227"><span class="lineNum">     227</span> <span class="tlaGNC">           1 :             state-&gt;last_rx.aeb_enable = (uint8_t)raw_en;</span></span>
+<span id="L228"><span class="lineNum">     228</span>              : </span>
+<span id="L229"><span class="lineNum">     229</span>              :             /* DriverOverride:  bit 17, 1 bit */</span>
+<span id="L230"><span class="lineNum">     230</span> <span class="tlaGNC">           1 :             uint32_t raw_ov = can_unpack_signal(data, 17U, 1U);</span></span>
+<span id="L231"><span class="lineNum">     231</span> <span class="tlaGNC">           1 :             state-&gt;last_rx.driver_override = (uint8_t)raw_ov;</span></span>
+<span id="L232"><span class="lineNum">     232</span>              :         }</span>
+<span id="L233"><span class="lineNum">     233</span>              :     }</span>
+<span id="L234"><span class="lineNum">     234</span> <span class="tlaGNC">           5 :     else if (id == CAN_ID_RADAR_TARGET)</span></span>
+<span id="L235"><span class="lineNum">     235</span>              :     {</span>
+<span id="L236"><span class="lineNum">     236</span> <span class="tlaGNC">           4 :         if (dlc &gt;= CAN_DLC_RADAR_TARGET)</span></span>
+<span id="L237"><span class="lineNum">     237</span>              :         {</span>
+<span id="L238"><span class="lineNum">     238</span>              :             /* TargetDistance:  bits 0..15, factor 0.01, offset 0 */</span>
+<span id="L239"><span class="lineNum">     239</span> <span class="tlaGNC">           3 :             uint32_t raw_dist = can_unpack_signal(data, 0U, 16U);</span></span>
+<span id="L240"><span class="lineNum">     240</span> <span class="tlaGNC">           3 :             state-&gt;last_rx.target_distance = decode_unsigned(raw_dist, 0.01F, 0.0F);</span></span>
+<span id="L241"><span class="lineNum">     241</span>              : </span>
+<span id="L242"><span class="lineNum">     242</span>              :             /* RelativeSpeed:  bits 16..31, factor 0.01, offset -327.68</span>
+<span id="L243"><span class="lineNum">     243</span>              :              * DBC @1+ = unsigned raw with offset */</span>
+<span id="L244"><span class="lineNum">     244</span> <span class="tlaGNC">           3 :             uint32_t raw_vrel = can_unpack_signal(data, 16U, 16U);</span></span>
+<span id="L245"><span class="lineNum">     245</span> <span class="tlaGNC">           3 :             state-&gt;last_rx.relative_speed = decode_unsigned(raw_vrel, 0.01F, -327.68F);</span></span>
+<span id="L246"><span class="lineNum">     246</span>              : </span>
+<span id="L247"><span class="lineNum">     247</span>              :             /* TTC:  bits 32..47, factor 0.001, offset 0 */</span>
+<span id="L248"><span class="lineNum">     248</span> <span class="tlaGNC">           3 :             uint32_t raw_ttc = can_unpack_signal(data, 32U, 16U);</span></span>
+<span id="L249"><span class="lineNum">     249</span> <span class="tlaGNC">           3 :             state-&gt;last_rx.ttc_radar = decode_unsigned(raw_ttc, 0.001F, 0.0F);</span></span>
+<span id="L250"><span class="lineNum">     250</span>              : </span>
+<span id="L251"><span class="lineNum">     251</span>              :             /* Confidence:  bits 48..55, factor 1, offset 0 */</span>
+<span id="L252"><span class="lineNum">     252</span> <span class="tlaGNC">           3 :             uint32_t raw_conf = can_unpack_signal(data, 48U, 8U);</span></span>
+<span id="L253"><span class="lineNum">     253</span> <span class="tlaGNC">           3 :             state-&gt;last_rx.confidence_raw = (uint8_t)raw_conf;</span></span>
+<span id="L254"><span class="lineNum">     254</span>              : </span>
+<span id="L255"><span class="lineNum">     255</span>              :             /* Valid frame received — reset miss counter */</span>
+<span id="L256"><span class="lineNum">     256</span> <span class="tlaGNC">           3 :             state-&gt;rx_miss_count = 0U;</span></span>
+<span id="L257"><span class="lineNum">     257</span> <span class="tlaGNC">           3 :             state-&gt;last_rx.rx_timeout_flag = 0U;</span></span>
+<span id="L258"><span class="lineNum">     258</span>              :         }</span>
+<span id="L259"><span class="lineNum">     259</span>              :     }</span>
+<span id="L260"><span class="lineNum">     260</span>              :     else</span>
+<span id="L261"><span class="lineNum">     261</span>              :     {</span>
+<span id="L262"><span class="lineNum">     262</span>              :         /* Unknown ID — ignore (MISRA: all paths handled) */</span>
+<span id="L263"><span class="lineNum">     263</span>              :     }</span>
+<span id="L264"><span class="lineNum">     264</span>              :     } /* end null guard */</span>
+<span id="L265"><span class="lineNum">     265</span> <span class="tlaGNC">          12 : }</span></span>
+<span id="L266"><span class="lineNum">     266</span>              : </span>
+<span id="L267"><span class="lineNum">     267</span>              : /**</span>
+<span id="L268"><span class="lineNum">     268</span>              :  * @brief Check for RX timeout.  Call once per 10 ms tick.</span>
+<span id="L269"><span class="lineNum">     269</span>              :  * @req FR-CAN-002 (timeout: 3 × 20 ms = 60 ms)</span>
+<span id="L270"><span class="lineNum">     270</span>              :  */</span>
+<span id="L271"><span class="lineNum">     271</span> <span class="tlaGNC">          24 : void can_check_timeout(can_state_t *state)</span></span>
+<span id="L272"><span class="lineNum">     272</span>              : {</span>
+<span id="L273"><span class="lineNum">     273</span> <span class="tlaGNC">          24 :     if (state != NULL)</span></span>
+<span id="L274"><span class="lineNum">     274</span>              :     {</span>
+<span id="L275"><span class="lineNum">     275</span> <span class="tlaGNC">          23 :     if (state-&gt;rx_miss_count &lt; 255U)</span></span>
+<span id="L276"><span class="lineNum">     276</span>              :     {</span>
+<span id="L277"><span class="lineNum">     277</span> <span class="tlaGNC">          22 :         state-&gt;rx_miss_count++;</span></span>
+<span id="L278"><span class="lineNum">     278</span>              :     }</span>
+<span id="L279"><span class="lineNum">     279</span>              : </span>
+<span id="L280"><span class="lineNum">     280</span>              :     /*</span>
+<span id="L281"><span class="lineNum">     281</span>              :      * Radar period = 20 ms, our tick = 10 ms.</span>
+<span id="L282"><span class="lineNum">     282</span>              :      * 3 missed frames ≈ 6 ticks of 10 ms = 60 ms.</span>
+<span id="L283"><span class="lineNum">     283</span>              :      * We use CAN_RX_TIMEOUT_CYCLES (3) as a count of our 20-ms-equivalent</span>
+<span id="L284"><span class="lineNum">     284</span>              :      * intervals, so threshold = 3 * 2 = 6 ticks.</span>
+<span id="L285"><span class="lineNum">     285</span>              :      */</span>
+<span id="L286"><span class="lineNum">     286</span> <span class="tlaGNC">          23 :     if (state-&gt;rx_miss_count &gt;= (CAN_RX_TIMEOUT_CYCLES * 2U))</span></span>
+<span id="L287"><span class="lineNum">     287</span>              :     {</span>
+<span id="L288"><span class="lineNum">     288</span> <span class="tlaGNC">           7 :         state-&gt;last_rx.rx_timeout_flag = 1U;</span></span>
+<span id="L289"><span class="lineNum">     289</span>              :     }</span>
+<span id="L290"><span class="lineNum">     290</span>              :     } /* end null guard */</span>
+<span id="L291"><span class="lineNum">     291</span> <span class="tlaGNC">          24 : }</span></span>
+<span id="L292"><span class="lineNum">     292</span>              : </span>
+<span id="L293"><span class="lineNum">     293</span>              : /**</span>
+<span id="L294"><span class="lineNum">     294</span>              :  * @brief Transmit AEB_BrakeCmd (0x080) with alive counter and CRC.</span>
+<span id="L295"><span class="lineNum">     295</span>              :  * @req FR-CAN-003</span>
+<span id="L296"><span class="lineNum">     296</span>              :  */</span>
+<span id="L297"><span class="lineNum">     297</span> <span class="tlaGNC">         119 : int32_t can_tx_brake_cmd(can_state_t       *state,</span></span>
+<span id="L298"><span class="lineNum">     298</span>              :                          const pid_output_t *pid_out,</span>
+<span id="L299"><span class="lineNum">     299</span>              :                          const fsm_output_t *fsm_out)</span>
+<span id="L300"><span class="lineNum">     300</span>              : {</span>
+<span id="L301"><span class="lineNum">     301</span> <span class="tlaGNC">         119 :     int32_t result = CAN_OK;</span></span>
+<span id="L302"><span class="lineNum">     302</span>              : </span>
+<span id="L303"><span class="lineNum">     303</span> <span class="tlaGNC">         119 :     if ((state == NULL) || (pid_out == NULL) || (fsm_out == NULL))</span></span>
+<span id="L304"><span class="lineNum">     304</span>              :     {</span>
+<span id="L305"><span class="lineNum">     305</span> <span class="tlaGNC">           3 :         result = CAN_ERR_TX;</span></span>
+<span id="L306"><span class="lineNum">     306</span>              :     }</span>
+<span id="L307"><span class="lineNum">     307</span>              :     else</span>
+<span id="L308"><span class="lineNum">     308</span>              :     {</span>
+<span id="L309"><span class="lineNum">     309</span> <span class="tlaGNC">         116 :         uint8_t frame[8]   = {0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U};</span></span>
+<span id="L310"><span class="lineNum">     310</span> <span class="tlaGNC">         116 :         uint8_t brake_mode = 0U;</span></span>
+<span id="L311"><span class="lineNum">     311</span>              : </span>
+<span id="L312"><span class="lineNum">     312</span>              :         /* BrakeRequest: bit 0, 1 bit */</span>
+<span id="L313"><span class="lineNum">     313</span> <span class="tlaGNC">         116 :         uint32_t brake_req = (pid_out-&gt;brake_pct &gt; 0.0F) ? 1U : 0U;</span></span>
+<span id="L314"><span class="lineNum">     314</span> <span class="tlaGNC">         116 :         can_pack_signal(frame, 0U, 1U, brake_req);</span></span>
+<span id="L315"><span class="lineNum">     315</span>              : </span>
+<span id="L316"><span class="lineNum">     316</span>              :         /* BrakePressure: bits 1..15, factor 0.1, offset 0 */</span>
+<span id="L317"><span class="lineNum">     317</span> <span class="tlaGNC">         116 :         uint32_t raw_press = encode_unsigned(pid_out-&gt;brake_bar, 0.1F, 0.0F);</span></span>
+<span id="L318"><span class="lineNum">     318</span> <span class="tlaGNC">         116 :         can_pack_signal(frame, 1U, 15U, raw_press);</span></span>
+<span id="L319"><span class="lineNum">     319</span>              : </span>
+<span id="L320"><span class="lineNum">     320</span>              :         /* BrakeMode: bits 16..18, 3 bits — map FSM state to brake mode */</span>
+<span id="L321"><span class="lineNum">     321</span> <span class="tlaGNC">         116 :         switch (fsm_out-&gt;fsm_state)</span></span>
+<span id="L322"><span class="lineNum">     322</span>              :         {</span>
+<span id="L323"><span class="lineNum">     323</span> <span class="tlaGNC">           1 :             case (uint8_t)FSM_OFF:        brake_mode = 0U; break;</span></span>
+<span id="L324"><span class="lineNum">     324</span> <span class="tlaGNC">           4 :             case (uint8_t)FSM_STANDBY:    brake_mode = 0U; break;</span></span>
+<span id="L325"><span class="lineNum">     325</span> <span class="tlaGNC">           1 :             case (uint8_t)FSM_WARNING:    brake_mode = 1U; break;</span></span>
+<span id="L326"><span class="lineNum">     326</span> <span class="tlaGNC">         106 :             case (uint8_t)FSM_BRAKE_L1:   brake_mode = 2U; break;</span></span>
+<span id="L327"><span class="lineNum">     327</span> <span class="tlaGNC">           1 :             case (uint8_t)FSM_BRAKE_L2:   brake_mode = 3U; break;</span></span>
+<span id="L328"><span class="lineNum">     328</span> <span class="tlaGNC">           1 :             case (uint8_t)FSM_BRAKE_L3:   brake_mode = 4U; break;</span></span>
+<span id="L329"><span class="lineNum">     329</span> <span class="tlaGNC">           1 :             case (uint8_t)FSM_POST_BRAKE: brake_mode = 5U; break;</span></span>
+<span id="L330"><span class="lineNum">     330</span> <span class="tlaGNC">           1 :             default:                      brake_mode = 0U; break;</span></span>
+<span id="L331"><span class="lineNum">     331</span>              :         }</span>
+<span id="L332"><span class="lineNum">     332</span> <span class="tlaGNC">         116 :         can_pack_signal(frame, 16U, 3U, (uint32_t)brake_mode);</span></span>
+<span id="L333"><span class="lineNum">     333</span>              : </span>
+<span id="L334"><span class="lineNum">     334</span>              :         /* AliveCounter: bits 24..27, 4 bits */</span>
+<span id="L335"><span class="lineNum">     335</span> <span class="tlaGNC">         116 :         can_pack_signal(frame, 24U, 4U, (uint32_t)state-&gt;alive_counter);</span></span>
+<span id="L336"><span class="lineNum">     336</span>              : </span>
+<span id="L337"><span class="lineNum">     337</span>              :         /* CRC: bits 28..31, 4 bits — computed over bytes 0..2 */</span>
+<span id="L338"><span class="lineNum">     338</span> <span class="tlaGNC">         116 :         uint8_t crc = compute_crc4(frame, 3U);</span></span>
+<span id="L339"><span class="lineNum">     339</span> <span class="tlaGNC">         116 :         can_pack_signal(frame, 28U, 4U, (uint32_t)crc);</span></span>
+<span id="L340"><span class="lineNum">     340</span>              : </span>
+<span id="L341"><span class="lineNum">     341</span>              :         /* Increment alive counter (wraps at 15) */</span>
+<span id="L342"><span class="lineNum">     342</span> <span class="tlaGNC">         116 :         state-&gt;alive_counter++;</span></span>
+<span id="L343"><span class="lineNum">     343</span> <span class="tlaGNC">         116 :         if (state-&gt;alive_counter &gt; ALIVE_COUNTER_MAX)</span></span>
+<span id="L344"><span class="lineNum">     344</span>              :         {</span>
+<span id="L345"><span class="lineNum">     345</span> <span class="tlaGNC">           7 :             state-&gt;alive_counter = 0U;</span></span>
+<span id="L346"><span class="lineNum">     346</span>              :         }</span>
+<span id="L347"><span class="lineNum">     347</span>              : </span>
+<span id="L348"><span class="lineNum">     348</span>              :         /* Send via HAL */</span>
+<span id="L349"><span class="lineNum">     349</span> <span class="tlaGNC">         116 :         if (can_hal_send(CAN_ID_BRAKE_CMD, frame, CAN_DLC_BRAKE_CMD) != 0)</span></span>
+<span id="L350"><span class="lineNum">     350</span>              :         {</span>
+<span id="L351"><span class="lineNum">     351</span> <span class="tlaGNC">          51 :             result = CAN_ERR_TX;</span></span>
+<span id="L352"><span class="lineNum">     352</span>              :         }</span>
+<span id="L353"><span class="lineNum">     353</span>              :     }</span>
+<span id="L354"><span class="lineNum">     354</span>              : </span>
+<span id="L355"><span class="lineNum">     355</span> <span class="tlaGNC">         119 :     return result;</span></span>
+<span id="L356"><span class="lineNum">     356</span>              : }</span>
+<span id="L357"><span class="lineNum">     357</span>              : </span>
+<span id="L358"><span class="lineNum">     358</span>              : /**</span>
+<span id="L359"><span class="lineNum">     359</span>              :  * @brief Transmit AEB_FSMState (0x200) every 50 ms.</span>
+<span id="L360"><span class="lineNum">     360</span>              :  * @req FR-CAN-001</span>
+<span id="L361"><span class="lineNum">     361</span>              :  */</span>
+<span id="L362"><span class="lineNum">     362</span> <span class="tlaGNC">          33 : int32_t can_tx_fsm_state(can_state_t       *state,</span></span>
+<span id="L363"><span class="lineNum">     363</span>              :                          const fsm_output_t *fsm_out)</span>
+<span id="L364"><span class="lineNum">     364</span>              : {</span>
+<span id="L365"><span class="lineNum">     365</span> <span class="tlaGNC">          33 :     int32_t result = 1;   /* 1 = not yet due */</span></span>
+<span id="L366"><span class="lineNum">     366</span>              : </span>
+<span id="L367"><span class="lineNum">     367</span> <span class="tlaGNC">          33 :     if ((state == NULL) || (fsm_out == NULL))</span></span>
+<span id="L368"><span class="lineNum">     368</span>              :     {</span>
+<span id="L369"><span class="lineNum">     369</span> <span class="tlaGNC">           2 :         result = CAN_ERR_TX;</span></span>
+<span id="L370"><span class="lineNum">     370</span>              :     }</span>
+<span id="L371"><span class="lineNum">     371</span>              :     else</span>
+<span id="L372"><span class="lineNum">     372</span>              :     {</span>
+<span id="L373"><span class="lineNum">     373</span> <span class="tlaGNC">          31 :         state-&gt;tx_cycle_counter++;</span></span>
+<span id="L374"><span class="lineNum">     374</span>              : </span>
+<span id="L375"><span class="lineNum">     375</span>              :         /* 50 ms / 10 ms = every 5 ticks */</span>
+<span id="L376"><span class="lineNum">     376</span> <span class="tlaGNC">          31 :         if (state-&gt;tx_cycle_counter &gt;= 5U)</span></span>
+<span id="L377"><span class="lineNum">     377</span>              :         {</span>
+<span id="L378"><span class="lineNum">     378</span> <span class="tlaGNC">           6 :             uint8_t frame[4] = {0U, 0U, 0U, 0U};</span></span>
+<span id="L379"><span class="lineNum">     379</span>              : </span>
+<span id="L380"><span class="lineNum">     380</span> <span class="tlaGNC">           6 :             state-&gt;tx_cycle_counter = 0U;</span></span>
+<span id="L381"><span class="lineNum">     381</span>              : </span>
+<span id="L382"><span class="lineNum">     382</span>              :             /* FSMState: bits 0..7 */</span>
+<span id="L383"><span class="lineNum">     383</span> <span class="tlaGNC">           6 :             can_pack_signal(frame, 0U, 8U, (uint32_t)fsm_out-&gt;fsm_state);</span></span>
+<span id="L384"><span class="lineNum">     384</span>              : </span>
+<span id="L385"><span class="lineNum">     385</span>              :             /* AlertLevel: bits 8..15 */</span>
+<span id="L386"><span class="lineNum">     386</span> <span class="tlaGNC">           6 :             can_pack_signal(frame, 8U, 8U, (uint32_t)fsm_out-&gt;alert_level);</span></span>
+<span id="L387"><span class="lineNum">     387</span>              : </span>
+<span id="L388"><span class="lineNum">     388</span>              :             /* BrakeActive: bits 16..23 */</span>
+<span id="L389"><span class="lineNum">     389</span> <span class="tlaGNC">           6 :             can_pack_signal(frame, 16U, 8U, (uint32_t)fsm_out-&gt;brake_active);</span></span>
+<span id="L390"><span class="lineNum">     390</span>              : </span>
+<span id="L391"><span class="lineNum">     391</span>              :             /* TTCThreshold: bits 24..31, factor 0.1, offset 0 */</span>
+<span id="L392"><span class="lineNum">     392</span> <span class="tlaGNC">           6 :             float32_t ttc_thresh = 0.0F;</span></span>
+<span id="L393"><span class="lineNum">     393</span> <span class="tlaGNC">           6 :             switch (fsm_out-&gt;fsm_state)</span></span>
+<span id="L394"><span class="lineNum">     394</span>              :             {</span>
+<span id="L395"><span class="lineNum">     395</span> <span class="tlaGNC">           1 :                 case (uint8_t)FSM_WARNING:    ttc_thresh = TTC_WARNING;  break;</span></span>
+<span id="L396"><span class="lineNum">     396</span> <span class="tlaGNC">           2 :                 case (uint8_t)FSM_BRAKE_L1:   ttc_thresh = TTC_BRAKE_L1; break;</span></span>
+<span id="L397"><span class="lineNum">     397</span> <span class="tlaGNC">           1 :                 case (uint8_t)FSM_BRAKE_L2:   ttc_thresh = TTC_BRAKE_L2; break;</span></span>
+<span id="L398"><span class="lineNum">     398</span> <span class="tlaGNC">           1 :                 case (uint8_t)FSM_BRAKE_L3:   ttc_thresh = TTC_BRAKE_L3; break;</span></span>
+<span id="L399"><span class="lineNum">     399</span> <span class="tlaGNC">           1 :                 default:                      ttc_thresh = 0.0F;         break;</span></span>
+<span id="L400"><span class="lineNum">     400</span>              :             }</span>
+<span id="L401"><span class="lineNum">     401</span> <span class="tlaGNC">           6 :             uint32_t raw_ttc = encode_unsigned(ttc_thresh, 0.1F, 0.0F);</span></span>
+<span id="L402"><span class="lineNum">     402</span> <span class="tlaGNC">           6 :             can_pack_signal(frame, 24U, 8U, raw_ttc);</span></span>
+<span id="L403"><span class="lineNum">     403</span>              : </span>
+<span id="L404"><span class="lineNum">     404</span> <span class="tlaGNC">           6 :             if (can_hal_send(CAN_ID_FSM_STATE, frame, CAN_DLC_FSM_STATE) != 0)</span></span>
+<span id="L405"><span class="lineNum">     405</span>              :             {</span>
+<span id="L406"><span class="lineNum">     406</span> <span class="tlaGNC">           1 :                 result = CAN_ERR_TX;</span></span>
+<span id="L407"><span class="lineNum">     407</span>              :             }</span>
+<span id="L408"><span class="lineNum">     408</span>              :             else</span>
+<span id="L409"><span class="lineNum">     409</span>              :             {</span>
+<span id="L410"><span class="lineNum">     410</span> <span class="tlaGNC">           5 :                 result = CAN_OK;</span></span>
+<span id="L411"><span class="lineNum">     411</span>              :             }</span>
+<span id="L412"><span class="lineNum">     412</span>              :         }</span>
+<span id="L413"><span class="lineNum">     413</span>              :     }</span>
+<span id="L414"><span class="lineNum">     414</span>              : </span>
+<span id="L415"><span class="lineNum">     415</span> <span class="tlaGNC">          33 :     return result;</span></span>
+<span id="L416"><span class="lineNum">     416</span>              : }</span>
+<span id="L417"><span class="lineNum">     417</span>              : </span>
+<span id="L418"><span class="lineNum">     418</span>              : /**</span>
+<span id="L419"><span class="lineNum">     419</span>              :  * @brief Transmit AEB_Alert (0x300).</span>
+<span id="L420"><span class="lineNum">     420</span>              :  * @req FR-CAN-003</span>
+<span id="L421"><span class="lineNum">     421</span>              :  */</span>
+<span id="L422"><span class="lineNum">     422</span> <span class="tlaGNC">          42 : int32_t can_tx_alert(const alert_output_t *alert_out)</span></span>
+<span id="L423"><span class="lineNum">     423</span>              : {</span>
+<span id="L424"><span class="lineNum">     424</span> <span class="tlaGNC">          42 :     int32_t result = CAN_OK;</span></span>
+<span id="L425"><span class="lineNum">     425</span>              : </span>
+<span id="L426"><span class="lineNum">     426</span> <span class="tlaGNC">          42 :     if (alert_out == NULL)</span></span>
+<span id="L427"><span class="lineNum">     427</span>              :     {</span>
+<span id="L428"><span class="lineNum">     428</span> <span class="tlaGNC">           1 :         result = CAN_ERR_TX;</span></span>
+<span id="L429"><span class="lineNum">     429</span>              :     }</span>
+<span id="L430"><span class="lineNum">     430</span>              :     else</span>
+<span id="L431"><span class="lineNum">     431</span>              :     {</span>
+<span id="L432"><span class="lineNum">     432</span> <span class="tlaGNC">          41 :         uint8_t frame[2] = {0U, 0U};</span></span>
+<span id="L433"><span class="lineNum">     433</span>              :         /* AlertType: bits 0..7, 8 bits, factor 1, offset 0 */</span>
+<span id="L434"><span class="lineNum">     434</span> <span class="tlaGNC">          41 :         can_pack_signal(frame, 0U, 8U, (uint32_t)alert_out-&gt;alert_type);</span></span>
+<span id="L435"><span class="lineNum">     435</span>              : </span>
+<span id="L436"><span class="lineNum">     436</span>              :         /* AlertActive: bit 8, 1 bit */</span>
+<span id="L437"><span class="lineNum">     437</span> <span class="tlaGNC">          41 :         can_pack_signal(frame, 8U, 1U, (uint32_t)alert_out-&gt;alert_active);</span></span>
+<span id="L438"><span class="lineNum">     438</span>              : </span>
+<span id="L439"><span class="lineNum">     439</span>              :         /* BuzzerCmd: bits 9..11, 3 bits */</span>
+<span id="L440"><span class="lineNum">     440</span> <span class="tlaGNC">          41 :         can_pack_signal(frame, 9U, 3U, (uint32_t)alert_out-&gt;buzzer_cmd);</span></span>
+<span id="L441"><span class="lineNum">     441</span>              : </span>
+<span id="L442"><span class="lineNum">     442</span> <span class="tlaGNC">          41 :         if (can_hal_send(CAN_ID_ALERT, frame, CAN_DLC_ALERT) != 0)</span></span>
+<span id="L443"><span class="lineNum">     443</span>              :         {</span>
+<span id="L444"><span class="lineNum">     444</span> <span class="tlaGNC">           8 :             result = CAN_ERR_TX;</span></span>
+<span id="L445"><span class="lineNum">     445</span>              :         }</span>
+<span id="L446"><span class="lineNum">     446</span>              :     }</span>
+<span id="L447"><span class="lineNum">     447</span>              : </span>
+<span id="L448"><span class="lineNum">     448</span> <span class="tlaGNC">          42 :     return result;</span></span>
+<span id="L449"><span class="lineNum">     449</span>              : }</span>
+<span id="L450"><span class="lineNum">     450</span>              : </span>
+<span id="L451"><span class="lineNum">     451</span>              : /**</span>
+<span id="L452"><span class="lineNum">     452</span>              :  * @brief Copy latest RX data to caller's struct.</span>
+<span id="L453"><span class="lineNum">     453</span>              :  */</span>
+<span id="L454"><span class="lineNum">     454</span> <span class="tlaGNC">           8 : void can_get_rx_data(const can_state_t *state,</span></span>
+<span id="L455"><span class="lineNum">     455</span>              :                      can_rx_data_t     *out)</span>
+<span id="L456"><span class="lineNum">     456</span>              : {</span>
+<span id="L457"><span class="lineNum">     457</span> <span class="tlaGNC">           8 :     if ((state != NULL) &amp;&amp; (out != NULL))</span></span>
+<span id="L458"><span class="lineNum">     458</span>              :     {</span>
+<span id="L459"><span class="lineNum">     459</span> <span class="tlaGNC">           6 :         (void)memcpy(out, &amp;state-&gt;last_rx, sizeof(can_rx_data_t));</span></span>
+<span id="L460"><span class="lineNum">     460</span>              :     }</span>
+<span id="L461"><span class="lineNum">     461</span> <span class="tlaGNC">           8 : }</span></span>
+        </pre>
+              </td>
+            </tr>
+          </table>
+          <br>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="ruler"><img src="../../glass.png" width=3 height=3 alt=""></td></tr>
+            <tr><td class="versionInfo">Generated by: <a href="https://github.com//linux-test-project/lcov" target="_parent">LCOV version 2.0-1</a></td></tr>
+          </table>
+          <br>
+
+</body>
+</html>

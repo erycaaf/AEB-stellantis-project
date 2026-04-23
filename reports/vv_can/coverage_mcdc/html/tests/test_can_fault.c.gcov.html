@@ -1,0 +1,504 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<html lang="en">
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <title>LCOV - can.info - tests/test_can_fault.c</title>
+  <link rel="stylesheet" type="text/css" href="../gcov.css">
+</head>
+
+<body>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="title">LCOV - code coverage report</td></tr>
+            <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+
+            <tr>
+              <td width="100%">
+                <table cellpadding=1 border=0 width="100%">
+          <tr>
+            <td width="10%" class="headerItem">Current view:</td>
+            <td width="10%" class="headerValue"><a href="../index.html">top level</a> - <a href="index.html">tests</a> - test_can_fault.c<span style="font-size: 80%;"> (source / <a href="test_can_fault.c.func-c.html">functions</a>)</span></td>
+            <td width="5%"></td>
+            <td width="5%"></td>
+            <td width="5%" class="headerCovTableHead">Coverage</td>
+            <td width="5%" class="headerCovTableHead" title="Covered + Uncovered code">Total</td>
+            <td width="5%" class="headerCovTableHead" title="Exercised code only">Hit</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test:</td>
+            <td class="headerValue">can.info</td>
+            <td></td>
+            <td class="headerItem">Lines:</td>
+            <td class="headerCovTableEntryHi">99.4&nbsp;%</td>
+            <td class="headerCovTableEntry">163</td>
+            <td class="headerCovTableEntry">162</td>
+          </tr>
+          <tr>
+            <td class="headerItem">Test Date:</td>
+            <td class="headerValue">2026-04-23 16:55:51</td>
+            <td></td>
+            <td class="headerItem">Functions:</td>
+            <td class="headerCovTableEntryHi">100.0&nbsp;%</td>
+            <td class="headerCovTableEntry">6</td>
+            <td class="headerCovTableEntry">6</td>
+          </tr>
+                  <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+          </table>
+
+          <table cellpadding=0 cellspacing=0 border=0>
+            <tr>
+              <td><br></td>
+            </tr>
+            <tr>
+              <td>
+<pre class="sourceHeading">            Line data    Source code</pre>
+<pre class="source">
+<span id="L1"><span class="lineNum">       1</span>              : /**</span>
+<span id="L2"><span class="lineNum">       2</span>              :  * @file  test_can_fault.c</span>
+<span id="L3"><span class="lineNum">       3</span>              :  * @brief Systematic fault injection for the AEB CAN module.</span>
+<span id="L4"><span class="lineNum">       4</span>              :  *</span>
+<span id="L5"><span class="lineNum">       5</span>              :  * Independent V&amp;V author: Eryca  (cross-validation of Lourenço's module).</span>
+<span id="L6"><span class="lineNum">       6</span>              :  * Original author:        Lourenço  (aeb_can.{c,h})</span>
+<span id="L7"><span class="lineNum">       7</span>              :  *</span>
+<span id="L8"><span class="lineNum">       8</span>              :  * Methodology:  ISO 26262-6:2018 Table 11 item 1e (&quot;highly recommended&quot;</span>
+<span id="L9"><span class="lineNum">       9</span>              :  *               for ASIL-D) — fault injection / error guessing.</span>
+<span id="L10"><span class="lineNum">      10</span>              :  *</span>
+<span id="L11"><span class="lineNum">      11</span>              :  * Structure mirrors test_uds_fault.c by Renato Fagundes:</span>
+<span id="L12"><span class="lineNum">      12</span>              :  *   Category A — invalid values (NULL pointers, bad DLC, unknown ID, HAL fault)</span>
+<span id="L13"><span class="lineNum">      13</span>              :  *   Category B — numeric extremes (NaN/Inf/negative in physical-to-raw,</span>
+<span id="L14"><span class="lineNum">      14</span>              :  *                raw values exceeding the signal bit-width)</span>
+<span id="L15"><span class="lineNum">      15</span>              :  *   Category C — state corruption (SEU: alive_counter, rx_miss_count,</span>
+<span id="L16"><span class="lineNum">      16</span>              :  *                tx_cycle_counter, initialised flag set to garbage values)</span>
+<span id="L17"><span class="lineNum">      17</span>              :  *   Category D — persistence (timeout recovery cycles, rapid force-fail</span>
+<span id="L18"><span class="lineNum">      18</span>              :  *                toggles, TX buffer burst)</span>
+<span id="L19"><span class="lineNum">      19</span>              :  *</span>
+<span id="L20"><span class="lineNum">      20</span>              :  * The fail-safe predicate applied to categories A/B is:</span>
+<span id="L21"><span class="lineNum">      21</span>              :  *   &quot;Under abnormal input, the function must return an error code</span>
+<span id="L22"><span class="lineNum">      22</span>              :  *    (CAN_ERR_TX / CAN_ERR_INIT) OR produce a frame whose packed raw</span>
+<span id="L23"><span class="lineNum">      23</span>              :  *    value is bounded within the declared signal width. Any response</span>
+<span id="L24"><span class="lineNum">      24</span>              :  *    that (i) dereferences a NULL pointer, (ii) writes bits outside</span>
+<span id="L25"><span class="lineNum">      25</span>              :  *    the target signal, or (iii) transmits a frame with</span>
+<span id="L26"><span class="lineNum">      26</span>              :  *    implementation-defined data is NOT fail-safe.&quot;</span>
+<span id="L27"><span class="lineNum">      27</span>              :  *</span>
+<span id="L28"><span class="lineNum">      28</span>              :  * @req NFR-SAF-ROB  Robustness of CAN module under invalid / corrupted</span>
+<span id="L29"><span class="lineNum">      29</span>              :  *                   input.  Traces to ISO 26262-6 Table 11 item 1e.</span>
+<span id="L30"><span class="lineNum">      30</span>              :  *</span>
+<span id="L31"><span class="lineNum">      31</span>              :  * Build:   make fault-can</span>
+<span id="L32"><span class="lineNum">      32</span>              :  * Artefacts: reports/vv_can/fault_injection/run.log</span>
+<span id="L33"><span class="lineNum">      33</span>              :  *</span>
+<span id="L34"><span class="lineNum">      34</span>              :  * @version 1.0</span>
+<span id="L35"><span class="lineNum">      35</span>              :  * @date 2026-04</span>
+<span id="L36"><span class="lineNum">      36</span>              :  */</span>
+<span id="L37"><span class="lineNum">      37</span>              : </span>
+<span id="L38"><span class="lineNum">      38</span>              : #include &quot;aeb_can.h&quot;</span>
+<span id="L39"><span class="lineNum">      39</span>              : #include &quot;can_hal.h&quot;</span>
+<span id="L40"><span class="lineNum">      40</span>              : #include &lt;stdio.h&gt;</span>
+<span id="L41"><span class="lineNum">      41</span>              : #include &lt;string.h&gt;</span>
+<span id="L42"><span class="lineNum">      42</span>              : #include &lt;math.h&gt;</span>
+<span id="L43"><span class="lineNum">      43</span>              : #include &lt;float.h&gt;</span>
+<span id="L44"><span class="lineNum">      44</span>              : </span>
+<span id="L45"><span class="lineNum">      45</span>              : /* ── Minimal assertion framework (pattern matches test_can.c) ─────────── */</span>
+<span id="L46"><span class="lineNum">      46</span>              : static int32_t faults_run     = 0;</span>
+<span id="L47"><span class="lineNum">      47</span>              : static int32_t faults_passed  = 0;</span>
+<span id="L48"><span class="lineNum">      48</span>              : static int32_t faults_failed  = 0;</span>
+<span id="L49"><span class="lineNum">      49</span>              : </span>
+<span id="L50"><span class="lineNum">      50</span>              : #define FAULT_ASSERT(cond, label) do {                                    \</span>
+<span id="L51"><span class="lineNum">      51</span>              :     faults_run++;                                                         \</span>
+<span id="L52"><span class="lineNum">      52</span>              :     if (cond) {                                                           \</span>
+<span id="L53"><span class="lineNum">      53</span>              :         faults_passed++;                                                  \</span>
+<span id="L54"><span class="lineNum">      54</span>              :         printf(&quot;  PASS  %s\n&quot;, label);                                    \</span>
+<span id="L55"><span class="lineNum">      55</span>              :     } else {                                                              \</span>
+<span id="L56"><span class="lineNum">      56</span>              :         faults_failed++;                                                  \</span>
+<span id="L57"><span class="lineNum">      57</span>              :         printf(&quot;  FAIL  %s  (%s:%d)\n&quot;, label, __FILE__, __LINE__);       \</span>
+<span id="L58"><span class="lineNum">      58</span>              :     }                                                                     \</span>
+<span id="L59"><span class="lineNum">      59</span>              : } while (0)</span>
+<span id="L60"><span class="lineNum">      60</span>              : </span>
+<span id="L61"><span class="lineNum">      61</span>              : #define CATEGORY(letter, title) \</span>
+<span id="L62"><span class="lineNum">      62</span>              :     printf(&quot;\n--- Category %s: %s ---\n&quot;, letter, title)</span>
+<span id="L63"><span class="lineNum">      63</span>              : </span>
+<span id="L64"><span class="lineNum">      64</span>              : /* ── HAL test helpers (stub exports) ──────────────────────────────────── */</span>
+<span id="L65"><span class="lineNum">      65</span>              : extern uint32_t can_hal_test_get_tx_count(void);</span>
+<span id="L66"><span class="lineNum">      66</span>              : extern void     can_hal_test_reset(void);</span>
+<span id="L67"><span class="lineNum">      67</span>              : extern void     can_hal_test_force_init_fail(int32_t fail);</span>
+<span id="L68"><span class="lineNum">      68</span>              : extern void     can_hal_test_force_send_fail(int32_t fail);</span>
+<span id="L69"><span class="lineNum">      69</span>              : </span>
+<span id="L70"><span class="lineNum">      70</span>              : /* Opaque tx_record_t from stub (we only inspect via pointer). */</span>
+<span id="L71"><span class="lineNum">      71</span>              : typedef struct { uint32_t id; uint8_t data[8]; uint8_t dlc; } tx_record_t;</span>
+<span id="L72"><span class="lineNum">      72</span>              : extern const tx_record_t *can_hal_test_get_tx(uint32_t index);</span>
+<span id="L73"><span class="lineNum">      73</span>              : </span>
+<span id="L74"><span class="lineNum">      74</span>              : /* ═════════════════════════════════════════════════════════════════════════</span>
+<span id="L75"><span class="lineNum">      75</span>              :  *  CATEGORY A — invalid values</span>
+<span id="L76"><span class="lineNum">      76</span>              :  *</span>
+<span id="L77"><span class="lineNum">      77</span>              :  *  Rationale: any public function must reject malformed calls without</span>
+<span id="L78"><span class="lineNum">      78</span>              :  *  dereferencing garbage.  Most of these probe the NULL guards; the</span>
+<span id="L79"><span class="lineNum">      79</span>              :  *  DLC-too-short cases probe the length checks in can_rx_process().</span>
+<span id="L80"><span class="lineNum">      80</span>              :  * ═════════════════════════════════════════════════════════════════════════ */</span>
+<span id="L81"><span class="lineNum">      81</span>              : </span>
+<span id="L82"><span class="lineNum">      82</span> <span class="tlaGNC tlaBgGNC">           1 : static void cat_A_null_pointers(void)</span></span>
+<span id="L83"><span class="lineNum">      83</span>              : {</span>
+<span id="L84"><span class="lineNum">      84</span>              :     can_state_t    state;</span>
+<span id="L85"><span class="lineNum">      85</span> <span class="tlaGNC">           1 :     pid_output_t   pid = { .brake_pct = 10.0F, .brake_bar = 1.0F };</span></span>
+<span id="L86"><span class="lineNum">      86</span> <span class="tlaGNC">           1 :     fsm_output_t   fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };</span></span>
+<span id="L87"><span class="lineNum">      87</span>              : </span>
+<span id="L88"><span class="lineNum">      88</span> <span class="tlaGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L89"><span class="lineNum">      89</span> <span class="tlaGNC">           1 :     (void)can_init(&amp;state);</span></span>
+<span id="L90"><span class="lineNum">      90</span>              : </span>
+<span id="L91"><span class="lineNum">      91</span>              :     /* A1: can_tx_brake_cmd with NULL state */</span>
+<span id="L92"><span class="lineNum">      92</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(can_tx_brake_cmd(NULL, &amp;pid, &amp;fsm) == CAN_ERR_TX,</span></span>
+<span id="L93"><span class="lineNum">      93</span>              :                  &quot;A1  brake_cmd(NULL,pid,fsm) -&gt; CAN_ERR_TX&quot;);</span>
+<span id="L94"><span class="lineNum">      94</span>              : </span>
+<span id="L95"><span class="lineNum">      95</span>              :     /* A2: can_tx_brake_cmd with NULL pid */</span>
+<span id="L96"><span class="lineNum">      96</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(can_tx_brake_cmd(&amp;state, NULL, &amp;fsm) == CAN_ERR_TX,</span></span>
+<span id="L97"><span class="lineNum">      97</span>              :                  &quot;A2  brake_cmd(state,NULL,fsm) -&gt; CAN_ERR_TX&quot;);</span>
+<span id="L98"><span class="lineNum">      98</span>              : </span>
+<span id="L99"><span class="lineNum">      99</span>              :     /* A3: can_tx_brake_cmd with NULL fsm */</span>
+<span id="L100"><span class="lineNum">     100</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(can_tx_brake_cmd(&amp;state, &amp;pid, NULL) == CAN_ERR_TX,</span></span>
+<span id="L101"><span class="lineNum">     101</span>              :                  &quot;A3  brake_cmd(state,pid,NULL) -&gt; CAN_ERR_TX&quot;);</span>
+<span id="L102"><span class="lineNum">     102</span>              : </span>
+<span id="L103"><span class="lineNum">     103</span>              :     /* A4: can_tx_fsm_state with NULL state */</span>
+<span id="L104"><span class="lineNum">     104</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(can_tx_fsm_state(NULL, &amp;fsm) == CAN_ERR_TX,</span></span>
+<span id="L105"><span class="lineNum">     105</span>              :                  &quot;A4  fsm_state(NULL,fsm) -&gt; CAN_ERR_TX&quot;);</span>
+<span id="L106"><span class="lineNum">     106</span>              : </span>
+<span id="L107"><span class="lineNum">     107</span>              :     /* A5: can_tx_fsm_state with NULL fsm */</span>
+<span id="L108"><span class="lineNum">     108</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(can_tx_fsm_state(&amp;state, NULL) == CAN_ERR_TX,</span></span>
+<span id="L109"><span class="lineNum">     109</span>              :                  &quot;A5  fsm_state(state,NULL) -&gt; CAN_ERR_TX&quot;);</span>
+<span id="L110"><span class="lineNum">     110</span>              : </span>
+<span id="L111"><span class="lineNum">     111</span>              :     /* A6: can_tx_alert with NULL alert */</span>
+<span id="L112"><span class="lineNum">     112</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(can_tx_alert(NULL) == CAN_ERR_TX,</span></span>
+<span id="L113"><span class="lineNum">     113</span>              :                  &quot;A6  alert(NULL) -&gt; CAN_ERR_TX&quot;);</span>
+<span id="L114"><span class="lineNum">     114</span>              : </span>
+<span id="L115"><span class="lineNum">     115</span>              :     /* A7: can_rx_process with NULL state must not crash */</span>
+<span id="L116"><span class="lineNum">     116</span> <span class="tlaGNC">           1 :     uint8_t frame[8] = {0};</span></span>
+<span id="L117"><span class="lineNum">     117</span> <span class="tlaGNC">           1 :     can_rx_process(NULL, CAN_ID_EGO_VEHICLE, frame, 8U);</span></span>
+<span id="L118"><span class="lineNum">     118</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(1, &quot;A7  rx_process(NULL,id,data,dlc) -&gt; no crash&quot;);</span></span>
+<span id="L119"><span class="lineNum">     119</span>              : </span>
+<span id="L120"><span class="lineNum">     120</span>              :     /* A8: can_rx_process with NULL data must not crash */</span>
+<span id="L121"><span class="lineNum">     121</span> <span class="tlaGNC">           1 :     can_rx_process(&amp;state, CAN_ID_EGO_VEHICLE, NULL, 8U);</span></span>
+<span id="L122"><span class="lineNum">     122</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(1, &quot;A8  rx_process(state,id,NULL,dlc) -&gt; no crash&quot;);</span></span>
+<span id="L123"><span class="lineNum">     123</span>              : </span>
+<span id="L124"><span class="lineNum">     124</span>              :     /* A9: can_check_timeout with NULL must not crash */</span>
+<span id="L125"><span class="lineNum">     125</span> <span class="tlaGNC">           1 :     can_check_timeout(NULL);</span></span>
+<span id="L126"><span class="lineNum">     126</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(1, &quot;A9  check_timeout(NULL) -&gt; no crash&quot;);</span></span>
+<span id="L127"><span class="lineNum">     127</span>              : </span>
+<span id="L128"><span class="lineNum">     128</span>              :     /* A10: can_get_rx_data with NULL state must not crash */</span>
+<span id="L129"><span class="lineNum">     129</span> <span class="tlaGNC">           1 :     can_rx_data_t dst = {0};</span></span>
+<span id="L130"><span class="lineNum">     130</span> <span class="tlaGNC">           1 :     can_get_rx_data(NULL, &amp;dst);</span></span>
+<span id="L131"><span class="lineNum">     131</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(1, &quot;A10 get_rx_data(NULL,dst) -&gt; no crash&quot;);</span></span>
+<span id="L132"><span class="lineNum">     132</span>              : </span>
+<span id="L133"><span class="lineNum">     133</span>              :     /* A11: can_get_rx_data with NULL dst must not crash */</span>
+<span id="L134"><span class="lineNum">     134</span> <span class="tlaGNC">           1 :     can_get_rx_data(&amp;state, NULL);</span></span>
+<span id="L135"><span class="lineNum">     135</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(1, &quot;A11 get_rx_data(state,NULL) -&gt; no crash&quot;);</span></span>
+<span id="L136"><span class="lineNum">     136</span> <span class="tlaGNC">           1 : }</span></span>
+<span id="L137"><span class="lineNum">     137</span>              : </span>
+<span id="L138"><span class="lineNum">     138</span> <span class="tlaGNC">           1 : static void cat_A_invalid_frames(void)</span></span>
+<span id="L139"><span class="lineNum">     139</span>              : {</span>
+<span id="L140"><span class="lineNum">     140</span>              :     can_state_t state;</span>
+<span id="L141"><span class="lineNum">     141</span> <span class="tlaGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L142"><span class="lineNum">     142</span> <span class="tlaGNC">           1 :     (void)can_init(&amp;state);</span></span>
+<span id="L143"><span class="lineNum">     143</span>              : </span>
+<span id="L144"><span class="lineNum">     144</span>              :     /* A12: DLC shorter than required for EgoVehicle (8) — must be silently</span>
+<span id="L145"><span class="lineNum">     145</span>              :      *      ignored (no decode, no rx_miss_count reset). */</span>
+<span id="L146"><span class="lineNum">     146</span> <span class="tlaGNC">           1 :     uint8_t short_frame[4] = { 0xFFU, 0xFFU, 0xFFU, 0xFFU };</span></span>
+<span id="L147"><span class="lineNum">     147</span> <span class="tlaGNC">           1 :     can_rx_process(&amp;state, CAN_ID_EGO_VEHICLE, short_frame, 4U);</span></span>
+<span id="L148"><span class="lineNum">     148</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(state.last_rx.vehicle_speed == 0.0F,</span></span>
+<span id="L149"><span class="lineNum">     149</span>              :                  &quot;A12 rx(EgoVehicle, dlc=4&lt;8) -&gt; no decode&quot;);</span>
+<span id="L150"><span class="lineNum">     150</span>              : </span>
+<span id="L151"><span class="lineNum">     151</span>              :     /* A13: DLC = 0 on a valid ID — silent */</span>
+<span id="L152"><span class="lineNum">     152</span> <span class="tlaGNC">           1 :     can_rx_process(&amp;state, CAN_ID_RADAR_TARGET, short_frame, 0U);</span></span>
+<span id="L153"><span class="lineNum">     153</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(state.last_rx.target_distance == 0.0F,</span></span>
+<span id="L154"><span class="lineNum">     154</span>              :                  &quot;A13 rx(RadarTarget, dlc=0) -&gt; no decode&quot;);</span>
+<span id="L155"><span class="lineNum">     155</span>              : </span>
+<span id="L156"><span class="lineNum">     156</span>              :     /* A14: unknown CAN ID — must be silently ignored. */</span>
+<span id="L157"><span class="lineNum">     157</span> <span class="tlaGNC">           1 :     uint8_t frame8[8] = { 0xAAU, 0xBBU, 0xCCU, 0xDDU, 0xEEU, 0xFFU, 0x11U, 0x22U };</span></span>
+<span id="L158"><span class="lineNum">     158</span> <span class="tlaGNC">           1 :     uint32_t tx_before = can_hal_test_get_tx_count();</span></span>
+<span id="L159"><span class="lineNum">     159</span> <span class="tlaGNC">           1 :     can_rx_process(&amp;state, 0x7FFU, frame8, 8U);</span></span>
+<span id="L160"><span class="lineNum">     160</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(can_hal_test_get_tx_count() == tx_before,</span></span>
+<span id="L161"><span class="lineNum">     161</span>              :                  &quot;A14 rx(unknown ID) -&gt; no TX side-effect&quot;);</span>
+<span id="L162"><span class="lineNum">     162</span>              : </span>
+<span id="L163"><span class="lineNum">     163</span>              :     /* A15: HAL init fault surfaces as CAN_ERR_INIT, initialised stays 0. */</span>
+<span id="L164"><span class="lineNum">     164</span> <span class="tlaGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L165"><span class="lineNum">     165</span> <span class="tlaGNC">           1 :     can_hal_test_force_init_fail(1);</span></span>
+<span id="L166"><span class="lineNum">     166</span>              :     can_state_t state2;</span>
+<span id="L167"><span class="lineNum">     167</span> <span class="tlaGNC">           1 :     (void)memset(&amp;state2, 0xA5, sizeof(state2));  /* garbage before init */</span></span>
+<span id="L168"><span class="lineNum">     168</span> <span class="tlaGNC">           1 :     int32_t rc = can_init(&amp;state2);</span></span>
+<span id="L169"><span class="lineNum">     169</span> <span class="tlaGNC">           1 :     can_hal_test_force_init_fail(0);</span></span>
+<span id="L170"><span class="lineNum">     170</span> <span class="tlaGNC">           1 :     FAULT_ASSERT((rc == CAN_ERR_INIT) &amp;&amp; (state2.initialised == 0U),</span></span>
+<span id="L171"><span class="lineNum">     171</span>              :                  &quot;A15 init with forced HAL failure -&gt; CAN_ERR_INIT, initialised=0&quot;);</span>
+<span id="L172"><span class="lineNum">     172</span> <span class="tlaGNC">           1 : }</span></span>
+<span id="L173"><span class="lineNum">     173</span>              : </span>
+<span id="L174"><span class="lineNum">     174</span>              : /* ═════════════════════════════════════════════════════════════════════════</span>
+<span id="L175"><span class="lineNum">     175</span>              :  *  CATEGORY B — numeric extremes</span>
+<span id="L176"><span class="lineNum">     176</span>              :  *</span>
+<span id="L177"><span class="lineNum">     177</span>              :  *  The DBC encode path is:  raw = (physical - offset) / factor</span>
+<span id="L178"><span class="lineNum">     178</span>              :  *  When `physical` is NaN, ±Inf, or extremely large, the float-to-uint</span>
+<span id="L179"><span class="lineNum">     179</span>              :  *  cast in encode_unsigned() has *undefined behaviour* per C11 §6.3.1.4.</span>
+<span id="L180"><span class="lineNum">     180</span>              :  *  Additionally, can_pack_signal() takes a 32-bit raw and shifts bit-by-bit</span>
+<span id="L181"><span class="lineNum">     181</span>              :  *  into the frame: if the caller passes raw_value with bits above `length`,</span>
+<span id="L182"><span class="lineNum">     182</span>              :  *  those should be discarded (current impl masks via shift, but the test</span>
+<span id="L183"><span class="lineNum">     183</span>              :  *  verifies it doesn't corrupt adjacent signals).</span>
+<span id="L184"><span class="lineNum">     184</span>              :  * ═════════════════════════════════════════════════════════════════════════ */</span>
+<span id="L185"><span class="lineNum">     185</span>              : </span>
+<span id="L186"><span class="lineNum">     186</span> <span class="tlaGNC">           1 : static void cat_B_encode_extremes(void)</span></span>
+<span id="L187"><span class="lineNum">     187</span>              : {</span>
+<span id="L188"><span class="lineNum">     188</span>              :     can_state_t  state;</span>
+<span id="L189"><span class="lineNum">     189</span> <span class="tlaGNC">           1 :     fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };</span></span>
+<span id="L190"><span class="lineNum">     190</span>              :     pid_output_t pid;</span>
+<span id="L191"><span class="lineNum">     191</span>              : </span>
+<span id="L192"><span class="lineNum">     192</span>              :     /* B1: brake_bar = NaN */</span>
+<span id="L193"><span class="lineNum">     193</span> <span class="tlaGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L194"><span class="lineNum">     194</span> <span class="tlaGNC">           1 :     (void)can_init(&amp;state);</span></span>
+<span id="L195"><span class="lineNum">     195</span> <span class="tlaGNC">           1 :     pid.brake_pct = 10.0F;</span></span>
+<span id="L196"><span class="lineNum">     196</span> <span class="tlaGNC">           1 :     pid.brake_bar = NAN;</span></span>
+<span id="L197"><span class="lineNum">     197</span> <span class="tlaGNC">           1 :     int32_t rc1 = can_tx_brake_cmd(&amp;state, &amp;pid, &amp;fsm);</span></span>
+<span id="L198"><span class="lineNum">     198</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(rc1 == CAN_OK,</span></span>
+<span id="L199"><span class="lineNum">     199</span>              :                  &quot;B1  brake_bar=NaN -&gt; returns, does not abort&quot;);</span>
+<span id="L200"><span class="lineNum">     200</span>              : </span>
+<span id="L201"><span class="lineNum">     201</span>              :     /* B2: brake_bar = +Inf */</span>
+<span id="L202"><span class="lineNum">     202</span> <span class="tlaGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L203"><span class="lineNum">     203</span> <span class="tlaGNC">           1 :     (void)can_init(&amp;state);</span></span>
+<span id="L204"><span class="lineNum">     204</span> <span class="tlaGNC">           1 :     pid.brake_bar = INFINITY;</span></span>
+<span id="L205"><span class="lineNum">     205</span> <span class="tlaGNC">           1 :     int32_t rc2 = can_tx_brake_cmd(&amp;state, &amp;pid, &amp;fsm);</span></span>
+<span id="L206"><span class="lineNum">     206</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(rc2 == CAN_OK,</span></span>
+<span id="L207"><span class="lineNum">     207</span>              :                  &quot;B2  brake_bar=+Inf -&gt; returns, does not abort&quot;);</span>
+<span id="L208"><span class="lineNum">     208</span>              : </span>
+<span id="L209"><span class="lineNum">     209</span>              :     /* B3: brake_bar = -Inf (negative branch of encode_unsigned clamps to 0) */</span>
+<span id="L210"><span class="lineNum">     210</span> <span class="tlaGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L211"><span class="lineNum">     211</span> <span class="tlaGNC">           1 :     (void)can_init(&amp;state);</span></span>
+<span id="L212"><span class="lineNum">     212</span> <span class="tlaGNC">           1 :     pid.brake_bar = -INFINITY;</span></span>
+<span id="L213"><span class="lineNum">     213</span> <span class="tlaGNC">           1 :     int32_t rc3 = can_tx_brake_cmd(&amp;state, &amp;pid, &amp;fsm);</span></span>
+<span id="L214"><span class="lineNum">     214</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(rc3 == CAN_OK,</span></span>
+<span id="L215"><span class="lineNum">     215</span>              :                  &quot;B3  brake_bar=-Inf -&gt; returns, does not abort&quot;);</span>
+<span id="L216"><span class="lineNum">     216</span>              :     /* The packed 15-bit BrakePressure signal must be 0 after -Inf clamp. */</span>
+<span id="L217"><span class="lineNum">     217</span> <span class="tlaGNC">           1 :     const tx_record_t *rec = can_hal_test_get_tx(0);</span></span>
+<span id="L218"><span class="lineNum">     218</span> <span class="tlaGNC">           1 :     if (rec != NULL) {</span></span>
+<span id="L219"><span class="lineNum">     219</span> <span class="tlaGNC">           1 :         uint32_t raw_pressure = can_unpack_signal(rec-&gt;data, 1U, 15U);</span></span>
+<span id="L220"><span class="lineNum">     220</span> <span class="tlaGNC">           1 :         FAULT_ASSERT(raw_pressure == 0U,</span></span>
+<span id="L221"><span class="lineNum">     221</span>              :                      &quot;B3b packed BrakePressure after -Inf == 0 (clamped)&quot;);</span>
+<span id="L222"><span class="lineNum">     222</span>              :     } else {</span>
+<span id="L223"><span class="lineNum">     223</span> <span class="tlaUNC tlaBgUNC">           0 :         FAULT_ASSERT(0, &quot;B3b TX record missing&quot;);</span></span>
+<span id="L224"><span class="lineNum">     224</span>              :     }</span>
+<span id="L225"><span class="lineNum">     225</span>              : </span>
+<span id="L226"><span class="lineNum">     226</span>              :     /* B4: brake_bar large positive — raw overflows the 15-bit field.</span>
+<span id="L227"><span class="lineNum">     227</span>              :      *     Spec: 15 bits can hold max 32767.  physical=100000 bar with</span>
+<span id="L228"><span class="lineNum">     228</span>              :      *     factor 0.1 yields raw=1_000_000, which overflows uint15.</span>
+<span id="L229"><span class="lineNum">     229</span>              :      *     Fail-safe: packed signal must stay within its 15-bit window</span>
+<span id="L230"><span class="lineNum">     230</span>              :      *     (bits 16..31 must not be disturbed). */</span>
+<span id="L231"><span class="lineNum">     231</span> <span class="tlaGNC tlaBgGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L232"><span class="lineNum">     232</span> <span class="tlaGNC">           1 :     (void)can_init(&amp;state);</span></span>
+<span id="L233"><span class="lineNum">     233</span> <span class="tlaGNC">           1 :     pid.brake_bar = 100000.0F;</span></span>
+<span id="L234"><span class="lineNum">     234</span> <span class="tlaGNC">           1 :     int32_t rc4 = can_tx_brake_cmd(&amp;state, &amp;pid, &amp;fsm);</span></span>
+<span id="L235"><span class="lineNum">     235</span> <span class="tlaGNC">           1 :     rec = can_hal_test_get_tx(0);</span></span>
+<span id="L236"><span class="lineNum">     236</span> <span class="tlaGNC">           1 :     int32_t bits16_to_31_intact = 0;</span></span>
+<span id="L237"><span class="lineNum">     237</span> <span class="tlaGNC">           1 :     if (rec != NULL) {</span></span>
+<span id="L238"><span class="lineNum">     238</span>              :         /* BrakeMode lives at bits 16..18.  Check that encode overflow</span>
+<span id="L239"><span class="lineNum">     239</span>              :          * did NOT flip those bits away from the FSM_BRAKE_L1 value (=2). */</span>
+<span id="L240"><span class="lineNum">     240</span> <span class="tlaGNC">           1 :         uint32_t brake_mode = can_unpack_signal(rec-&gt;data, 16U, 3U);</span></span>
+<span id="L241"><span class="lineNum">     241</span> <span class="tlaGNC">           1 :         bits16_to_31_intact = (brake_mode == 2U) ? 1 : 0;</span></span>
+<span id="L242"><span class="lineNum">     242</span>              :     }</span>
+<span id="L243"><span class="lineNum">     243</span> <span class="tlaGNC">           1 :     FAULT_ASSERT((rc4 == CAN_OK) &amp;&amp; (bits16_to_31_intact == 1),</span></span>
+<span id="L244"><span class="lineNum">     244</span>              :                  &quot;B4  brake_bar=1e5 -&gt; adjacent signals intact&quot;);</span>
+<span id="L245"><span class="lineNum">     245</span>              : </span>
+<span id="L246"><span class="lineNum">     246</span>              :     /* B5: brake_bar = FLT_MAX — same overflow class, extreme magnitude. */</span>
+<span id="L247"><span class="lineNum">     247</span> <span class="tlaGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L248"><span class="lineNum">     248</span> <span class="tlaGNC">           1 :     (void)can_init(&amp;state);</span></span>
+<span id="L249"><span class="lineNum">     249</span> <span class="tlaGNC">           1 :     pid.brake_bar = FLT_MAX;</span></span>
+<span id="L250"><span class="lineNum">     250</span> <span class="tlaGNC">           1 :     int32_t rc5 = can_tx_brake_cmd(&amp;state, &amp;pid, &amp;fsm);</span></span>
+<span id="L251"><span class="lineNum">     251</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(rc5 == CAN_OK,</span></span>
+<span id="L252"><span class="lineNum">     252</span>              :                  &quot;B5  brake_bar=FLT_MAX -&gt; does not abort&quot;);</span>
+<span id="L253"><span class="lineNum">     253</span>              : </span>
+<span id="L254"><span class="lineNum">     254</span>              :     /* B6: pack_signal with raw_value far above length — must not corrupt</span>
+<span id="L255"><span class="lineNum">     255</span>              :      *     bits outside the target range.  We pack 0xFFFFFFFF into bits</span>
+<span id="L256"><span class="lineNum">     256</span>              :      *     0..3 of an all-zero buffer and verify bits 4..63 stayed zero. */</span>
+<span id="L257"><span class="lineNum">     257</span>              :     uint8_t buf[8];</span>
+<span id="L258"><span class="lineNum">     258</span> <span class="tlaGNC">           1 :     (void)memset(buf, 0, sizeof(buf));</span></span>
+<span id="L259"><span class="lineNum">     259</span> <span class="tlaGNC">           1 :     can_pack_signal(buf, 0U, 4U, 0xFFFFFFFFU);</span></span>
+<span id="L260"><span class="lineNum">     260</span> <span class="tlaGNC">           1 :     int32_t outside_zero = 1;</span></span>
+<span id="L261"><span class="lineNum">     261</span> <span class="tlaGNC">           1 :     if ((buf[0] &amp; 0xF0U) != 0U) { outside_zero = 0; }</span></span>
+<span id="L262"><span class="lineNum">     262</span> <span class="tlaGNC">           8 :     for (uint8_t k = 1U; k &lt; 8U; k++) {</span></span>
+<span id="L263"><span class="lineNum">     263</span> <span class="tlaGNC">           7 :         if (buf[k] != 0U) { outside_zero = 0; break; }</span></span>
+<span id="L264"><span class="lineNum">     264</span>              :     }</span>
+<span id="L265"><span class="lineNum">     265</span> <span class="tlaGNC">           1 :     FAULT_ASSERT((buf[0] &amp; 0x0FU) == 0x0FU &amp;&amp; outside_zero == 1,</span></span>
+<span id="L266"><span class="lineNum">     266</span>              :                  &quot;B6  pack(0xFFFFFFFF, len=4) -&gt; masked, no bleed&quot;);</span>
+<span id="L267"><span class="lineNum">     267</span> <span class="tlaGNC">           1 : }</span></span>
+<span id="L268"><span class="lineNum">     268</span>              : </span>
+<span id="L269"><span class="lineNum">     269</span>              : /* ═════════════════════════════════════════════════════════════════════════</span>
+<span id="L270"><span class="lineNum">     270</span>              :  *  CATEGORY C — state corruption (SEU simulation)</span>
+<span id="L271"><span class="lineNum">     271</span>              :  *</span>
+<span id="L272"><span class="lineNum">     272</span>              :  *  A single-event upset (cosmic ray / alpha particle) can flip bits in</span>
+<span id="L273"><span class="lineNum">     273</span>              :  *  SRAM.  These tests write arbitrary values into module-private state</span>
+<span id="L274"><span class="lineNum">     274</span>              :  *  fields and verify that the next public-API call behaves safely — it</span>
+<span id="L275"><span class="lineNum">     275</span>              :  *  must not crash, hang, or emit undefined frames.  True resilience would</span>
+<span id="L276"><span class="lineNum">     276</span>              :  *  require CRC-protected state (future safety mechanism); this test</span>
+<span id="L277"><span class="lineNum">     277</span>              :  *  characterises today's behaviour.</span>
+<span id="L278"><span class="lineNum">     278</span>              :  * ═════════════════════════════════════════════════════════════════════════ */</span>
+<span id="L279"><span class="lineNum">     279</span>              : </span>
+<span id="L280"><span class="lineNum">     280</span> <span class="tlaGNC">           1 : static void cat_C_state_corruption(void)</span></span>
+<span id="L281"><span class="lineNum">     281</span>              : {</span>
+<span id="L282"><span class="lineNum">     282</span>              :     can_state_t state;</span>
+<span id="L283"><span class="lineNum">     283</span>              : </span>
+<span id="L284"><span class="lineNum">     284</span>              :     /* C1: alive_counter corrupted to 0xAA (&gt; ALIVE_COUNTER_MAX of 15).</span>
+<span id="L285"><span class="lineNum">     285</span>              :      *     Expected: next tx_brake_cmd resets it to 0 via the wrap-around</span>
+<span id="L286"><span class="lineNum">     286</span>              :      *     branch `if (alive_counter &gt; ALIVE_COUNTER_MAX)`. */</span>
+<span id="L287"><span class="lineNum">     287</span> <span class="tlaGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L288"><span class="lineNum">     288</span> <span class="tlaGNC">           1 :     (void)can_init(&amp;state);</span></span>
+<span id="L289"><span class="lineNum">     289</span> <span class="tlaGNC">           1 :     state.alive_counter = 0xAAU;</span></span>
+<span id="L290"><span class="lineNum">     290</span> <span class="tlaGNC">           1 :     pid_output_t pid = { .brake_pct = 1.0F, .brake_bar = 0.1F };</span></span>
+<span id="L291"><span class="lineNum">     291</span> <span class="tlaGNC">           1 :     fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_STANDBY };</span></span>
+<span id="L292"><span class="lineNum">     292</span> <span class="tlaGNC">           1 :     (void)can_tx_brake_cmd(&amp;state, &amp;pid, &amp;fsm);</span></span>
+<span id="L293"><span class="lineNum">     293</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(state.alive_counter &lt;= ALIVE_COUNTER_MAX,</span></span>
+<span id="L294"><span class="lineNum">     294</span>              :                  &quot;C1  alive_counter=0xAA -&gt; bounded after next TX&quot;);</span>
+<span id="L295"><span class="lineNum">     295</span>              : </span>
+<span id="L296"><span class="lineNum">     296</span>              :     /* C2: rx_miss_count corrupted to 0xFF — saturation clamp must hold. */</span>
+<span id="L297"><span class="lineNum">     297</span> <span class="tlaGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L298"><span class="lineNum">     298</span> <span class="tlaGNC">           1 :     (void)can_init(&amp;state);</span></span>
+<span id="L299"><span class="lineNum">     299</span> <span class="tlaGNC">           1 :     state.rx_miss_count = 0xFFU;</span></span>
+<span id="L300"><span class="lineNum">     300</span> <span class="tlaGNC">           1 :     can_check_timeout(&amp;state);</span></span>
+<span id="L301"><span class="lineNum">     301</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(state.rx_miss_count == 0xFFU,</span></span>
+<span id="L302"><span class="lineNum">     302</span>              :                  &quot;C2  rx_miss_count=0xFF -&gt; saturates at 0xFF (no wrap)&quot;);</span>
+<span id="L303"><span class="lineNum">     303</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(state.last_rx.rx_timeout_flag == 1U,</span></span>
+<span id="L304"><span class="lineNum">     304</span>              :                  &quot;C2b rx_miss_count=0xFF -&gt; timeout_flag=1&quot;);</span>
+<span id="L305"><span class="lineNum">     305</span>              : </span>
+<span id="L306"><span class="lineNum">     306</span>              :     /* C3: tx_cycle_counter corrupted to UINT32_MAX.  Next call increments</span>
+<span id="L307"><span class="lineNum">     307</span>              :      *     → wraps to 0 → below threshold → FSMState NOT sent.  This is</span>
+<span id="L308"><span class="lineNum">     308</span>              :      *     not perfectly fail-safe (a SEU can delay a 50 ms transmission</span>
+<span id="L309"><span class="lineNum">     309</span>              :      *     by up to 50 ms), but it must not crash or saturate. */</span>
+<span id="L310"><span class="lineNum">     310</span> <span class="tlaGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L311"><span class="lineNum">     311</span> <span class="tlaGNC">           1 :     (void)can_init(&amp;state);</span></span>
+<span id="L312"><span class="lineNum">     312</span> <span class="tlaGNC">           1 :     state.tx_cycle_counter = 0xFFFFFFFFU;</span></span>
+<span id="L313"><span class="lineNum">     313</span> <span class="tlaGNC">           1 :     uint32_t tx_before = can_hal_test_get_tx_count();</span></span>
+<span id="L314"><span class="lineNum">     314</span> <span class="tlaGNC">           1 :     int32_t  rc = can_tx_fsm_state(&amp;state, &amp;fsm);</span></span>
+<span id="L315"><span class="lineNum">     315</span> <span class="tlaGNC">           1 :     uint32_t tx_after  = can_hal_test_get_tx_count();</span></span>
+<span id="L316"><span class="lineNum">     316</span> <span class="tlaGNC">           1 :     FAULT_ASSERT((rc == 1) &amp;&amp; (tx_after == tx_before),</span></span>
+<span id="L317"><span class="lineNum">     317</span>              :                  &quot;C3  tx_cycle_counter=UINT32_MAX -&gt; wraps safely, no TX&quot;);</span>
+<span id="L318"><span class="lineNum">     318</span>              : </span>
+<span id="L319"><span class="lineNum">     319</span>              :     /* C4: initialised flag corrupted to 0x55.  No public API reads this</span>
+<span id="L320"><span class="lineNum">     320</span>              :      *     field today, so the corruption is benign in current code.</span>
+<span id="L321"><span class="lineNum">     321</span>              :      *     Document that and record as informational. */</span>
+<span id="L322"><span class="lineNum">     322</span> <span class="tlaGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L323"><span class="lineNum">     323</span> <span class="tlaGNC">           1 :     (void)can_init(&amp;state);</span></span>
+<span id="L324"><span class="lineNum">     324</span> <span class="tlaGNC">           1 :     state.initialised = 0x55U;</span></span>
+<span id="L325"><span class="lineNum">     325</span> <span class="tlaGNC">           1 :     (void)can_tx_brake_cmd(&amp;state, &amp;pid, &amp;fsm);</span></span>
+<span id="L326"><span class="lineNum">     326</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(1,</span></span>
+<span id="L327"><span class="lineNum">     327</span>              :                  &quot;C4  initialised=0x55 -&gt; no observable effect (informational)&quot;);</span>
+<span id="L328"><span class="lineNum">     328</span> <span class="tlaGNC">           1 : }</span></span>
+<span id="L329"><span class="lineNum">     329</span>              : </span>
+<span id="L330"><span class="lineNum">     330</span>              : /* ═════════════════════════════════════════════════════════════════════════</span>
+<span id="L331"><span class="lineNum">     331</span>              :  *  CATEGORY D — persistence</span>
+<span id="L332"><span class="lineNum">     332</span>              :  *</span>
+<span id="L333"><span class="lineNum">     333</span>              :  *  Sustained or repeated abnormal conditions and recovery scenarios.</span>
+<span id="L334"><span class="lineNum">     334</span>              :  * ═════════════════════════════════════════════════════════════════════════ */</span>
+<span id="L335"><span class="lineNum">     335</span>              : </span>
+<span id="L336"><span class="lineNum">     336</span> <span class="tlaGNC">           1 : static void cat_D_persistence(void)</span></span>
+<span id="L337"><span class="lineNum">     337</span>              : {</span>
+<span id="L338"><span class="lineNum">     338</span>              :     can_state_t state;</span>
+<span id="L339"><span class="lineNum">     339</span>              : </span>
+<span id="L340"><span class="lineNum">     340</span>              :     /* D1: Timeout → valid RX → timeout cycle.  After recovery the miss</span>
+<span id="L341"><span class="lineNum">     341</span>              :      *     count and flag must both return to a clean state. */</span>
+<span id="L342"><span class="lineNum">     342</span> <span class="tlaGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L343"><span class="lineNum">     343</span> <span class="tlaGNC">           1 :     (void)can_init(&amp;state);</span></span>
+<span id="L344"><span class="lineNum">     344</span> <span class="tlaGNC">          11 :     for (uint8_t i = 0U; i &lt; 10U; i++) { can_check_timeout(&amp;state); }</span></span>
+<span id="L345"><span class="lineNum">     345</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(state.last_rx.rx_timeout_flag == 1U,</span></span>
+<span id="L346"><span class="lineNum">     346</span>              :                  &quot;D1a 10 ticks no RX -&gt; timeout_flag=1&quot;);</span>
+<span id="L347"><span class="lineNum">     347</span>              : </span>
+<span id="L348"><span class="lineNum">     348</span> <span class="tlaGNC">           1 :     uint8_t radar_frame[8] = {0};</span></span>
+<span id="L349"><span class="lineNum">     349</span> <span class="tlaGNC">           1 :     can_pack_signal(radar_frame, 0U, 16U, 2500U);  /* 25.0 m */</span></span>
+<span id="L350"><span class="lineNum">     350</span> <span class="tlaGNC">           1 :     can_rx_process(&amp;state, CAN_ID_RADAR_TARGET, radar_frame, 8U);</span></span>
+<span id="L351"><span class="lineNum">     351</span> <span class="tlaGNC">           1 :     FAULT_ASSERT((state.rx_miss_count == 0U) &amp;&amp;</span></span>
+<span id="L352"><span class="lineNum">     352</span>              :                  (state.last_rx.rx_timeout_flag == 0U),</span>
+<span id="L353"><span class="lineNum">     353</span>              :                  &quot;D1b valid radar frame -&gt; miss_count=0, flag cleared&quot;);</span>
+<span id="L354"><span class="lineNum">     354</span>              : </span>
+<span id="L355"><span class="lineNum">     355</span>              :     /* D2: 100 rapid force_send_fail toggles — no inconsistency between</span>
+<span id="L356"><span class="lineNum">     356</span>              :      *     the toggle state and the function's return code.</span>
+<span id="L357"><span class="lineNum">     357</span>              :      *</span>
+<span id="L358"><span class="lineNum">     358</span>              :      *     Stub artefact:  can_hal's TX capture buffer holds 32 frames.</span>
+<span id="L359"><span class="lineNum">     359</span>              :      *     When it fills, can_hal_send returns -1 regardless of the</span>
+<span id="L360"><span class="lineNum">     360</span>              :      *     force_send_fail toggle — that is a limitation of the test</span>
+<span id="L361"><span class="lineNum">     361</span>              :      *     harness, NOT of aeb_can.c.  To probe only the CAN module we</span>
+<span id="L362"><span class="lineNum">     362</span>              :      *     drain the TX buffer every 16 iterations via can_hal_test_reset,</span>
+<span id="L363"><span class="lineNum">     363</span>              :      *     which is the test-harness equivalent of a real CAN controller</span>
+<span id="L364"><span class="lineNum">     364</span>              :      *     consuming its transmit queue.  We keep the module state intact</span>
+<span id="L365"><span class="lineNum">     365</span>              :      *     by NOT re-initialising; only the HAL buffers are cleared. */</span>
+<span id="L366"><span class="lineNum">     366</span> <span class="tlaGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L367"><span class="lineNum">     367</span> <span class="tlaGNC">           1 :     (void)can_init(&amp;state);</span></span>
+<span id="L368"><span class="lineNum">     368</span> <span class="tlaGNC">           1 :     pid_output_t pid = { .brake_pct = 5.0F, .brake_bar = 0.5F };</span></span>
+<span id="L369"><span class="lineNum">     369</span> <span class="tlaGNC">           1 :     fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };</span></span>
+<span id="L370"><span class="lineNum">     370</span> <span class="tlaGNC">           1 :     int32_t inconsistent = 0;</span></span>
+<span id="L371"><span class="lineNum">     371</span> <span class="tlaGNC">         101 :     for (uint32_t i = 0U; i &lt; 100U; i++) {</span></span>
+<span id="L372"><span class="lineNum">     372</span> <span class="tlaGNC">         100 :         if ((i &gt; 0U) &amp;&amp; ((i % 16U) == 0U)) {</span></span>
+<span id="L373"><span class="lineNum">     373</span> <span class="tlaGNC">           6 :             can_hal_test_reset();            /* drain HAL TX buffer */</span></span>
+<span id="L374"><span class="lineNum">     374</span>              :         }</span>
+<span id="L375"><span class="lineNum">     375</span> <span class="tlaGNC">         100 :         can_hal_test_force_send_fail((int32_t)(i &amp; 1U));</span></span>
+<span id="L376"><span class="lineNum">     376</span> <span class="tlaGNC">         100 :         int32_t rc = can_tx_brake_cmd(&amp;state, &amp;pid, &amp;fsm);</span></span>
+<span id="L377"><span class="lineNum">     377</span> <span class="tlaGNC">         100 :         int32_t expect_ok = ((i &amp; 1U) == 0U) ? 1 : 0;</span></span>
+<span id="L378"><span class="lineNum">     378</span> <span class="tlaGNC">         100 :         int32_t got_ok    = (rc == CAN_OK) ? 1 : 0;</span></span>
+<span id="L379"><span class="lineNum">     379</span> <span class="tlaGNC">         100 :         if (expect_ok != got_ok) { inconsistent = 1; }</span></span>
+<span id="L380"><span class="lineNum">     380</span>              :     }</span>
+<span id="L381"><span class="lineNum">     381</span> <span class="tlaGNC">           1 :     can_hal_test_force_send_fail(0);</span></span>
+<span id="L382"><span class="lineNum">     382</span> <span class="tlaGNC">           1 :     FAULT_ASSERT(inconsistent == 0,</span></span>
+<span id="L383"><span class="lineNum">     383</span>              :                  &quot;D2  100 send_fail toggles -&gt; rc matches toggle state&quot;);</span>
+<span id="L384"><span class="lineNum">     384</span>              : </span>
+<span id="L385"><span class="lineNum">     385</span>              :     /* D3: TX burst that fills the stub's 32-slot buffer.</span>
+<span id="L386"><span class="lineNum">     386</span>              :      *     After the 33rd call the HAL returns -1 (buffer full) and</span>
+<span id="L387"><span class="lineNum">     387</span>              :      *     can_tx_alert must surface that as CAN_ERR_TX. */</span>
+<span id="L388"><span class="lineNum">     388</span> <span class="tlaGNC">           1 :     can_hal_test_reset();</span></span>
+<span id="L389"><span class="lineNum">     389</span> <span class="tlaGNC">           1 :     (void)can_init(&amp;state);</span></span>
+<span id="L390"><span class="lineNum">     390</span> <span class="tlaGNC">           1 :     alert_output_t alr = { .alert_type = 2U, .alert_active = 1U, .buzzer_cmd = 1U };</span></span>
+<span id="L391"><span class="lineNum">     391</span> <span class="tlaGNC">           1 :     int32_t first_fail_index = -1;</span></span>
+<span id="L392"><span class="lineNum">     392</span> <span class="tlaGNC">          41 :     for (int32_t i = 0; i &lt; 40; i++) {</span></span>
+<span id="L393"><span class="lineNum">     393</span> <span class="tlaGNC">          40 :         int32_t rc = can_tx_alert(&amp;alr);</span></span>
+<span id="L394"><span class="lineNum">     394</span> <span class="tlaGNC">          40 :         if ((rc == CAN_ERR_TX) &amp;&amp; (first_fail_index &lt; 0)) {</span></span>
+<span id="L395"><span class="lineNum">     395</span> <span class="tlaGNC">           1 :             first_fail_index = i;</span></span>
+<span id="L396"><span class="lineNum">     396</span>              :         }</span>
+<span id="L397"><span class="lineNum">     397</span>              :     }</span>
+<span id="L398"><span class="lineNum">     398</span> <span class="tlaGNC">           1 :     FAULT_ASSERT((first_fail_index &gt;= 32) &amp;&amp; (first_fail_index &lt;= 35),</span></span>
+<span id="L399"><span class="lineNum">     399</span>              :                  &quot;D3  TX burst &gt; buffer -&gt; CAN_ERR_TX surfaces (expected ~32)&quot;);</span>
+<span id="L400"><span class="lineNum">     400</span> <span class="tlaGNC">           1 : }</span></span>
+<span id="L401"><span class="lineNum">     401</span>              : </span>
+<span id="L402"><span class="lineNum">     402</span>              : /* ═════════════════════════════════════════════════════════════════════════</span>
+<span id="L403"><span class="lineNum">     403</span>              :  *  MAIN</span>
+<span id="L404"><span class="lineNum">     404</span>              :  * ═════════════════════════════════════════════════════════════════════════ */</span>
+<span id="L405"><span class="lineNum">     405</span> <span class="tlaGNC">           1 : int main(void)</span></span>
+<span id="L406"><span class="lineNum">     406</span>              : {</span>
+<span id="L407"><span class="lineNum">     407</span> <span class="tlaGNC">           1 :     printf(&quot;=== AEB CAN Module — Fault Injection (ISO 26262-6 Tab.11) ===\n&quot;);</span></span>
+<span id="L408"><span class="lineNum">     408</span>              : </span>
+<span id="L409"><span class="lineNum">     409</span> <span class="tlaGNC">           1 :     CATEGORY(&quot;A&quot;, &quot;Invalid values (NULL pointers, bad DLC, unknown ID, HAL fault)&quot;);</span></span>
+<span id="L410"><span class="lineNum">     410</span> <span class="tlaGNC">           1 :     cat_A_null_pointers();</span></span>
+<span id="L411"><span class="lineNum">     411</span> <span class="tlaGNC">           1 :     cat_A_invalid_frames();</span></span>
+<span id="L412"><span class="lineNum">     412</span>              : </span>
+<span id="L413"><span class="lineNum">     413</span> <span class="tlaGNC">           1 :     CATEGORY(&quot;B&quot;, &quot;Numeric extremes (NaN, Inf, encode overflow, pack overflow)&quot;);</span></span>
+<span id="L414"><span class="lineNum">     414</span> <span class="tlaGNC">           1 :     cat_B_encode_extremes();</span></span>
+<span id="L415"><span class="lineNum">     415</span>              : </span>
+<span id="L416"><span class="lineNum">     416</span> <span class="tlaGNC">           1 :     CATEGORY(&quot;C&quot;, &quot;State corruption (SEU on alive_counter, rx_miss, cycle_counter)&quot;);</span></span>
+<span id="L417"><span class="lineNum">     417</span> <span class="tlaGNC">           1 :     cat_C_state_corruption();</span></span>
+<span id="L418"><span class="lineNum">     418</span>              : </span>
+<span id="L419"><span class="lineNum">     419</span> <span class="tlaGNC">           1 :     CATEGORY(&quot;D&quot;, &quot;Persistence (timeout recovery, 100 toggles, TX burst)&quot;);</span></span>
+<span id="L420"><span class="lineNum">     420</span> <span class="tlaGNC">           1 :     cat_D_persistence();</span></span>
+<span id="L421"><span class="lineNum">     421</span>              : </span>
+<span id="L422"><span class="lineNum">     422</span> <span class="tlaGNC">           1 :     printf(&quot;\n=== Fault injection summary: %d asserts, %d passed, %d failed ===\n&quot;,</span></span>
+<span id="L423"><span class="lineNum">     423</span>              :            faults_run, faults_passed, faults_failed);</span>
+<span id="L424"><span class="lineNum">     424</span>              : </span>
+<span id="L425"><span class="lineNum">     425</span>              :     /* Exit 0 iff all fail-safe predicates held.  A non-zero exit is a</span>
+<span id="L426"><span class="lineNum">     426</span>              :      * signal to the CI that the module may have a robustness bug. */</span>
+<span id="L427"><span class="lineNum">     427</span> <span class="tlaGNC">           1 :     return (faults_failed &gt; 0) ? 1 : 0;</span></span>
+<span id="L428"><span class="lineNum">     428</span>              : }</span>
+        </pre>
+              </td>
+            </tr>
+          </table>
+          <br>
+
+          <table width="100%" border=0 cellspacing=0 cellpadding=0>
+            <tr><td class="ruler"><img src="../glass.png" width=3 height=3 alt=""></td></tr>
+            <tr><td class="versionInfo">Generated by: <a href="https://github.com//linux-test-project/lcov" target="_parent">LCOV version 2.0-1</a></td></tr>
+          </table>
+          <br>
+
+</body>
+</html>

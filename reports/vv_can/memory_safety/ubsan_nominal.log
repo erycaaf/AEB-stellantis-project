@@ -1,0 +1,17 @@
+=== AEB CAN Module — Unit Tests ===
+
+  [TEST] test_signal_roundtrip
+  [TEST] test_init_success
+  [TEST] test_init_failure
+  [TEST] test_rx_ego_vehicle
+  [TEST] test_rx_yaw_rate
+  [TEST] test_rx_radar_target
+  [TEST] test_rx_driver_input
+  [TEST] test_tx_alert
+  [TEST] test_rx_timeout
+  [TEST] test_rx_timeout_reset_on_valid_frame
+  [TEST] test_tx_brake_cmd
+  [TEST] test_tx_fsm_period
+  [TEST] test_tx_send_failure
+
+=== Results: 36 run, 36 passed, 0 failed ===

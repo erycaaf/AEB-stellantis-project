@@ -1,0 +1,24 @@
+Requirement,Test function,Input,Expected,P/F,Evidence,Suite
+FR-CAN-001,test_tx_fsm_period,5 ticks of 10 ms with fsm_state=FSM_WARNING,TX on 5th tick (CAN_ID_FSM_STATE 0x200) rc=CAN_OK; ticks 1-4 rc=1 (not due),P,reports/vv_can/coverage_mcdc/run_nominal.log,Nominal
+FR-CAN-001,"can_tx_fsm_state HAL fail",5 ticks with force_send_fail=1,rc=CAN_ERR_TX on 5th tick,P,reports/vv_can/coverage_mcdc/run_struct.log,Structural
+FR-CAN-002,test_rx_radar_target,"RadarTarget frame: distance=50.0 m, vrel=-5.0 m/s, ttc=3.5 s, conf=12","target_distance=50.0, relative_speed=-5.0, ttc_radar=3.5, confidence_raw=12, rx_timeout_flag=0",P,reports/vv_can/coverage_mcdc/run_nominal.log,Nominal
+FR-CAN-002,test_rx_timeout,"6 ticks (60 ms) with no radar RX",rx_timeout_flag=1,P,reports/vv_can/coverage_mcdc/run_nominal.log,Nominal
+FR-CAN-002,test_rx_timeout_reset_on_valid_frame,"5 ticks no RX + 1 valid radar frame + 1 tick",rx_timeout_flag=0 after recovery,P,reports/vv_can/coverage_mcdc/run_nominal.log,Nominal
+FR-CAN-002,D1a/D1b persistence,"10 ticks no RX then radar frame","rx_timeout_flag=1 then cleared, miss_count=0",P,reports/vv_can/fault_injection/run.log,Fault
+FR-CAN-003,test_signal_roundtrip,"pack(0xABCD, bits 4..19, len=16)",unpack returns 0xABCD; adjacent bits intact,P,reports/vv_can/coverage_mcdc/run_nominal.log,Nominal
+FR-CAN-003,test_tx_brake_cmd,"pid.brake_pct=75, fsm=BRAKE_L3",rc=CAN_OK; tx_count=1; alive_counter incremented,P,reports/vv_can/coverage_mcdc/run_nominal.log,Nominal
+FR-CAN-003,test_tx_alert,"alert_type=3, active=1, buzzer=4",rc=CAN_OK; tx_count=1,P,reports/vv_can/coverage_mcdc/run_nominal.log,Nominal
+FR-CAN-003,test_rx_ego_vehicle,"EgoVehicle frame: speed=13.89, accel=-2.0, steer=10.0","decoded vehicle_speed=13.89, long_accel=-2.0, steering_angle=10.0",P,reports/vv_can/coverage_mcdc/run_nominal.log,Nominal
+FR-CAN-003,test_rx_driver_input,"DriverInput: brake=80, accel=0, aeb_enable=1, override=0",all 4 fields decoded correctly,P,reports/vv_can/coverage_mcdc/run_nominal.log,Nominal
+FR-CAN-003,test_rx_yaw_rate,EgoVehicle yaw_rate=5.0 deg/s,decoded yaw_rate=5.0,P,reports/vv_can/coverage_mcdc/run_nominal.log,Nominal
+FR-CAN-004,test_init_success,can_init with HAL OK,rc=CAN_OK; state.initialised=1; alive_counter=0,P,reports/vv_can/coverage_mcdc/run_nominal.log,Nominal
+FR-CAN-004,test_init_failure,can_init with force_init_fail=1,rc=CAN_ERR_INIT; state.initialised=0,P,reports/vv_can/coverage_mcdc/run_nominal.log,Nominal
+NFR-SAF-ROB,test_tx_send_failure,tx_brake_cmd with force_send_fail=1,rc=CAN_ERR_TX,P,reports/vv_can/coverage_mcdc/run_nominal.log,Nominal
+NFR-SAF-ROB,cat_A_null_pointers (A1-A11),NULL in every public API,Every call returns CAN_ERR_TX or does not crash,P,reports/vv_can/fault_injection/run.log,Fault
+NFR-SAF-ROB,cat_A_invalid_frames (A12-A15),"short DLC, unknown ID, HAL init fault","No decode, no side effects, CAN_ERR_INIT surfaces",P,reports/vv_can/fault_injection/run.log,Fault
+NFR-SAF-ROB,cat_B_encode_extremes (B1-B6),"NaN, +/-Inf, FLT_MAX, pack overflow","All calls return, adjacent signals intact (but see Bug #1 for UB)",F,reports/vv_can/memory_safety/ubsan_fault.log,Fault
+NFR-SAF-ROB,cat_C_state_corruption (C1-C4),"alive_counter=0xAA, rx_miss=0xFF, tx_cycle=MAX, init=0x55","Bounded, saturated, or no observable effect",P,reports/vv_can/fault_injection/run.log,Fault
+NFR-SAF-ROB,cat_D_persistence (D2-D3),"100 toggles, TX burst 40 frames","rc matches toggle state, CAN_ERR_TX at buffer full",P,reports/vv_can/fault_injection/run.log,Fault
+NFR-COD-006,statement coverage aeb_can.c,all three suites merged via gcov-tool,167/167 lines = 100.00% (target >= 80%),P,reports/vv_can/coverage_mcdc/aeb_can.c.gcov,Coverage
+NFR-COD-007,branch coverage aeb_can.c,all three suites merged via gcov-tool,81/81 branches = 100.00% (target >= 60%),P,reports/vv_can/coverage_mcdc/aeb_can.c.gcov,Coverage
+NFR-COD-008,MC/DC coverage aeb_can.c,"gcc-14 -fcondition-coverage, merged",68/68 outcomes = 100.00%,P,reports/vv_can/coverage_mcdc/aeb_can.c.gcov,Coverage
