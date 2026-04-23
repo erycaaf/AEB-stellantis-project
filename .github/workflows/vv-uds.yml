@@ -1,0 +1,223 @@
+name: UDS V&V
+
+# Runs the ASIL-D V&V stack scoped to the UDS module.
+#
+# Triggers only on paths that can affect UDS behaviour. On PRs to
+# development/main, the blocking gates (MC/DC, memory safety, MISRA) must
+# pass; fault-uds is intentionally non-blocking until the three
+# robustness bugs documented in reports/vv_uds/fault_injection/run.log
+# are patched on fix/uds-robustness. After that PR lands, flip
+# `continue-on-error` on the fault-injection step to `false`.
+#
+# On push to development/main (post-merge), the job additionally refreshes
+# the committed reports under reports/vv_uds/** as the bot
+# github-actions[bot], using a commit message that does not touch
+# UDS-relevant paths, so the workflow does not re-trigger.
+
+on:
+  pull_request:
+    branches: [development, main]
+    paths:
+      - 'src/communication/aeb_uds.c'
+      - 'include/aeb_uds.h'
+      - 'include/aeb_types.h'
+      - 'include/aeb_config.h'
+      - 'tests/test_uds.c'
+      - 'tests/test_uds_fault.c'
+      - 'Makefile'
+      - 'docker/Dockerfile.vv'
+      - '.github/workflows/vv-uds.yml'
+  push:
+    branches: [development, main]
+    paths:
+      - 'src/communication/aeb_uds.c'
+      - 'include/aeb_uds.h'
+      - 'include/aeb_types.h'
+      - 'include/aeb_config.h'
+      - 'tests/test_uds.c'
+      - 'tests/test_uds_fault.c'
+      - 'Makefile'
+      - 'docker/Dockerfile.vv'
+      - '.github/workflows/vv-uds.yml'
+
+permissions:
+  contents: write       # needed to commit refreshed reports on push
+  pull-requests: read
+
+concurrency:
+  # Avoid overlapping runs on the same branch (the refresh-push step can
+  # race with itself if two pushes land quickly).
+  group: vv-uds-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  vv-uds:
+    name: UDS V&V stack
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history needed so we can push back on development/main
+          fetch-depth: 0
+
+      - name: Install V&V toolchain (matches docker/Dockerfile.vv)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-14 g++-14 make libc6-dev \
+            cppcheck valgrind lcov gcovr python3-minimal bc
+          sudo ln -sf /usr/bin/gcc-14  /usr/local/bin/gcc
+          sudo ln -sf /usr/bin/g++-14  /usr/local/bin/g++
+          sudo ln -sf /usr/bin/gcov-14 /usr/local/bin/gcov
+          gcc --version | head -1
+          gcov --version | head -1
+          cppcheck --version
+          valgrind --version
+
+      # ─── Blocking gate 1: structural coverage ─────────────────────────────
+      - name: MC/DC coverage (gate ≥ 95%)
+        run: |
+          make mcdc-uds
+          SUM="reports/vv_uds/coverage_mcdc/gcov_summary.txt"
+          STMT=$(grep '^Lines executed:'             "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          BRCH=$(grep '^Branches executed:'          "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          MCDC=$(grep '^Condition outcomes covered:' "$SUM"          | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          echo "UDS coverage — stmt=${STMT}% branch=${BRCH}% mcdc=${MCDC}%"
+          for metric in "Statement:$STMT" "Branch:$BRCH" "MC/DC:$MCDC"; do
+            name="${metric%%:*}"; value="${metric##*:}"
+            if [ "$(echo "$value < 95.0" | bc -l)" = "1" ]; then
+              echo "::error title=UDS coverage regression::${name} dropped to ${value}% (required ≥95%)"
+              exit 1
+            fi
+          done
+
+      # ─── Blocking gate 2: dynamic memory safety on nominal suite ──────────
+      - name: Memory safety (Valgrind + ASan + UBSan)
+        run: |
+          make memory-uds
+          MS="reports/vv_uds/memory_safety"
+          # Valgrind/ASan on the *nominal* suite must be silent.
+          # Logs from the *fault* suite can contain expected UBSan reports
+          # (aeb_uds.c:82, :103) until Rian's patch lands — those are the
+          # evidence for Bug #1, not a regression.
+          if [ -s "$MS/valgrind_test_uds.log" ]; then
+            echo "::error title=Valgrind regression::Errors on nominal UDS suite"
+            cat "$MS/valgrind_test_uds.log"; exit 1
+          fi
+          if [ -s "$MS/ubsan_test_uds.log" ]; then
+            echo "::error title=UBSan regression::Errors on nominal UDS suite"
+            cat "$MS/ubsan_test_uds.log"; exit 1
+          fi
+
+      # ─── Blocking gate 3: MISRA C:2012 (UDS scope only) ───────────────────
+      - name: MISRA (0 issues in aeb_uds.{c,h})
+        run: |
+          make misra-uds
+          UDS_ISSUES=$(python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          t = ET.parse("reports/vv_uds/misra/cppcheck_uds.xml")
+          target = ("src/communication/aeb_uds.c", "include/aeb_uds.h")
+          n = 0
+          for e in t.findall(".//error"):
+              loc = e.find("location")
+              if loc is not None and loc.get("file","") in target:
+                  n += 1
+          print(n)
+          PY
+          )
+          echo "MISRA issues in aeb_uds scope: $UDS_ISSUES"
+          if [ "$UDS_ISSUES" != "0" ]; then
+            echo "::error title=MISRA regression::$UDS_ISSUES issue(s) in aeb_uds.{c,h}"
+            exit 1
+          fi
+
+      # ─── Non-blocking (reports-only) until Rian's fix lands ───────────────
+      # Flip `continue-on-error` to `false` after fix/uds-robustness merges.
+      - name: Fault injection (non-blocking until bugs patched)
+        continue-on-error: true
+        run: make fault-uds
+
+      # ─── Summary for the PR/commit checks UI ──────────────────────────────
+      - name: Step summary
+        if: always()
+        run: |
+          {
+            echo "## UDS V&V — run #${{ github.run_number }}"
+            echo ""
+            echo "### Structural coverage"
+            echo '```'
+            cat reports/vv_uds/coverage_mcdc/gcov_summary.txt
+            echo '```'
+            echo ""
+            echo "### Fault injection"
+            echo '```'
+            tail -5 reports/vv_uds/fault_injection/run.log
+            echo '```'
+            echo ""
+            echo "### Memory safety"
+            for f in reports/vv_uds/memory_safety/*.log; do
+              name=$(basename "$f")
+              if [ -s "$f" ]; then
+                echo "**${name}:**"
+                echo '```'
+                head -20 "$f"
+                echo '```'
+              else
+                echo "**${name}:** _clean_"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vv-uds-reports-run${{ github.run_number }}
+          path: reports/vv_uds/
+          retention-days: 30
+
+      # ─── Commit refreshed reports back (push to dev/main only) ────────────
+      # The path filter excludes reports/vv_uds/** from the workflow
+      # triggers, so this commit does NOT re-fire the workflow.
+      - name: Commit refreshed reports
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main')
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add reports/vv_uds/coverage_mcdc/run.log \
+                  reports/vv_uds/coverage_mcdc/gcov_summary.txt \
+                  reports/vv_uds/coverage_mcdc/aeb_uds.c.gcov \
+                  reports/vv_uds/fault_injection/run.log \
+                  reports/vv_uds/memory_safety/valgrind_test_uds.log \
+                  reports/vv_uds/memory_safety/valgrind_test_uds_fault.log \
+                  reports/vv_uds/memory_safety/ubsan_test_uds.log \
+                  reports/vv_uds/memory_safety/ubsan_test_uds_fault.log \
+                  reports/vv_uds/misra/cppcheck_uds.xml
+
+          # Self-enforcing scope guard: the bot must ONLY ever touch
+          # reports/vv_uds/**. If the staged diff includes anything outside
+          # that tree, abort — this prevents a compromised workflow from
+          # using the branch-protection bypass to modify source/tests.
+          OUT_OF_SCOPE=$(git diff --staged --name-only | grep -v '^reports/vv_uds/' || true)
+          if [ -n "$OUT_OF_SCOPE" ]; then
+            echo "::error title=V&V bot scope violation::Refusing to commit files outside reports/vv_uds/**:"
+            echo "$OUT_OF_SCOPE"
+            exit 1
+          fi
+
+          if git diff --staged --quiet; then
+            echo "No V&V report changes to commit."
+          else
+            git commit -m "chore(vv-uds): refresh reports from run #${{ github.run_number }}"
+            # Push back to the same branch that triggered us.
+            # On protected branches without a bypass rule for
+            # github-actions[bot], this step will fail and the run will be
+            # marked failed. The self-enforcing scope guard above limits the
+            # bot's blast radius to reports/vv_uds/** even when bypass is
+            # granted. See the team CI guide (vv_uds_workflow.pdf in the
+            # shared docs area) for the three configuration options
+            # (self-enforcing bypass / auto-PR / path-scoped ruleset).
+            git push origin "HEAD:${{ github.ref_name }}"
+          fi
