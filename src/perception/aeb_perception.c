@@ -286,8 +286,14 @@ void perception_step(const raw_sensor_input_t *in, perception_output_t *out)
     float32_t fused_v;
     float32_t conf;
 
-    out->v_ego      = in->v_ego;
     out->fault_flag = 0U;
+
+    if (isfinite(in->v_ego)) {
+        out->v_ego = in->v_ego;
+    } else {
+        out->v_ego       = 0.0f;
+        out->fault_flag |= AEB_FAULT_CAN_TO;
+    }
 
     /* CAN timeout: hold last Kalman estimate, flag all faults */
     if (in->can_timeout != 0U) {
