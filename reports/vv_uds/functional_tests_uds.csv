@@ -1,0 +1,40 @@
+Requirement,TestFunction,Category,Inputs,ExpectedOutput,PassFail,Evidence
+FR-UDS-001,test_read_did_ttc,Nominal,"sid=0x22 did=0xF100 ttc=3.45","sid=0x62 scaled_val=345",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-001,test_read_did_fsm_state,Nominal,"sid=0x22 did=0xF101 fsm=BRAKE_L2","sid=0x62 data1=4",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-001,test_read_did_brake_pressure,Nominal,"sid=0x22 did=0xF102 brake_pct=75.5","sid=0x62 scaled_val=755",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-001,test_read_did_unsupported,Nominal,"sid=0x22 did=0xFFFF","sid=0x7F NRC=0x31",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-001,test_ttc_zero,Edge,"sid=0x22 did=0xF100 ttc=0.0","scaled_val=0",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-001,test_ttc_max,Edge,"sid=0x22 did=0xF100 ttc=10.0","scaled_val=1000",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-001,test_brake_pressure_max,Edge,"sid=0x22 did=0xF102 brake_pct=100.0","scaled_val=1000",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-001,test_fsm_state_post_brake,Edge,"sid=0x22 did=0xF101 fsm=POST_BRAKE","data1=6",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-002,test_dtc_sensor_fault,Nominal,"sensor_fault=1","dtc_count=1 fault_lamp=1",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-002,test_dtc_crc_error,Nominal,"crc_error=1","dtc_count=1",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-002,test_dtc_actuator_fault,Nominal,"actuator_fault=1","dtc_count=1",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-002,test_dtc_latch_persists,Nominal,"sensor_fault=1 then 0","dtc_count=1 (latched)",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-002,test_dtc_multiple_faults,Nominal,"all three faults=1","dtc_count=3",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-003,test_clear_dtc,Nominal,"sid=0x14 after all faults","sid=0x54 dtc_count=0",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-003,test_dtc_clear_then_refault,Nominal,"clear then re-fault","dtc_count=1 re-latched",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-004,test_routine_disable_aeb,Nominal,"sid=0x31 rid=0x0301 value=0","aeb_enabled=0",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-004,test_routine_enable_aeb,Nominal,"sid=0x31 rid=0x0301 value=1","aeb_enabled=1",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-004,test_routine_invalid_value,Nominal,"sid=0x31 rid=0x0301 value=5","sid=0x7F",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-004,test_routine_unsupported_rid,Nominal,"sid=0x31 rid=0xFFFF","sid=0x7F",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-004,test_enable_disable_cycle,Nominal,"disable then empty cycle then enable","aeb_enabled persists correctly",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-005,test_unsupported_sid,Nominal,"sid=0xAA","sid=0x7F NRC=0x11",P,reports/vv_uds/coverage_mcdc/run.log
+FR-UDS-005,test_empty_request,Nominal,"sid=0","no response",P,reports/vv_uds/coverage_mcdc/run.log
+FR-COD-001,test_init_defaults,Nominal,"power-on","aeb_enabled=1 dtc_count=0 fault_lamp=0",P,reports/vv_uds/coverage_mcdc/run.log
+NFR-SAF-ROB,fault_a1_ttc_nan,FaultA,"ttc=NaN read 0xF100","fail-safe response",P,reports/vv_uds/fault_injection/run.log (pass by coincidence; see Bug #1)
+NFR-SAF-ROB,fault_a2_ttc_pos_inf,FaultA,"ttc=+Inf read 0xF100","fail-safe response",P,reports/vv_uds/fault_injection/run.log (pass by coincidence; see Bug #1)
+NFR-SAF-ROB,fault_a3_ttc_neg_inf,FaultA,"ttc=-Inf read 0xF100","fail-safe response",P,reports/vv_uds/fault_injection/run.log (pass by coincidence; see Bug #1)
+NFR-SAF-ROB,fault_a4_brake_nan,FaultA,"brake_pct=NaN read 0xF102","fail-safe response",P,reports/vv_uds/fault_injection/run.log (pass by coincidence; see Bug #1)
+NFR-SAF-ROB,fault_a5_brake_pos_inf,FaultA,"brake_pct=+Inf read 0xF102","fail-safe response",P,reports/vv_uds/fault_injection/run.log (pass by coincidence; see Bug #1)
+NFR-SAF-ROB,fault_b1_ttc_negative,FaultB,"ttc=-1.0 read 0xF100","fail-safe response",F,Bug #1 - unsafe float->uint16 cast (aeb_uds.c:82)
+NFR-SAF-ROB,fault_b2_ttc_overflow,FaultB,"ttc=700.0 read 0xF100","fail-safe response",F,Bug #1 - unsafe float->uint16 cast (aeb_uds.c:82)
+NFR-SAF-ROB,fault_b3_ttc_float_max,FaultB,"ttc=FLT_MAX","fail-safe response",P,reports/vv_uds/fault_injection/run.log (pass by coincidence; overflow->+Inf->0)
+NFR-SAF-ROB,fault_b4_brake_negative,FaultB,"brake_pct=-25.0","fail-safe response",F,Bug #1 - unsafe float->uint16 cast (aeb_uds.c:103)
+NFR-SAF-ROB,fault_b5_brake_overflow,FaultB,"brake_pct=7000.0","fail-safe response",F,Bug #1 - unsafe float->uint16 cast (aeb_uds.c:103)
+NFR-SAF-ROB,fault_c1_aeb_enabled_corrupted,FaultC-SEU,"state.aeb_enabled=0xAA","normalised to 0 or 1",F,Bug #2 - aeb_enabled propagated raw (aeb_uds.c:275)
+NFR-SAF-ROB,fault_c2_dtc_flags_corrupted,FaultC-SEU,"all DTC flags=0xFF","dtc_count<=3",F,Bug #3 - dtc_count sum overflow (aeb_uds.c:277)
+NFR-SAF-ROB,fault_c3_single_dtc_corrupted,FaultC-SEU,"dtc_sensor=0x80","dtc_count<=3",F,Bug #3 - dtc_count sum overflow (aeb_uds.c:277)
+NFR-SAF-ROB,fault_d1_clear_while_active,FaultD,"clear DTC with active fault","dtc_count=0",P,reports/vv_uds/fault_injection/run.log
+NFR-SAF-ROB,fault_d2_rapid_toggle,FaultD,"100 enable/disable toggles","aeb_enabled coherent",P,reports/vv_uds/fault_injection/run.log
+NFR-SAF-ROB,fault_d3_unknown_sid_does_not_spoof,FaultD,"sid=0xAA","sid=0x7F (no spoofed positive)",P,reports/vv_uds/fault_injection/run.log
