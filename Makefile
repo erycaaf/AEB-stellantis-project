@@ -280,6 +280,7 @@ mcdc-decision:
 		--filter 'src/decision/' \
 		--html-details $(VV_REPORT_DIR)/coverage_mcdc/report.html \
 		--cobertura $(VV_REPORT_DIR)/coverage_mcdc/coverage.xml \
+		--json-summary $(VV_REPORT_DIR)/coverage_mcdc/coverage.json \
 		--txt $(VV_REPORT_DIR)/coverage_mcdc/coverage_summary.txt \
 		--print-summary
 	@echo ""

@@ -85,27 +85,33 @@ jobs:
           valgrind --version
 
       # ─── Blocking gate 1: structural coverage ─────────────────────────────
-      # gcov_summary.txt has one metric block per source file; `sort -n | head -1`
-      # picks the worst-performing file so neither TTC nor FSM can regress silently.
+      # gcovr --json-summary aggregates line, branch, and condition coverage
+      # across all test binaries into totals; the gate enforces ≥95% on each.
       - name: MC/DC coverage (gate ≥ 95%)
         run: |
           make mcdc-decision
-          SUM="reports/vv_decision/coverage_mcdc/gcov_summary.txt"
-          STMT=$(grep '^Lines executed:'             "$SUM" | sed 's/.*:\([0-9.]*\)%.*/\1/' | sort -n | head -1)
-          BRCH=$(grep '^Branches executed:'          "$SUM" | sed 's/.*:\([0-9.]*\)%.*/\1/' | sort -n | head -1)
-          MCDC=$(grep '^Condition outcomes covered:' "$SUM" | sed 's/.*:\([0-9.]*\)%.*/\1/' | sort -n | head -1)
-          echo "Decision coverage (worst-file) — stmt=${STMT}% branch=${BRCH}% mcdc=${MCDC}%"
-          for metric in "Statement:$STMT" "Branch:$BRCH" "MC/DC:$MCDC"; do
-            name="${metric%%:*}"; value="${metric##*:}"
-            if [ -z "$value" ]; then
-              echo "::error title=Decision coverage parse::${name} value missing in $SUM"
-              exit 1
-            fi
-            if [ "$(echo "$value < 95.0" | bc -l)" = "1" ]; then
-              echo "::error title=Decision coverage regression::${name} dropped to ${value}% (required ≥95%)"
-              exit 1
-            fi
-          done
+          python3 - <<'PY'
+          import json, sys
+          with open("reports/vv_decision/coverage_mcdc/coverage.json") as f:
+              d = json.load(f)
+          stmt   = d.get("line_percent")
+          branch = d.get("branch_percent")
+          mcdc   = d.get("condition_percent")
+          if stmt is None or branch is None:
+              print("::error title=Decision coverage parse::line_percent/branch_percent missing in coverage.json")
+              sys.exit(1)
+          if mcdc is None:
+              print("::error title=Decision MC/DC parse::condition_percent missing in coverage.json — check -fcondition-coverage and gcovr version")
+              sys.exit(1)
+          print(f"Decision coverage (aggregate) — stmt={stmt:.2f}% branch={branch:.2f}% mcdc={mcdc:.2f}%")
+          failed = False
+          for name, value in (("Statement", stmt), ("Branch", branch), ("MC/DC", mcdc)):
+              if value < 95.0:
+                  print(f"::error title=Decision coverage regression::{name} at {value:.2f}% (required ≥95%)")
+                  failed = True
+          if failed:
+              sys.exit(1)
+          PY
 
       # ─── Blocking gate 2: dynamic memory safety on nominal suites ─────────
       - name: Memory safety (Valgrind + ASan + UBSan)
