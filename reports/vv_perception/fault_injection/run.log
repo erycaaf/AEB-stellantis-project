@@ -5,27 +5,27 @@
 
 --- Category A: NaN / inf in sensor inputs ---
 [A1] NaN injected in lidar_d (single frame)
-       distance=nan  v_rel=nan  conf=0.993979  fault=0x00
-  [FAIL] A1: NaN lidar_d must produce fail-safe output  (line 116)
-  [FAIL] A1: distance must be finite (no NaN propagation)  (line 118)
+       distance=29.995872  v_rel=4.999996  conf=0.667735  fault=0x00
+  [PASS] A1: NaN lidar_d must produce fail-safe output
+  [PASS] A1: distance must be finite (no NaN propagation)
 
 [A2] NaN injected in radar_d (single frame)
-       distance=nan  v_rel=nan  conf=0.993979  fault=0x00
-  [FAIL] A2: NaN radar_d must produce fail-safe output  (line 136)
-  [FAIL] A2: v_rel must be finite (no NaN propagation through Kalman)  (line 138)
+       distance=30.124697  v_rel=-0.075302  conf=0.436876  fault=0x00
+  [PASS] A2: NaN radar_d must produce fail-safe output
+  [PASS] A2: v_rel must be finite (no NaN propagation through Kalman)
 
 [A3] +inf injected in lidar_d
-       distance=-nan  conf=0.993979  fault=0x00
-  [FAIL] A3: +inf lidar_d must produce fail-safe output  (line 155)
+       distance=29.995872  conf=0.667735  fault=0x00
+  [PASS] A3: +inf lidar_d must produce fail-safe output
 
 [A4] -inf injected in radar_vr
-       distance=-nan  v_rel=-nan  conf=0.993979  fault=0x00
-  [FAIL] A4: -inf radar_vr must produce fail-safe output  (line 173)
-  [FAIL] A4: v_rel must remain finite  (line 175)
+       distance=30.124697  v_rel=-0.075302  conf=0.436876  fault=0x00
+  [PASS] A4: -inf radar_vr must produce fail-safe output
+  [PASS] A4: v_rel must remain finite
 
 [A5] NaN injected in v_ego (passthrough)
-       v_ego_out=nan  fault=0x00
-  [FAIL] A5: NaN v_ego must be sanitised or trigger a fault flag  (line 195)
+       v_ego_out=0.000000  fault=0x80
+  [PASS] A5: NaN v_ego must be sanitised or trigger a fault flag
 
 --- Category B: Out-of-range numeric extremes ---
 [B1] FLT_MAX injected in radar_d for SENSOR_FAULT_CYCLES frames
@@ -46,9 +46,9 @@
   [PASS] B4: 1000 m/s radar_vr must latch RADAR fault
   [PASS] B4: v_rel output must remain clamped to [-MAX_REL_VEL, +MAX_REL_VEL]
 
-[B5] Alternating ROC > DIST_ROC_LIMIT (radar)
-       distance=30.445597  fault=0x02
-  [PASS] B5: alternating ROC violation must latch RADAR fault
+[B5] Alternating ROC > DIST_ROC_LIMIT (radar) — regression guard
+       distance=30.825939  fault=0x00
+  [PASS] B5: alternating ROC (bad/good/bad) must NOT latch RADAR fault
 
 --- Category C: SEU / control-path corruption ---
 [C1] can_timeout asserted on the FIRST frame (state never seeded)
@@ -73,8 +73,8 @@
   [PASS] D1: counter must saturate, not wrap (fault still latched on cycle 301)
 
 [D2] Rapid bad/good/bad oscillation (counter reset semantics)
-       fault=0x01
-  [FAIL] D2: oscillating bad/good must not produce false-positive latch  (line 424)
+       fault=0x00
+  [PASS] D2: oscillating bad/good must not produce false-positive latch
 
 [D3] Recovery after latch (FR-PER-006: latched fault is sticky?)
        after latch: fault=0x01
@@ -82,5 +82,5 @@
   [PASS] D3: LiDAR fault must clear after sustained good data
 
 ======================================================
-  Results: 16 passed, 9 failed
+  Results: 25 passed, 0 failed
 ======================================================
