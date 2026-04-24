@@ -21,12 +21,13 @@
 #   make misra-decision    — cppcheck MISRA scoped to aeb_ttc / aeb_fsm
 #   make vv-decision       — full V&V stack
 #
-# Targets (ASIL-D V&V — Perception module):
-#   make mcdc-perception   — MC/DC coverage (nominal + complementary combined union)
-#   make fault-perception  — systematic fault-injection suite
-#   make memory-perception — Valgrind + ASan + UBSan on Perception suites
-#   make misra-perception  — cppcheck MISRA scoped to aeb_perception.{c,h}
-#   make vv-perception     — full V&V stack
+# Targets (ASIL-D V&V — PID + Alert modules):
+#   make mcdc-pid-alert    — MC/DC coverage (gcc-14 + gcov-14 + gcovr)
+#   make fault-pid-alert   — systematic fault-injection suite (PID + Alert)
+#   make memory-pid-alert  — Valgrind + ASan + UBSan on PID + Alert suites
+#   make misra-pid-alert   — cppcheck MISRA scoped to aeb_pid / aeb_alert
+#   make html-pid-alert    — navigable HTML reports (lcov genhtml + cppcheck-htmlreport + wrappers)
+#   make vv-pid-alert      — full V&V stack
 #
 # V&V artefacts land under reports/vv_<module>/. Consolidated reports
 # live in the team documentation area, outside this repo.
@@ -415,7 +416,7 @@ vv-decision: mcdc-decision fault-decision memory-decision misra-decision html-de
 
 	# ── ASIL-D V&V targets (Execution: PID + Alert) ────────────────────────
 
-mcdc-pid-alert fault-pid-alert memory-pid-alert misra-pid-alert vv-pid-alert: \
+mcdc-pid-alert fault-pid-alert memory-pid-alert misra-pid-alert html-pid-alert vv-pid-alert: \
 	VV_REPORT_DIR := reports/vv_pid_alert
 
 mcdc-pid-alert:
@@ -453,7 +454,7 @@ mcdc-pid-alert:
 	@cat $(VV_REPORT_DIR)/coverage_mcdc/gcov_summary.txt
 	@echo ""
 	@echo "=== Generating HTML report (gcovr) ==="
-	cd $(VV_REPORT_DIR)/coverage_mcdc && gcovr --gcov-executable='gcov-14 --conditions' \
+	cd $(VV_REPORT_DIR)/coverage_mcdc && $(CURDIR)/$(GCOVR) --gcov-executable='gcov-14 --conditions' \
 	                                             --root=../../.. \
 	                                             --filter='.*/src/execution/.*' \
 	                                             --html-details report.html \
@@ -473,6 +474,39 @@ fault-pid-alert:
 	@echo "=== Alert Fault Injection Test Suite ==="
 	-$(VV_REPORT_DIR)/fault_injection/test_alert_fault | tee $(VV_REPORT_DIR)/fault_injection/alert_fault.log
 	@echo ""
+	@echo "=== Consolidating per-submodule logs into run.log ==="
+	@# run.log is consumed by scripts/wrap_fault.py, which expects rows
+	@# formatted as "[NN] short_name ... PASS|FAIL" and a trailing
+	@# "Results: N / M passed" line. The two per-submodule logs emit
+	@# "  PASS: description [tests/...]" / "  FAIL: description [...]"
+	@# instead, so we reformat them here: prepend an incrementing [NN]
+	@# counter, derive a short underscored test name from the description,
+	@# prefix with the submodule name, and synthesise a single
+	@# consolidated Results: trailer.
+	@awk ' \
+	    BEGIN { n = 0 } \
+	    FNR == 1 { \
+	        split(FILENAME, parts, "/"); base = parts[length(parts)]; \
+	        mod = (base ~ /^alert_/) ? "alert" : "pid" \
+	    } \
+	    /^[[:space:]]*(PASS|FAIL):/ { \
+	        n++; \
+	        status = ($$0 ~ /PASS/) ? "PASS" : "FAIL"; \
+	        desc = $$0; \
+	        sub(/^[[:space:]]*(PASS|FAIL):[[:space:]]*/, "", desc); \
+	        sub(/[[:space:]]*\[.*\][[:space:]]*$$/, "", desc); \
+	        gsub(/[^A-Za-z0-9]+/, "_", desc); \
+	        printf "[%02d] %s_%s %s\n", n, mod, desc, status; \
+	        next \
+	    } \
+	    { print } \
+	' $(VV_REPORT_DIR)/fault_injection/pid_fault.log \
+	  $(VV_REPORT_DIR)/fault_injection/alert_fault.log \
+	  > $(VV_REPORT_DIR)/fault_injection/run.log
+	@PASS=$$(grep -hEc '^\[[0-9]+\].*PASS$$' $(VV_REPORT_DIR)/fault_injection/run.log); \
+	 TOTAL=$$(grep -hEc '^\[[0-9]+\].*(PASS|FAIL)$$' $(VV_REPORT_DIR)/fault_injection/run.log); \
+	 sed -i -E '/^[[:space:]]*Results:[[:space:]]+[0-9]+\/[0-9]+ passed/d' $(VV_REPORT_DIR)/fault_injection/run.log; \
+	 echo "Results: $$PASS / $$TOTAL passed" >> $(VV_REPORT_DIR)/fault_injection/run.log
 	@echo "=== Logs saved in $(VV_REPORT_DIR)/fault_injection/ ==="
 
 memory-pid-alert:
@@ -480,12 +514,12 @@ memory-pid-alert:
 	@echo "=== Valgrind ==="
 	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs -o $(VV_REPORT_DIR)/memory_safety/test_pid_val   $(SRC_PID_TEST)   $(LDFLAGS)
 	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs -o $(VV_REPORT_DIR)/memory_safety/test_alert_val $(SRC_ALERT_TEST) $(LDFLAGS)
-	@valgrind --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=1 \
+	@valgrind --quiet --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=1 \
 		$(VV_REPORT_DIR)/memory_safety/test_pid_val > /dev/null \
 		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_pid.log; \
 		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_pid.log; \
 		[ ! -s $(VV_REPORT_DIR)/memory_safety/valgrind_test_pid.log ] && echo "(clean)" || true
-	@valgrind --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=1 \
+	@valgrind --quiet --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=1 \
 		$(VV_REPORT_DIR)/memory_safety/test_alert_val > /dev/null \
 		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_alert.log; \
 		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_alert.log; \
@@ -496,6 +530,18 @@ memory-pid-alert:
 	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_alert_san $(SRC_ALERT_TEST) $(LDFLAGS)
 	@$(VV_REPORT_DIR)/memory_safety/test_pid_san   > /dev/null 2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_pid.log;   cat $(VV_REPORT_DIR)/memory_safety/ubsan_test_pid.log;   [ ! -s $(VV_REPORT_DIR)/memory_safety/ubsan_test_pid.log ]   && echo "(clean)" || true
 	@$(VV_REPORT_DIR)/memory_safety/test_alert_san > /dev/null 2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_alert.log; cat $(VV_REPORT_DIR)/memory_safety/ubsan_test_alert.log; [ ! -s $(VV_REPORT_DIR)/memory_safety/ubsan_test_alert.log ] && echo "(clean)" || true
+	@echo ""
+	@echo "=== Consolidating per-submodule logs for HTML wrapper ==="
+	@# scripts/wrap_memory.sh expects a single log per tool/suite using
+	@# the pattern <tool>_test_<module>.log. Since this module bundles
+	@# two sub-modules (pid + alert), we concatenate the pair into the
+	@# aggregated name 'pid-alert' the CI workflow and the wrapper use.
+	@cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_pid.log \
+	     $(VV_REPORT_DIR)/memory_safety/valgrind_test_alert.log \
+	     > $(VV_REPORT_DIR)/memory_safety/valgrind_test_pid-alert.log
+	@cat $(VV_REPORT_DIR)/memory_safety/ubsan_test_pid.log \
+	     $(VV_REPORT_DIR)/memory_safety/ubsan_test_alert.log \
+	     > $(VV_REPORT_DIR)/memory_safety/ubsan_test_pid-alert.log
 
 misra-pid-alert:
 	@mkdir -p $(VV_REPORT_DIR)/misra
@@ -508,7 +554,45 @@ misra-pid-alert:
 		2> $(VV_REPORT_DIR)/misra/cppcheck_pid_alert.xml
 	@echo "cppcheck XML -> $(VV_REPORT_DIR)/misra/cppcheck_pid_alert.xml"
 
-vv-pid-alert: mcdc-pid-alert fault-pid-alert memory-pid-alert misra-pid-alert
+html-pid-alert:
+	@mkdir -p $(VV_REPORT_DIR)/coverage_html $(VV_REPORT_DIR)/misra_html
+	# Coverage HTML — lcov genhtml from the gcov outputs produced by
+	# mcdc-pid-alert. lcov failures are NOT masked: without them the
+	# bundle would publish empty and the CI step would go green with
+	# no signal. If lcov errors, the step errors.
+	@if [ ! -d $(VV_REPORT_DIR)/coverage_mcdc ]; then \
+		echo "html-pid-alert: missing $(VV_REPORT_DIR)/coverage_mcdc — run mcdc-pid-alert first"; \
+		exit 1; \
+	fi
+	lcov --capture --directory $(VV_REPORT_DIR)/coverage_mcdc \
+		--gcov-tool gcov-14 \
+		--rc branch_coverage=1 \
+		--output-file $(VV_REPORT_DIR)/coverage_html/coverage.info
+	lcov --extract $(VV_REPORT_DIR)/coverage_html/coverage.info \
+		'*aeb_pid.c' '*aeb_alert.c' \
+		--rc branch_coverage=1 \
+		--output-file $(VV_REPORT_DIR)/coverage_html/coverage_pid_alert.info
+	genhtml $(VV_REPORT_DIR)/coverage_html/coverage_pid_alert.info \
+		--branch-coverage \
+		--title "PID + Alert Coverage" \
+		--legend \
+		--output-directory $(VV_REPORT_DIR)/coverage_html
+	# MISRA HTML — cppcheck-htmlreport from the XML produced by misra-pid-alert.
+	@if [ ! -s $(VV_REPORT_DIR)/misra/cppcheck_pid_alert.xml ]; then \
+		echo "html-pid-alert: missing cppcheck_pid_alert.xml — run misra-pid-alert first"; \
+		exit 1; \
+	fi
+	cppcheck-htmlreport \
+		--file=$(VV_REPORT_DIR)/misra/cppcheck_pid_alert.xml \
+		--report-dir=$(VV_REPORT_DIR)/misra_html \
+		--source-dir=. \
+		--title="PID + Alert MISRA C:2012 Report"
+	# Memory + fault HTML wrappers — the aggregated module name is "pid-alert".
+	@bash scripts/wrap_memory.sh pid-alert $(VV_REPORT_DIR)
+	@python3 scripts/wrap_fault.py pid-alert $(VV_REPORT_DIR)
+	@echo "=== HTML reports in $(VV_REPORT_DIR)/{coverage_html,misra_html,memory_html,fault_html}/ ==="
+
+vv-pid-alert: mcdc-pid-alert fault-pid-alert memory-pid-alert misra-pid-alert html-pid-alert
 	@echo ""
 	@echo "=== PID + Alert V&V stack complete — artefacts in $(VV_REPORT_DIR)/ ==="
 
