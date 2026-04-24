@@ -43,12 +43,14 @@ CFLAGS_SAN = -Wall -Wextra -Wpedantic -std=c99 -O0 -g -Iinclude -Istubs \
 GCOV       = gcov-14
 GCOVR     ?= $(if $(wildcard venv/bin/gcovr),venv/bin/gcovr,gcovr)
 
-# Per-target V&V report directory — keeps the UDS and Decision stacks
+# Per-target V&V report directory — keeps the UDS, Decision and CAN stacks
 # from overwriting each other when both are invoked in the same workflow.
 mcdc-uds fault-uds memory-uds misra-uds html-uds vv-uds: \
         VV_REPORT_DIR := reports/vv_uds
 mcdc-decision fault-decision memory-decision misra-decision html-decision vv-decision: \
         VV_REPORT_DIR := reports/vv_decision
+mcdc-can fault-can memory-can misra-can vv-can: \
+        VV_REPORT_DIR := reports/vv_can
 
 # All sources (stubs + real code)
 SRC_ALL = src/communication/aeb_can.c \
