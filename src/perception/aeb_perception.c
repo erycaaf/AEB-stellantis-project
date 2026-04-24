@@ -51,6 +51,8 @@ static uint8_t lidar_fault_detect(float32_t d_l)
     if (bad != 0U) {
         if (s_lidar.ctr < 255U) { s_lidar.ctr++; }
     } else {
+        /* Update ROC baseline and arm is_first only on trustworthy frames —
+         * prevents a bad first frame from contaminating prev_d. */
         s_lidar.ctr      = 0U;
         s_lidar.prev_d   = d_l;
         s_lidar.is_first = 0U;
@@ -98,6 +100,8 @@ static uint8_t radar_fault_detect(float32_t d_r, float32_t vr_r)
     if (bad != 0U) {
         if (s_radar.ctr < 255U) { s_radar.ctr++; }
     } else {
+        /* Update ROC baseline and arm is_first only on trustworthy frames —
+         * prevents a bad first frame from contaminating prev_d/prev_vr. */
         s_radar.ctr      = 0U;
         s_radar.prev_d   = d_r;
         s_radar.prev_vr  = vr_r;
@@ -148,6 +152,8 @@ static void kalman_fusion(
     uint8_t r_ok = ((r_fault == 0U) && (fi == 0U) &&
                     isfinite(d_r) && isfinite(vr_r)) ? 1U : 0U;
 
+    /* Seed deferred until a finite radar frame; until then, l_ok/r_ok are
+     * both 0 and *out_conf below is forced to 0.0f — "no information" signalled. */
     if ((s_kalman.initialized == 0U) && isfinite(d_r) && isfinite(vr_r)) {
         s_kalman.x[0] = d_r;
         s_kalman.x[1] = vr_r;
