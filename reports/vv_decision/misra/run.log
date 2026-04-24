@@ -1,0 +1,16 @@
+cppcheck --addon=misra --std=c99 -Iinclude -Istubs \
+	--suppress=unusedFunction --suppress=missingIncludeSystem \
+	--enable=all \
+	--xml --xml-version=2 \
+	src/decision/aeb_ttc.c src/decision/aeb_fsm.c \
+	include/aeb_ttc.h include/aeb_fsm.h \
+	2> reports/vv_decision/misra/cppcheck_decision.xml
+Checking src/decision/aeb_ttc.c ...
+1/4 files checked 13% done
+Checking src/decision/aeb_fsm.c ...
+2/4 files checked 83% done
+Checking include/aeb_ttc.h ...
+3/4 files checked 91% done
+Checking include/aeb_fsm.h ...
+4/4 files checked 100% done
+cppcheck XML -> reports/vv_decision/misra/cppcheck_decision.xml
