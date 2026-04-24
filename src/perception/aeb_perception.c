@@ -292,7 +292,7 @@ void perception_step(const raw_sensor_input_t *in, perception_output_t *out)
 
     out->fault_flag = 0U;
 
-    if (isfinite(in->v_ego)) {
+    if (isfinite(in->v_ego) != 0) {
         out->v_ego = in->v_ego;
     } else {
         out->v_ego       = 0.0f;
