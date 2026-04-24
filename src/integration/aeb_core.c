@@ -9,7 +9,8 @@
  *          modules in the correct data-flow order:
  *
  *          CAN RX check -> Perception -> TTC -> Override -> FSM
- *                       -> PID + Alert -> UDS monitor -> CAN TX
+ *                       -> PID + Alert -> UDS monitor -> UDS request
+ *                       -> CAN TX
  *
  *          This file contains no control logic of its own — it only
  *          calls module APIs in sequence and routes structs between them.
@@ -120,7 +121,30 @@ void aeb_core_step(aeb_core_state_t *state,
                        0U,   /* crc_error: checked by CAN layer */
                        0U);  /* actuator_fault: not modelled */
 
-    /* ── 10. CAN TX ───────────────────────────────────────────────────── */
+    /* ── 10. UDS request service — FR-UDS-005 (same-cycle response) ───── */
+    /* Retry policy: on TX failure (bus-off, TX mailbox full, HAL error)
+     * we leave uds_request_pending = 1 so the next 10 ms tick retries the
+     * transmission. Silently clearing would force the requester into a
+     * P2_server timeout per ISO 14229-2 §6.3 instead of the best-effort
+     * retry at the ECU level that ASIL-D prefers for an idempotent DID
+     * read / short RoutineControl request. */
+    if (can_rx.uds_request_pending != 0U)
+    {
+        uds_response_t uds_resp = {0};
+
+        uds_process_request(&state->uds,
+                            &can_rx.uds_request,
+                            &uds_resp,
+                            &state->fsm,
+                            &state->pid,
+                            &state->ttc);
+        if (can_tx_uds_response(&uds_resp) == CAN_OK)
+        {
+            can_clear_uds_request_pending(&state->can);
+        }
+    }
+
+    /* ── 11. CAN TX ───────────────────────────────────────────────────── */
     (void)can_tx_brake_cmd(&state->can, &state->pid, &state->fsm);
     (void)can_tx_fsm_state(&state->can, &state->fsm);
     (void)can_tx_alert(&state->alert);

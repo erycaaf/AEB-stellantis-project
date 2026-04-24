@@ -7,17 +7,11 @@
  */
 
 #include "can_hal.h"
+#include "can_hal_test.h"
 #include <string.h>
 
 /* ── TX capture buffer for test inspection ──────────────────────────── */
 #define TX_BUF_SIZE  (32U)
-
-typedef struct
-{
-    uint32_t id;
-    uint8_t  data[8];
-    uint8_t  dlc;
-} tx_record_t;
 
 static tx_record_t tx_buffer[TX_BUF_SIZE];
 static uint32_t    tx_count = 0U;
