@@ -32,3 +32,8 @@ docs/Memory_Safety_Report.html
 *.gcov
 *.gcda
 *.gcno
+
+# Compiled test binaries within V&V report folders
+reports/vv_*/coverage_mcdc/test_*
+reports/vv_*/fault_injection/test_*
+reports/vv_*/memory_safety/bin/

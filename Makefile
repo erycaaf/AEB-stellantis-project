@@ -107,7 +107,7 @@ clean:
 # ==========================================================================
 # Requisitos (uma vez):
 #   sudo apt install -y gcc-14
-#   pip install gcovr --break-system-packages
+#   sudo apt install -y gcovr    # Ubuntu 24.04: version 7.2 (supports MC/DC)
 #
 # Uso:
 #   make mcdc        — rodar cobertura MC/DC e gerar relatório HTML
@@ -118,11 +118,11 @@ MCDC_CC       = gcc-14
 MCDC_CFLAGS   = --coverage -fcondition-coverage -std=c99 \
                 -Wall -Wextra -Wpedantic -Iinclude -Istubs
 MCDC_LDFLAGS  = -lm
-MCDC_DIR      = coverage_mcdc
+MCDC_DIR      = reports/vv_pid_alert/coverage_mcdc
 
 .PHONY: mcdc mcdc-clean
 
-mcdc:
+mcdc-pid-alert:
 	@echo "=== Building MC/DC test binaries (gcc-14 -fcondition-coverage) ==="
 	@rm -rf $(MCDC_DIR) && mkdir -p $(MCDC_DIR)
 	$(MCDC_CC) $(MCDC_CFLAGS) -c src/execution/aeb_pid.c   -o $(MCDC_DIR)/aeb_pid.o
@@ -149,21 +149,36 @@ mcdc:
 	                         --xml coverage.xml \
 	                         --txt-summary
 	@echo ""
+	@echo ""
+	@echo "=== Writing gcov_summary.txt ==="
+	@{ \
+	  echo "MC/DC Coverage Summary — PID + Alert"; \
+	  echo "Generated: $$(date -Iseconds)"; \
+	  echo "Toolchain: $$(gcc-14 --version | head -1)"; \
+	  echo "=============================================="; \
+	  echo ""; \
+	  echo "-- aeb_pid.c --"; \
+	  (cd $(MCDC_DIR) && gcov-14 --conditions -b -c aeb_pid.gcda 2>/dev/null) | head -10; \
+	  echo ""; \
+	  echo "-- aeb_alert.c --"; \
+	  (cd $(MCDC_DIR) && gcov-14 --conditions -b -c aeb_alert.gcda 2>/dev/null) | head -10; \
+	} > $(MCDC_DIR)/gcov_summary.txt
+
 	@echo "=== DONE ==="
 	@echo "Open: $(MCDC_DIR)/report.html"
 
-mcdc-clean:
+mcdc-pid-alert-clean:
 	rm -rf $(MCDC_DIR)
 
 # ==========================================================================
 # Fault Injection Tests (ASIL-D Robustness)
 # ==========================================================================
 
-FAULT_DIR = fault_tests
+FAULT_DIR = reports/vv_pid_alert/fault_injection
 
 .PHONY: fault fault-clean
 
-fault:
+fault-pid-alert:
 	@echo "=== Building fault injection tests ==="
 	@rm -rf $(FAULT_DIR) && mkdir -p $(FAULT_DIR)
 	$(CC) $(CFLAGS) src/execution/aeb_pid.c   tests/test_pid_fault.c   $(LDFLAGS) -o $(FAULT_DIR)/test_pid_fault
@@ -177,7 +192,7 @@ fault:
 	@echo ""
 	@echo "=== Logs saved in $(FAULT_DIR)/ ==="
 
-fault-clean:
+fault-pid-alert-clean:
 	rm -rf $(FAULT_DIR)
 
 
@@ -194,21 +209,21 @@ fault-clean:
 #   make memory-clean    — limpa artefatos
 # ==========================================================================
 
-MEM_DIR      = memory_safety
+MEM_DIR      = reports/vv_pid_alert/memory_safety
 SAN_CFLAGS   = -fsanitize=address,undefined -fno-omit-frame-pointer -g -O1 \
                -std=c99 -Wall -Wextra -Iinclude -Istubs
 
 .PHONY: memory memory-valgrind memory-asan memory-clean
 
-memory: memory-valgrind memory-asan
+memory-pid-alert: memory-valgrind-pid-alert memory-asan-pid-alert
 	@echo ""
 	@echo "=== Memory Safety: todos os checks concluídos ==="
 	@echo "Logs: $(MEM_DIR)/valgrind/  e  $(MEM_DIR)/sanitizers/"
 
-memory-valgrind: $(TEST_BINS)
+memory-valgrind-pid-alert: test_pid test_alert
 	@mkdir -p $(MEM_DIR)/valgrind
 	@echo "=== Valgrind (leak-check=full) ==="
-	@for t in $(TEST_BINS); do \
+	@for t in test_pid test_alert; do \
 		valgrind --leak-check=full \
 		         --show-leak-kinds=all \
 		         --errors-for-leak-kinds=all \
@@ -225,18 +240,12 @@ memory-valgrind: $(TEST_BINS)
 		fi; \
 	done
 
-memory-asan:
+memory-asan-pid-alert:
 	@mkdir -p $(MEM_DIR)/bin $(MEM_DIR)/sanitizers
 	@echo "=== AddressSanitizer + UBSan ==="
-	$(CC) $(SAN_CFLAGS) $(SRC_SMOKE)        -lm -o $(MEM_DIR)/bin/san_smoke
-	$(CC) $(SAN_CFLAGS) $(SRC_CAN_TEST)     -lm -o $(MEM_DIR)/bin/san_can
-	$(CC) $(SAN_CFLAGS) $(SRC_PERCEPTION_TEST)  -lm -o $(MEM_DIR)/bin/san_perception
-	$(CC) $(SAN_CFLAGS) $(SRC_DECISION_TEST)    -lm -o $(MEM_DIR)/bin/san_decision
 	$(CC) $(SAN_CFLAGS) $(SRC_PID_TEST)         -lm -o $(MEM_DIR)/bin/san_pid
 	$(CC) $(SAN_CFLAGS) $(SRC_ALERT_TEST)       -lm -o $(MEM_DIR)/bin/san_alert
-	$(CC) $(SAN_CFLAGS) $(SRC_UDS_TEST)         -lm -o $(MEM_DIR)/bin/san_uds
-	$(CC) $(SAN_CFLAGS) $(SRC_INTEGRATION_TEST) -lm -o $(MEM_DIR)/bin/san_integration
-	@for t in smoke can perception decision pid alert uds integration; do \
+	@for t in pid alert; do \
 		$(MEM_DIR)/bin/san_$$t > $(MEM_DIR)/sanitizers/$$t.log 2>&1; \
 		ec=$$?; \
 		if [ $$ec -eq 0 ]; then \
@@ -246,5 +255,5 @@ memory-asan:
 		fi; \
 	done
 
-memory-clean:
+memory-pid-alert-clean:
 	rm -rf $(MEM_DIR)
