@@ -68,10 +68,18 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             gcc-14 g++-14 make libc6-dev \
             cppcheck python3-pygments \
-            valgrind lcov gcovr python3-minimal bc
+            valgrind lcov python3-minimal python3-venv bc
           sudo ln -sf /usr/bin/gcc-14  /usr/local/bin/gcc
           sudo ln -sf /usr/bin/g++-14  /usr/local/bin/g++
           sudo ln -sf /usr/bin/gcov-14 /usr/local/bin/gcov
+          # gcovr ≥ 8.0 is required for GCC 14 condition-coverage to show up
+          # in --json-summary (the apt version on Ubuntu 24.04 is 7.2, which
+          # omits condition_percent). The Makefile auto-selects venv/bin/gcovr
+          # via wildcard, so no Makefile change is needed.
+          python3 -m venv venv
+          venv/bin/pip install --quiet --upgrade pip
+          venv/bin/pip install --quiet 'gcovr>=8.0'
+          venv/bin/gcovr --version | head -1
           # cppcheck-htmlreport pinned to the tag matching the apt cppcheck
           # version (docker/Dockerfile.vv documents cppcheck 2.13).
           sudo curl -fsSL \
