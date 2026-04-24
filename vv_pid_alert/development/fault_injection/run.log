@@ -4,8 +4,8 @@
 ========================================
 
 [FAULT-A1] a_ego = NaN (faulty accelerometer)
-[01] pid_brake_pct_stays_in FAIL
-[02] pid_brake_bar_stays_in FAIL
+[01] pid_brake_pct_stays_in_0_100_no_NaN_propagation_ PASS
+[02] pid_brake_bar_stays_in_0_10_no_NaN_propagation_ PASS
 
 [FAULT-A2] a_ego = +Infinity (saturated sensor)
 [03] pid_brake_pct_stays_in_0_100_with_a_ego_Inf PASS
@@ -16,7 +16,7 @@
 [06] pid_brake_bar_stays_in_0_10_with_a_ego_Inf PASS
 
 [FAULT-A4] decel_target = NaN (corrupted FSM output)
-[07] pid_brake_pct_stays_in FAIL
+[07] pid_brake_pct_stays_in_0_100_with_decel_target_NaN PASS
 
 [FAULT-B1] a_ego = 100 m/s^2 (impossible but finite)
 [08] pid_brake_pct_clamped_to_0_100_under_extreme_a_ego PASS
@@ -29,11 +29,11 @@
 [11] pid_brake_pct_stays_in_0_100_with_a_ego_FLT_MAX PASS
 
 [FAULT-C1] fsm_state = 99 (invalid state)
-[12] pid_invalid_fsm_state_produces_zero_braking_fail_safe_ FAIL
-[13] pid_invalid_fsm_state_produces_zero_pressure FAIL
+[12] pid_invalid_fsm_state_produces_zero_braking_fail_safe_ PASS
+[13] pid_invalid_fsm_state_produces_zero_pressure PASS
 
 [FAULT-C2] fsm_state = 255 (UINT8_MAX, bit-flip scenario)
-[14] pid_fsm_state_255_produces_zero_braking_fail_safe_ FAIL
+[14] pid_fsm_state_255_produces_zero_braking_fail_safe_ PASS
 
 [FAULT-D1] integrator reset after invalid-state excursion
 [15] pid_precondition_integrator_accumulated_braking_output PASS
@@ -92,4 +92,4 @@
 
 ========================================
 ========================================
-Results: 30 / 36 passed
+Results: 36 / 36 passed
