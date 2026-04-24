@@ -16,6 +16,13 @@ reports/vv_uds/**/test_uds*
 reports/vv_uds/**/*.gcda
 reports/vv_uds/**/*.gcno
 
+# V&V HTML bundles — regenerated locally by `make html-uds` and
+# published to gh-pages by the publish-pages job; never committed.
+reports/vv_uds/coverage_html/
+reports/vv_uds/misra_html/
+reports/vv_uds/memory_html/
+reports/vv_uds/fault_html/
+
 # V&V intermediate artefacts — Decision
 # Only text/XML/CSV/gcov evidence under reports/vv_decision/ is committed.
 # The gcovr HTML bundle is regenerated locally by `make mcdc-decision`.

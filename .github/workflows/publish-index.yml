@@ -26,6 +26,12 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+    # Serialise every gh-pages push across ALL workflows in the repo to
+    # avoid non-fast-forward races. Shared string, matches the group used
+    # by the per-module publish-pages jobs (e.g. vv-uds.yml).
+    concurrency:
+      group: gh-pages-deploy
+      cancel-in-progress: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4

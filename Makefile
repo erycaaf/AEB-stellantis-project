@@ -157,8 +157,16 @@ mcdc-uds:
 fault-uds:
 	@mkdir -p $(VV_REPORT_DIR)/fault_injection
 	$(CC) $(CFLAGS) -O0 -g -o $(VV_REPORT_DIR)/fault_injection/test_uds_fault $(SRC_UDS_FAULT_TEST) $(LDFLAGS)
-	@$(VV_REPORT_DIR)/fault_injection/test_uds_fault | tee $(VV_REPORT_DIR)/fault_injection/run.log; \
-		echo ""; echo "(non-zero exit expected while bugs are pending patch)"
+	@$(VV_REPORT_DIR)/fault_injection/test_uds_fault > $(VV_REPORT_DIR)/fault_injection/run.log 2>&1; \
+		rc=$$?; \
+		cat $(VV_REPORT_DIR)/fault_injection/run.log; \
+		echo ""; \
+		if [ "$$rc" = "0" ]; then \
+			echo "(all fault assertions PASS — time to flip continue-on-error to false in vv-uds.yml)"; \
+		else \
+			echo "(non-zero exit expected while bugs are pending patch)"; \
+		fi; \
+		exit $$rc
 
 memory-uds:
 	@mkdir -p $(VV_REPORT_DIR)/memory_safety
@@ -203,29 +211,35 @@ misra-uds:
 html-uds:
 	@mkdir -p $(VV_REPORT_DIR)/coverage_html $(VV_REPORT_DIR)/misra_html
 	# Coverage HTML — lcov genhtml from the gcov outputs produced by mcdc-uds.
-	@if [ -d $(VV_REPORT_DIR)/coverage_mcdc ]; then \
-		lcov --capture --directory $(VV_REPORT_DIR)/coverage_mcdc \
-			--rc branch_coverage=1 \
-			--output-file $(VV_REPORT_DIR)/coverage_html/coverage.info >/dev/null 2>&1 || true; \
-		if [ -s $(VV_REPORT_DIR)/coverage_html/coverage.info ]; then \
-			lcov --extract $(VV_REPORT_DIR)/coverage_html/coverage.info '*aeb_uds.c' \
-				--rc branch_coverage=1 \
-				--output-file $(VV_REPORT_DIR)/coverage_html/coverage_uds.info >/dev/null 2>&1 || true; \
-			genhtml $(VV_REPORT_DIR)/coverage_html/coverage_uds.info \
-				--branch-coverage \
-				--title "UDS Coverage" \
-				--legend \
-				--output-directory $(VV_REPORT_DIR)/coverage_html >/dev/null 2>&1; \
-		fi; \
+	# lcov failures (e.g. incompatible gcov, empty directory) are NOT masked:
+	# without them the bundle would publish empty and the CI step would go
+	# green with no signal. If lcov errors, the step errors.
+	@if [ ! -d $(VV_REPORT_DIR)/coverage_mcdc ]; then \
+		echo "html-uds: missing $(VV_REPORT_DIR)/coverage_mcdc — run mcdc-uds first"; \
+		exit 1; \
 	fi
+	lcov --capture --directory $(VV_REPORT_DIR)/coverage_mcdc \
+		--rc branch_coverage=1 \
+		--output-file $(VV_REPORT_DIR)/coverage_html/coverage.info
+	lcov --extract $(VV_REPORT_DIR)/coverage_html/coverage.info '*aeb_uds.c' \
+		--rc branch_coverage=1 \
+		--output-file $(VV_REPORT_DIR)/coverage_html/coverage_uds.info
+	genhtml $(VV_REPORT_DIR)/coverage_html/coverage_uds.info \
+		--branch-coverage \
+		--title "UDS Coverage" \
+		--legend \
+		--output-directory $(VV_REPORT_DIR)/coverage_html
 	# MISRA HTML — cppcheck-htmlreport from the XML produced by misra-uds.
-	@if [ -s $(VV_REPORT_DIR)/misra/cppcheck_uds.xml ]; then \
-		cppcheck-htmlreport \
-			--file=$(VV_REPORT_DIR)/misra/cppcheck_uds.xml \
-			--report-dir=$(VV_REPORT_DIR)/misra_html \
-			--source-dir=. \
-			--title="UDS MISRA C:2012 Report" >/dev/null 2>&1 || true; \
+	# Same policy: fail loudly rather than publish an empty bundle.
+	@if [ ! -s $(VV_REPORT_DIR)/misra/cppcheck_uds.xml ]; then \
+		echo "html-uds: missing cppcheck_uds.xml — run misra-uds first"; \
+		exit 1; \
 	fi
+	cppcheck-htmlreport \
+		--file=$(VV_REPORT_DIR)/misra/cppcheck_uds.xml \
+		--report-dir=$(VV_REPORT_DIR)/misra_html \
+		--source-dir=. \
+		--title="UDS MISRA C:2012 Report"
 	# Memory + fault HTML wrappers.
 	@bash scripts/wrap_memory.sh uds $(VV_REPORT_DIR)
 	@python3 scripts/wrap_fault.py uds $(VV_REPORT_DIR)
