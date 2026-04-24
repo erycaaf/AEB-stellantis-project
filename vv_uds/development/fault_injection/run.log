@@ -13,22 +13,15 @@
 
 -- Category B: Numeric extremes --
   [fault_b1_ttc_negative]
-    FAIL  fault_b1_ttc_negative  B1: TTC<0 fail-safe
   [fault_b2_ttc_overflow]
-    FAIL  fault_b2_ttc_overflow  B2: TTC overflow fail-safe
   [fault_b3_ttc_float_max]
   [fault_b4_brake_negative]
-    FAIL  fault_b4_brake_negative  B4: Brake<0 fail-safe
   [fault_b5_brake_overflow]
-    FAIL  fault_b5_brake_overflow  B5: Brake overflow fail-safe
 
 -- Category C: Corrupted state (SEU) --
   [fault_c1_aeb_enabled_corrupted]
-    FAIL  fault_c1_aeb_enabled_corrupted  C1: aeb_enabled normalised to {0,1}
   [fault_c2_dtc_flags_corrupted]
-    FAIL  fault_c2_dtc_flags_corrupted  C2: dtc_count bounded [0..3]
   [fault_c3_single_dtc_corrupted]
-    FAIL  fault_c3_single_dtc_corrupted  C3: dtc_count bounded [0..3]
 
 -- Category D: Persistence --
   [fault_d1_clear_while_active]
@@ -36,6 +29,6 @@
   [fault_d3_unknown_sid_does_not_spoof]
 
 ======================================
-  Assertions: 18 run  11 passed  7 failed
+  Assertions: 18 run  18 passed  0 failed
 ======================================
 
