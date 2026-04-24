@@ -179,12 +179,6 @@ fault-uds:
 	@$(VV_REPORT_DIR)/fault_injection/test_uds_fault > $(VV_REPORT_DIR)/fault_injection/run.log 2>&1; \
 		rc=$$?; \
 		cat $(VV_REPORT_DIR)/fault_injection/run.log; \
-		echo ""; \
-		if [ "$$rc" = "0" ]; then \
-			echo "(all fault assertions PASS — time to flip continue-on-error to false in vv-uds.yml)"; \
-		else \
-			echo "(non-zero exit expected while bugs are pending patch)"; \
-		fi; \
 		exit $$rc
 
 memory-uds:
