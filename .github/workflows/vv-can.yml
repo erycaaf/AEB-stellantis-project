@@ -1,0 +1,293 @@
+name: CAN V&V
+
+# Runs the ASIL-D V&V stack scoped to the CAN interface module.
+#
+# Triggers only on paths that can affect CAN behaviour. On PRs to
+# development/main, four blocking gates must pass: MC/DC coverage,
+# dynamic memory safety, MISRA C:2012 conformance, and fault injection.
+# The fault-injection gate is blocking from day one — the robustness bug
+# surfaced during cross-validation (encode_unsigned NaN/Inf cast) was
+# patched by PR #102 (fix/can-encode-robustness) before this workflow
+# landed, so any new fault regression is a real CI failure.
+#
+# Reports are published in two layers:
+#   1. Workflow Artifacts on every run (PR or push), retention 30 days.
+#   2. GitHub Pages (gh-pages branch) on push to development/main —
+#      navigable HTML reports under
+#      https://erycaaf.github.io/AEB-stellantis-project/vv_can/<branch>/.
+
+on:
+  pull_request:
+    branches: [development, main]
+    paths:
+      - 'src/communication/aeb_can.c'
+      - 'include/aeb_can.h'
+      - 'include/aeb_types.h'
+      - 'include/aeb_config.h'
+      - 'stubs/can_hal.c'
+      - 'stubs/can_hal.h'
+      - 'tests/test_can.c'
+      - 'tests/test_can_fault.c'
+      - 'tests/test_can_struct.c'
+      - 'Makefile'
+      - 'scripts/wrap_memory.sh'
+      - 'scripts/wrap_fault.py'
+      - 'docker/Dockerfile.vv'
+      - '.github/workflows/vv-can.yml'
+  push:
+    branches: [development, main]
+    paths:
+      - 'src/communication/aeb_can.c'
+      - 'include/aeb_can.h'
+      - 'include/aeb_types.h'
+      - 'include/aeb_config.h'
+      - 'stubs/can_hal.c'
+      - 'stubs/can_hal.h'
+      - 'tests/test_can.c'
+      - 'tests/test_can_fault.c'
+      - 'tests/test_can_struct.c'
+      - 'Makefile'
+      - 'scripts/wrap_memory.sh'
+      - 'scripts/wrap_fault.py'
+      - 'docker/Dockerfile.vv'
+      - '.github/workflows/vv-can.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: vv-can-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  vv-can:
+    name: CAN V&V stack
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install V&V toolchain (matches docker/Dockerfile.vv)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-14 g++-14 make libc6-dev \
+            cppcheck python3-pygments \
+            valgrind lcov python3-minimal python3-venv bc
+          sudo ln -sf /usr/bin/gcc-14  /usr/local/bin/gcc
+          sudo ln -sf /usr/bin/g++-14  /usr/local/bin/g++
+          sudo ln -sf /usr/bin/gcov-14 /usr/local/bin/gcov
+          # gcovr 7.2 from apt cannot parse gcov-14's "Condition outcomes
+          # covered" output. gcovr >= 8.0 is required. Install via venv so
+          # the Makefile picks it up through the $(wildcard venv/bin/gcovr)
+          # autodetection at the top of the file.
+          python3 -m venv venv
+          venv/bin/pip install --quiet --upgrade pip
+          venv/bin/pip install --quiet 'gcovr>=8.0'
+          # cppcheck-htmlreport is no longer packaged on Ubuntu 24.04 — fetch
+          # the upstream script pinned to the tag matching the apt-installed
+          # cppcheck version (docker/Dockerfile.vv documents cppcheck 2.13).
+          sudo curl -fsSL \
+            https://raw.githubusercontent.com/danmar/cppcheck/2.13.0/htmlreport/cppcheck-htmlreport \
+            -o /usr/local/bin/cppcheck-htmlreport
+          sudo chmod +x /usr/local/bin/cppcheck-htmlreport
+          gcc --version | head -1
+          gcov --version | head -1
+          venv/bin/gcovr --version | head -1
+          cppcheck --version
+          cppcheck-htmlreport --help | head -1
+          valgrind --version
+
+      # ─── Blocking gate 1: structural coverage ─────────────────────────────
+      # Uses the Cobertura XML produced by mcdc-can (gcovr --cobertura),
+      # NOT per-binary gcov_summary.txt. gcov_summary.txt isolates each
+      # suite and under-reports by construction; Cobertura XML merges
+      # the nominal + structural + fault .gcda accumulated on the shared
+      # aeb_can.c object — which is the figure ISO 26262-6 Table 12
+      # expects for MC/DC conformance.
+      - name: MC/DC coverage (gate ≥ 95%)
+        run: |
+          make mcdc-can
+          XML="reports/vv_can/coverage_mcdc/coverage.xml"
+          if [ ! -s "$XML" ]; then
+            echo "::error title=Coverage::coverage.xml not produced by mcdc-can"
+            exit 1
+          fi
+          read LINE BRCH MCDC < <(python3 - <<PY
+          import re, xml.etree.ElementTree as ET
+          root = ET.parse("$XML").getroot()
+          line = float(root.get("line-rate", "0")) * 100.0
+          brch = float(root.get("branch-rate", "0")) * 100.0
+          tot = 0; hit = 0
+          for ln in root.iter("line"):
+              cc = ln.get("condition-coverage")
+              if not cc:
+                  continue
+              m = re.search(r"\((\d+)/(\d+)\)", cc)
+              if m:
+                  hit += int(m.group(1))
+                  tot += int(m.group(2))
+          mcdc = (hit / tot * 100.0) if tot else 100.0
+          print(f"{line:.2f} {brch:.2f} {mcdc:.2f}")
+          PY
+          )
+          echo "CAN coverage — stmt=${LINE}% branch=${BRCH}% mcdc=${MCDC}%"
+          for metric in "Statement:$LINE" "Branch:$BRCH" "MC/DC:$MCDC"; do
+            name="${metric%%:*}"; value="${metric##*:}"
+            if [ "$(echo "$value < 95.0" | bc -l)" = "1" ]; then
+              echo "::error title=CAN coverage regression::${name} dropped to ${value}% (required ≥95%)"
+              exit 1
+            fi
+          done
+
+      # ─── Blocking gate 2: dynamic memory safety on nominal suite ──────────
+      # Valgrind/ASan/UBSan on the *nominal* suite must be silent.
+      # Logs from the *fault* suite used to contain expected UBSan
+      # reports for Bug #1 (encode_unsigned NaN/Inf cast) until PR #102
+      # (fix/can-encode-robustness) landed — the guard is now in place,
+      # so both lanes should be clean. Any regression in either is real.
+      - name: Memory safety (Valgrind + ASan + UBSan)
+        run: |
+          make memory-can
+          MS="reports/vv_can/memory_safety"
+          if [ -s "$MS/valgrind_test_can.log" ]; then
+            echo "::error title=Valgrind regression::Errors on nominal CAN suite"
+            cat "$MS/valgrind_test_can.log"; exit 1
+          fi
+          if [ -s "$MS/ubsan_test_can.log" ]; then
+            echo "::error title=UBSan regression::Errors on nominal CAN suite"
+            cat "$MS/ubsan_test_can.log"; exit 1
+          fi
+
+      # ─── Blocking gate 3: MISRA C:2012 (CAN scope only) ───────────────────
+      # Counts only findings emitted by the MISRA addon (id prefix
+      # "misra-c2012"), not cppcheck-native style/portability/unused
+      # warnings. Also filters Advisory rules that don't reflect real
+      # defects in the source (2.3 / 2.4 — unused type/tag declarations
+      # used only by downstream TUs that cppcheck cannot see). Required
+      # and Mandatory rules are never filtered.
+      - name: MISRA Required/Mandatory (0 findings in aeb_can.{c,h})
+        run: |
+          make misra-can
+          CAN_ISSUES=$(python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          t = ET.parse("reports/vv_can/misra/cppcheck_can.xml")
+          target = ("src/communication/aeb_can.c", "include/aeb_can.h")
+          ADVISORY = {
+              "misra-c2012-2.3",  # unused type declaration
+              "misra-c2012-2.4",  # unused tag declaration
+          }
+          n = 0
+          for e in t.findall(".//error"):
+              rid = e.get("id", "")
+              if not rid.startswith("misra-c2012"):
+                  continue
+              if rid in ADVISORY:
+                  continue
+              loc = e.find("location")
+              if loc is not None and loc.get("file", "") in target:
+                  n += 1
+          print(n)
+          PY
+          )
+          echo "MISRA Required/Mandatory issues in aeb_can scope: $CAN_ISSUES"
+          if [ "$CAN_ISSUES" != "0" ]; then
+            echo "::error title=MISRA regression::$CAN_ISSUES issue(s) in aeb_can.{c,h}"
+            exit 1
+          fi
+
+      # ─── Blocking gate 4: fault injection (31/31 required) ────────────────
+      # Bug #1 (encode_unsigned NaN/Inf cast) was the only known robustness
+      # defect when this V&V was run; it was patched on PR #102 before
+      # this workflow landed. The gate is blocking from day one — any
+      # fault-injection regression is treated as a CI failure.
+      - name: Fault injection
+        run: make fault-can
+
+      # ─── Generate navigable HTML reports ──────────────────────────────────
+      - name: Generate HTML reports
+        if: always()
+        run: make html-can
+
+      # ─── Summary for the PR/commit checks UI ──────────────────────────────
+      - name: Step summary
+        if: always()
+        run: |
+          {
+            echo "## CAN V&V — run #${{ github.run_number }}"
+            echo ""
+            if [ "${{ github.event_name }}" = "push" ]; then
+              echo "📊 **Browse reports:** https://erycaaf.github.io/AEB-stellantis-project/vv_can/${{ github.ref_name }}/"
+              echo ""
+            fi
+            echo "### Structural coverage (merged nominal + structural + fault)"
+            echo '```'
+            cat reports/vv_can/coverage_mcdc/coverage_summary.txt 2>/dev/null \
+              || cat reports/vv_can/coverage_mcdc/gcov_summary.txt 2>/dev/null \
+              || echo "(coverage summary not produced)"
+            echo '```'
+            echo ""
+            echo "### Fault injection"
+            echo '```'
+            tail -5 reports/vv_can/fault_injection/run.log 2>/dev/null \
+              || echo "(no fault log)"
+            echo '```'
+            echo ""
+            echo "### Memory safety"
+            for f in reports/vv_can/memory_safety/*.log; do
+              [ -e "$f" ] || continue
+              name=$(basename "$f")
+              if [ -s "$f" ]; then
+                echo "**${name}:**"
+                echo '```'
+                head -20 "$f"
+                echo '```'
+              else
+                echo "**${name}:** _clean_"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vv-can-reports-run${{ github.run_number }}
+          path: reports/vv_can/
+          retention-days: 30
+
+  # ───────────────────────────────────────────────────────────────────────
+  # Publish HTML reports to GitHub Pages on push to development/main only.
+  # Each module workflow publishes its own subdirectory under vv_<module>/
+  # on the gh-pages branch; keep_files: true preserves the others.
+  # ───────────────────────────────────────────────────────────────────────
+  publish-pages:
+    needs: vv-can
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    # Serialise every gh-pages push across ALL workflows in the repo
+    # (vv-uds, vv-decision, vv-pid-alert, vv-can, publish-index, ...)
+    # to avoid non-fast-forward races. Shared string, no ref suffix.
+    concurrency:
+      group: gh-pages-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Download reports
+        uses: actions/download-artifact@v4
+        with:
+          name: vv-can-reports-run${{ github.run_number }}
+          path: site/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          destination_dir: vv_can/${{ github.ref_name }}
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: '41898282+github-actions[bot]@users.noreply.github.com'
+          commit_message: 'docs(vv-can): publish reports from run #${{ github.run_number }} (${{ github.ref_name }})'
