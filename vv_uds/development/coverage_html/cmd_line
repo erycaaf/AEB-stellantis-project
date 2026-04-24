@@ -1,0 +1,1 @@
+genhtml reports/vv_uds/coverage_html/coverage_uds.info --branch-coverage --title 'UDS Coverage' --legend --output-directory reports/vv_uds/coverage_html
