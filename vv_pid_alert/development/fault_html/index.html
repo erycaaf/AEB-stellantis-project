@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PID-ALERT — Fault Injection Report</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         max-width: 1100px; margin: 2em auto; padding: 0 1em; color: #222; }
+  h1 { color: #1a3a5c; border-bottom: 3px solid #1a3a5c; padding-bottom: 0.3em; }
+  h2 { color: #2c5f8a; margin-top: 1.5em; }
+  table { border-collapse: collapse; width: 100%; margin-top: 1em; }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #ddd; }
+  th { background: #1a3a5c; color: white; }
+  tr:nth-child(even) { background: #fafafa; }
+  td.num { width: 50px; color: #666; font-family: monospace; }
+  td.ok { color: #1b5e20; font-weight: bold; }
+  td.err { color: #b71c1c; font-weight: bold; }
+  .meta { color: #666; font-size: 0.9em; }
+  .summary { background: #e8f5e9; border-left: 4px solid #1b5e20;
+             padding: 1em; margin: 1em 0; }
+  .summary.partial { background: #fff3e0; border-left-color: #e65100; }
+  pre { background: #f4f4f4; border: 1px solid #ddd; padding: 1em;
+        overflow-x: auto; font-size: 0.8em; }
+  details { margin-top: 2em; }
+  .nav { margin-bottom: 2em; }
+  .nav a { color: #2c5f8a; text-decoration: none; margin-right: 1em; }
+  .nav a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="nav">
+  <a href="../">↑ Module reports</a> ·
+  <a href="../../../">↑ All modules</a>
+</div>
+
+<h1>PID-ALERT — Fault Injection Report</h1>
+<p class="meta">Commit <code>8e403ba</code> · Generated 2026-04-24 12:48:39 UTC</p>
+
+<div class="summary partial">
+  <strong>Result:</strong> 30 / 36 passed ·
+  30 passed · 6 failed
+</div>
+
+<h2>Per-assertion results</h2>
+<table>
+  <tr><th>#</th><th>Test</th><th>Status</th></tr>
+  <tr><td class="num">01</td><td><code>pid_brake_pct_stays_in</code></td><td class="err">FAIL</td></tr><tr><td class="num">02</td><td><code>pid_brake_bar_stays_in</code></td><td class="err">FAIL</td></tr><tr><td class="num">03</td><td><code>pid_brake_pct_stays_in_0_100_with_a_ego_Inf</code></td><td class="ok">PASS</td></tr><tr><td class="num">04</td><td><code>pid_brake_bar_stays_in_0_10_with_a_ego_Inf</code></td><td class="ok">PASS</td></tr><tr><td class="num">05</td><td><code>pid_brake_pct_stays_in_0_100_with_a_ego_Inf</code></td><td class="ok">PASS</td></tr><tr><td class="num">06</td><td><code>pid_brake_bar_stays_in_0_10_with_a_ego_Inf</code></td><td class="ok">PASS</td></tr><tr><td class="num">07</td><td><code>pid_brake_pct_stays_in</code></td><td class="err">FAIL</td></tr><tr><td class="num">08</td><td><code>pid_brake_pct_clamped_to_0_100_under_extreme_a_ego</code></td><td class="ok">PASS</td></tr><tr><td class="num">09</td><td><code>pid_brake_pct_saturates_at_100_under_extreme_demand</code></td><td class="ok">PASS</td></tr><tr><td class="num">10</td><td><code>pid_brake_pct_never_exceeds_BRAKE_OUT_MAX</code></td><td class="ok">PASS</td></tr><tr><td class="num">11</td><td><code>pid_brake_pct_stays_in_0_100_with_a_ego_FLT_MAX</code></td><td class="ok">PASS</td></tr><tr><td class="num">12</td><td><code>pid_invalid_fsm_state_produces_zero_braking_fail_safe_</code></td><td class="err">FAIL</td></tr><tr><td class="num">13</td><td><code>pid_invalid_fsm_state_produces_zero_pressure</code></td><td class="err">FAIL</td></tr><tr><td class="num">14</td><td><code>pid_fsm_state_255_produces_zero_braking_fail_safe_</code></td><td class="err">FAIL</td></tr><tr><td class="num">15</td><td><code>pid_precondition_integrator_accumulated_braking_output</code></td><td class="ok">PASS</td></tr><tr><td class="num">16</td><td><code>pid_invalid_state_forces_reset_brake_pct_drops_to_0</code></td><td class="ok">PASS</td></tr><tr><td class="num">17</td><td><code>pid_no_stale_integrator_carry_over_after_invalid_state_excursion</code></td><td class="ok">PASS</td></tr><tr><td class="num">18</td><td><code>pid_jerk_limiter_holds_even_under_spike_input_FR_BRK_004_</code></td><td class="ok">PASS</td></tr><tr><td class="num">19</td><td><code>alert_fsm_state_7_ALERT_NONE_silent_default_</code></td><td class="ok">PASS</td></tr><tr><td class="num">20</td><td><code>alert_fsm_state_7_alert_active_0</code></td><td class="ok">PASS</td></tr><tr><td class="num">21</td><td><code>alert_fsm_state_7_BUZZER_SILENT</code></td><td class="ok">PASS</td></tr><tr><td class="num">22</td><td><code>alert_fsm_state_99_ALERT_NONE_silent_default_</code></td><td class="ok">PASS</td></tr><tr><td class="num">23</td><td><code>alert_fsm_state_99_alert_active_0</code></td><td class="ok">PASS</td></tr><tr><td class="num">24</td><td><code>alert_fsm_state_255_ALERT_NONE_silent_default_</code></td><td class="ok">PASS</td></tr><tr><td class="num">25</td><td><code>alert_fsm_state_255_alert_active_0</code></td><td class="ok">PASS</td></tr><tr><td class="num">26</td><td><code>alert_fsm_state_255_BUZZER_SILENT</code></td><td class="ok">PASS</td></tr><tr><td class="num">27</td><td><code>alert_override_detect_returns_valid_0_1_even_with_NaN_input</code></td><td class="ok">PASS</td></tr><tr><td class="num">28</td><td><code>alert_override_detect_Inf_treats_as_override</code></td><td class="ok">PASS</td></tr><tr><td class="num">29</td><td><code>alert_override_detect_Inf_treats_as_override</code></td><td class="ok">PASS</td></tr><tr><td class="num">30</td><td><code>alert_huge_positive_angle_override</code></td><td class="ok">PASS</td></tr><tr><td class="num">31</td><td><code>alert_huge_negative_angle_override</code></td><td class="ok">PASS</td></tr><tr><td class="num">32</td><td><code>alert_steering_5_0_exact_threshold_no_override</code></td><td class="ok">PASS</td></tr><tr><td class="num">33</td><td><code>alert_steering_5_0_exact_threshold_no_override</code></td><td class="ok">PASS</td></tr><tr><td class="num">34</td><td><code>alert_steering_5_01_just_above_override_active</code></td><td class="ok">PASS</td></tr><tr><td class="num">35</td><td><code>alert_brake_pedal_2_triggers_override_safe_default_</code></td><td class="ok">PASS</td></tr><tr><td class="num">36</td><td><code>alert_brake_pedal_255_triggers_override_safe_default_</code></td><td class="ok">PASS</td></tr>
+</table>
+
+<details>
+<summary>Raw log</summary>
+<pre>========================================
+  AEB PID — Fault Injection Tests
+  (ASIL-D Robustness — ISO 26262-6 §9.4.2)
+========================================
+
+[FAULT-A1] a_ego = NaN (faulty accelerometer)
+[01] pid_brake_pct_stays_in FAIL
+[02] pid_brake_bar_stays_in FAIL
+
+[FAULT-A2] a_ego = +Infinity (saturated sensor)
+[03] pid_brake_pct_stays_in_0_100_with_a_ego_Inf PASS
+[04] pid_brake_bar_stays_in_0_10_with_a_ego_Inf PASS
+
+[FAULT-A3] a_ego = -Infinity (sensor stuck low)
+[05] pid_brake_pct_stays_in_0_100_with_a_ego_Inf PASS
+[06] pid_brake_bar_stays_in_0_10_with_a_ego_Inf PASS
+
+[FAULT-A4] decel_target = NaN (corrupted FSM output)
+[07] pid_brake_pct_stays_in FAIL
+
+[FAULT-B1] a_ego = 100 m/s^2 (impossible but finite)
+[08] pid_brake_pct_clamped_to_0_100_under_extreme_a_ego PASS
+
+[FAULT-B2] decel_target = 1000 m/s^2 (impossible command)
+[09] pid_brake_pct_saturates_at_100_under_extreme_demand PASS
+[10] pid_brake_pct_never_exceeds_BRAKE_OUT_MAX PASS
+
+[FAULT-B3] a_ego = FLT_MAX (numerical overflow test)
+[11] pid_brake_pct_stays_in_0_100_with_a_ego_FLT_MAX PASS
+
+[FAULT-C1] fsm_state = 99 (invalid state)
+[12] pid_invalid_fsm_state_produces_zero_braking_fail_safe_ FAIL
+[13] pid_invalid_fsm_state_produces_zero_pressure FAIL
+
+[FAULT-C2] fsm_state = 255 (UINT8_MAX, bit-flip scenario)
+[14] pid_fsm_state_255_produces_zero_braking_fail_safe_ FAIL
+
+[FAULT-D1] integrator reset after invalid-state excursion
+[15] pid_precondition_integrator_accumulated_braking_output PASS
+[16] pid_invalid_state_forces_reset_brake_pct_drops_to_0 PASS
+[17] pid_no_stale_integrator_carry_over_after_invalid_state_excursion PASS
+
+[FAULT-D2] jerk limit holds even with extreme target change
+[18] pid_jerk_limiter_holds_even_under_spike_input_FR_BRK_004_ PASS
+
+========================================
+========================================
+========================================
+  AEB Alert — Fault Injection Tests
+  (ASIL-D Robustness — ISO 26262-6 §9.4.2)
+========================================
+
+[FAULT-A1] alert_map(7) — one past valid range
+[19] alert_fsm_state_7_ALERT_NONE_silent_default_ PASS
+[20] alert_fsm_state_7_alert_active_0 PASS
+[21] alert_fsm_state_7_BUZZER_SILENT PASS
+
+[FAULT-A2] alert_map(99) — grossly out of range
+[22] alert_fsm_state_99_ALERT_NONE_silent_default_ PASS
+[23] alert_fsm_state_99_alert_active_0 PASS
+
+[FAULT-A3] alert_map(255) — UINT8_MAX (bit-flip scenario)
+[24] alert_fsm_state_255_ALERT_NONE_silent_default_ PASS
+[25] alert_fsm_state_255_alert_active_0 PASS
+[26] alert_fsm_state_255_BUZZER_SILENT PASS
+
+[FAULT-B1] override_detect(NaN, 0)
+[27] alert_override_detect_returns_valid_0_1_even_with_NaN_input PASS
+
+[FAULT-B2] override_detect(+Inf, 0)
+[28] alert_override_detect_Inf_treats_as_override PASS
+
+[FAULT-B3] override_detect(-Inf, 0)
+[29] alert_override_detect_Inf_treats_as_override PASS
+
+[FAULT-C1] override_detect(1e20, 0)
+[30] alert_huge_positive_angle_override PASS
+
+[FAULT-C2] override_detect(-1e20, 0)
+[31] alert_huge_negative_angle_override PASS
+
+[FAULT-C3] override_detect at exact 5.0 deg boundary
+[32] alert_steering_5_0_exact_threshold_no_override PASS
+[33] alert_steering_5_0_exact_threshold_no_override PASS
+[34] alert_steering_5_01_just_above_override_active PASS
+
+[FAULT-D1] override_detect(0, 2) — unexpected pedal value
+[35] alert_brake_pedal_2_triggers_override_safe_default_ PASS
+
+[FAULT-D2] override_detect(0, 255) — corrupted pedal signal
+[36] alert_brake_pedal_255_triggers_override_safe_default_ PASS
+
+========================================
+========================================
+Results: 30 / 36 passed
+</pre>
+</details>
+
+<hr>
+<p class="meta">Generated by GitHub Actions ·
+  <a href="https://github.com/erycaaf/AEB-stellantis-project">Repository</a></p>
+</body>
+</html>
