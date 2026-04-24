@@ -37,7 +37,7 @@
           </tr>
           <tr>
             <td class="headerItem">Test Date:</td>
-            <td class="headerValue">2026-04-24 20:39:15</td>
+            <td class="headerValue">2026-04-24 22:10:51</td>
             <td></td>
             <td class="headerItem">Functions:</td>
             <td class="headerCovTableEntryHi">100.0&nbsp;%</td>
@@ -258,206 +258,204 @@
 <span id="L179"><span class="lineNum">     179</span>                 :             :     /* Bug #2 SEU hardening: normalise driver-&gt;aeb_enabled to a strict</span>
 <span id="L180"><span class="lineNum">     180</span>                 :             :      * Boolean at entry. A bit-flip that turns 1U into (say) 0xAA would</span>
 <span id="L181"><span class="lineNum">     181</span>                 :             :      * otherwise make (aeb_enabled == 0U) false and leave the FSM running</span>
-<span id="L182"><span class="lineNum">     182</span>                 :             :      * on corrupted state. Any non-zero bit pattern is treated as enabled;</span>
-<span id="L183"><span class="lineNum">     183</span>                 :             :      * any zero is treated as disabled. */</span>
-<span id="L184"><span class="lineNum">     184</span>         [<span class="tlaGBC" title="Branch 0 was taken 1719 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1 time"> + </span>]:<span class="tlaGNC">        1720 :     aeb_enabled_norm = (driver-&gt;aeb_enabled != 0U) ? 1U : 0U;</span></span>
-<span id="L185"><span class="lineNum">     185</span>                 :             : </span>
-<span id="L186"><span class="lineNum">     186</span>                 :<span class="tlaGNC">        1720 :     current_state = (fsm_state_e)fsm_out-&gt;fsm_state;</span></span>
+<span id="L182"><span class="lineNum">     182</span>                 :             :      * on corrupted state. Strict match: only the canonical 1U bit pattern</span>
+<span id="L183"><span class="lineNum">     183</span>                 :             :      * counts as enabled. Any other value (0U, SEU-corrupted bit patterns,</span>
+<span id="L184"><span class="lineNum">     184</span>                 :             :      * garbage from uninitialised memory) falls safe to disabled → FSM_OFF</span>
+<span id="L185"><span class="lineNum">     185</span>                 :             :      * via the Priority-1 check below. */</span>
+<span id="L186"><span class="lineNum">     186</span>         [<span class="tlaGBC" title="Branch 0 was taken 1719 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1 time"> + </span>]:<span class="tlaGNC">        1720 :     aeb_enabled_norm = (driver-&gt;aeb_enabled == 1U) ? 1U : 0U;</span></span>
 <span id="L187"><span class="lineNum">     187</span>                 :             : </span>
-<span id="L188"><span class="lineNum">     188</span>                 :             :     /* Bug #4 SEU hardening: normalise out-of-enum fsm_state to the</span>
-<span id="L189"><span class="lineNum">     189</span>                 :             :      * fail-safe FSM_STANDBY. A bit-flip in RAM could corrupt the</span>
-<span id="L190"><span class="lineNum">     190</span>                 :             :      * persisted fsm_state byte (e.g. 1 -&gt; 42), which would then be</span>
-<span id="L191"><span class="lineNum">     191</span>                 :             :      * inherited by new_state at the top of the transition logic and,</span>
-<span id="L192"><span class="lineNum">     192</span>                 :             :      * on iterations where desired_state resolves to STANDBY, would be</span>
-<span id="L193"><span class="lineNum">     193</span>                 :             :      * written back unchanged into fsm_out-&gt;fsm_state — and broadcast</span>
-<span id="L194"><span class="lineNum">     194</span>                 :             :      * via CAN/UDS to actuators and displays. STANDBY is the conservative</span>
-<span id="L195"><span class="lineNum">     195</span>                 :             :      * choice: zero braking demand, no alert. */</span>
-<span id="L196"><span class="lineNum">     196</span>         [<span class="tlaUNC" title="Branch 0 was not taken"> - </span><span class="tlaGBC" title="Branch 1 was taken 1720 times"> + </span>]:<span class="tlaGNC">        1720 :     if ((uint8_t)current_state &gt; (uint8_t)FSM_POST_BRAKE)</span></span>
-<span id="L197"><span class="lineNum">     197</span>                 :             :     {</span>
-<span id="L198"><span class="lineNum">     198</span>                 :<span class="tlaUNC tlaBgUNC">           0 :         current_state = FSM_STANDBY;</span></span>
-<span id="L199"><span class="lineNum">     199</span>                 :<span class="tlaUNC">           0 :         fsm_out-&gt;fsm_state = (uint8_t)FSM_STANDBY;</span></span>
-<span id="L200"><span class="lineNum">     200</span>                 :             :     }</span>
-<span id="L201"><span class="lineNum">     201</span>                 :             : </span>
-<span id="L202"><span class="lineNum">     202</span>                 :<span class="tlaGNC tlaBgGNC">        1720 :     desired_state = evaluate_desired_state(perception, ttc_in);</span></span>
+<span id="L188"><span class="lineNum">     188</span>                 :<span class="tlaGNC">        1720 :     current_state = (fsm_state_e)fsm_out-&gt;fsm_state;</span></span>
+<span id="L189"><span class="lineNum">     189</span>                 :             : </span>
+<span id="L190"><span class="lineNum">     190</span>                 :             :     /* Bug #4 SEU hardening: normalise out-of-enum fsm_state to the</span>
+<span id="L191"><span class="lineNum">     191</span>                 :             :      * fail-safe FSM_STANDBY. A bit-flip in RAM could corrupt the</span>
+<span id="L192"><span class="lineNum">     192</span>                 :             :      * persisted fsm_state byte (e.g. 1 -&gt; 42), which would then be</span>
+<span id="L193"><span class="lineNum">     193</span>                 :             :      * inherited by new_state at the top of the transition logic and,</span>
+<span id="L194"><span class="lineNum">     194</span>                 :             :      * on iterations where desired_state resolves to STANDBY, would be</span>
+<span id="L195"><span class="lineNum">     195</span>                 :             :      * written back unchanged into fsm_out-&gt;fsm_state — and broadcast</span>
+<span id="L196"><span class="lineNum">     196</span>                 :             :      * via CAN/UDS to actuators and displays. STANDBY is the conservative</span>
+<span id="L197"><span class="lineNum">     197</span>                 :             :      * choice: zero braking demand, no alert. */</span>
+<span id="L198"><span class="lineNum">     198</span>         [<span class="tlaUNC" title="Branch 0 was not taken"> - </span><span class="tlaGBC" title="Branch 1 was taken 1720 times"> + </span>]:<span class="tlaGNC">        1720 :     if ((uint8_t)current_state &gt; (uint8_t)FSM_POST_BRAKE)</span></span>
+<span id="L199"><span class="lineNum">     199</span>                 :             :     {</span>
+<span id="L200"><span class="lineNum">     200</span>                 :<span class="tlaUNC tlaBgUNC">           0 :         current_state = FSM_STANDBY;</span></span>
+<span id="L201"><span class="lineNum">     201</span>                 :<span class="tlaUNC">           0 :         fsm_out-&gt;fsm_state = (uint8_t)FSM_STANDBY;</span></span>
+<span id="L202"><span class="lineNum">     202</span>                 :             :     }</span>
 <span id="L203"><span class="lineNum">     203</span>                 :             : </span>
-<span id="L204"><span class="lineNum">     204</span>                 :             :     /* ===== PRIORITY 1: Fault and Safety ===== */</span>
-<span id="L205"><span class="lineNum">     205</span>   [<span class="tlaGBC" title="Branch 0 was taken 1719 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 2 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 3 was taken 1718 times"> + </span>]:<span class="tlaGNC">        1720 :     if ((perception-&gt;fault_flag != 0U) || (aeb_enabled_norm == 0U))</span></span>
-<span id="L206"><span class="lineNum">     206</span>                 :             :     {</span>
-<span id="L207"><span class="lineNum">     207</span>                 :<span class="tlaGNC">           2 :         fsm_out-&gt;fsm_state = (uint8_t)FSM_OFF;</span></span>
-<span id="L208"><span class="lineNum">     208</span>                 :<span class="tlaGNC">           2 :         fsm_out-&gt;brake_active = 0U;</span></span>
-<span id="L209"><span class="lineNum">     209</span>                 :<span class="tlaGNC">           2 :         fsm_out-&gt;alert_level = 0U;</span></span>
-<span id="L210"><span class="lineNum">     210</span>                 :<span class="tlaGNC">           2 :         fsm_out-&gt;decel_target = 0.0f;</span></span>
-<span id="L211"><span class="lineNum">     211</span>                 :<span class="tlaGNC">           2 :         fsm_out-&gt;warn_timer = 0.0f;</span></span>
-<span id="L212"><span class="lineNum">     212</span>                 :<span class="tlaGNC">           2 :         fsm_out-&gt;state_timer = 0.0f;</span></span>
-<span id="L213"><span class="lineNum">     213</span>                 :<span class="tlaGNC">           2 :         m_fsm_mem.warn_timer_s = 0.0f;</span></span>
-<span id="L214"><span class="lineNum">     214</span>                 :<span class="tlaGNC">           2 :         m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
-<span id="L215"><span class="lineNum">     215</span>                 :<span class="tlaGNC">           2 :         m_fsm_mem.post_brake_timer_s = 0.0f;</span></span>
-<span id="L216"><span class="lineNum">     216</span>                 :<span class="tlaGNC">           2 :         return;</span></span>
-<span id="L217"><span class="lineNum">     217</span>                 :             :     }</span>
-<span id="L218"><span class="lineNum">     218</span>                 :             : </span>
-<span id="L219"><span class="lineNum">     219</span>                 :             :     /* ===== PRIORITY 2: Driver Override ===== */</span>
-<span id="L220"><span class="lineNum">     220</span>                 :             :     /* MISRA C:2012 Rule 10.3: the Boolean expression on the right-hand</span>
-<span id="L221"><span class="lineNum">     221</span>                 :             :      * side must be explicitly cast to the uint8_t essential type of</span>
-<span id="L222"><span class="lineNum">     222</span>                 :             :      * the lvalue. */</span>
-<span id="L223"><span class="lineNum">     223</span>                 :<span class="tlaGNC">        5152 :     driver_override = (uint8_t)((driver-&gt;brake_pedal != 0U) ||</span></span>
-<span id="L224"><span class="lineNum">     224</span>   [<span class="tlaGBC" title="Branch 0 was taken 1716 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 1714 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 2 times"> + </span>]:<span class="tlaGNC">        3432 :                                 (driver-&gt;steering_angle &gt; STEERING_OVERRIDE_DEG) ||</span></span>
-<span id="L225"><span class="lineNum">     225</span>         [<span class="tlaGBC" title="Branch 0 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 1 was taken 1713 times"> + </span>]:<span class="tlaGNC">        1714 :                                 (driver-&gt;steering_angle &lt; -STEERING_OVERRIDE_DEG));</span></span>
-<span id="L226"><span class="lineNum">     226</span>                 :             : </span>
-<span id="L227"><span class="lineNum">     227</span>   [<span class="tlaGBC" title="Branch 0 was taken 5 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1713 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 3 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 2 times"> + </span>]:<span class="tlaGNC">        1718 :     if ((driver_override != 0U) &amp;&amp; (current_state != FSM_POST_BRAKE))</span></span>
-<span id="L228"><span class="lineNum">     228</span>                 :             :     {</span>
-<span id="L229"><span class="lineNum">     229</span>                 :<span class="tlaGNC">           3 :         fsm_out-&gt;fsm_state = (uint8_t)FSM_STANDBY;</span></span>
-<span id="L230"><span class="lineNum">     230</span>                 :<span class="tlaGNC">           3 :         fsm_out-&gt;brake_active = 0U;</span></span>
-<span id="L231"><span class="lineNum">     231</span>                 :<span class="tlaGNC">           3 :         fsm_out-&gt;alert_level = 0U;</span></span>
-<span id="L232"><span class="lineNum">     232</span>                 :<span class="tlaGNC">           3 :         fsm_out-&gt;decel_target = 0.0f;</span></span>
-<span id="L233"><span class="lineNum">     233</span>                 :<span class="tlaGNC">           3 :         fsm_out-&gt;warn_timer = 0.0f;</span></span>
-<span id="L234"><span class="lineNum">     234</span>                 :<span class="tlaGNC">           3 :         fsm_out-&gt;state_timer = 0.0f;</span></span>
-<span id="L235"><span class="lineNum">     235</span>                 :<span class="tlaGNC">           3 :         m_fsm_mem.warn_timer_s = 0.0f;</span></span>
-<span id="L236"><span class="lineNum">     236</span>                 :<span class="tlaGNC">           3 :         m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
-<span id="L237"><span class="lineNum">     237</span>                 :<span class="tlaGNC">           3 :         return;</span></span>
-<span id="L238"><span class="lineNum">     238</span>                 :             :     }</span>
-<span id="L239"><span class="lineNum">     239</span>                 :             : </span>
-<span id="L240"><span class="lineNum">     240</span>                 :             :     /* ===== PRIORITY 3: Speed Range Validation ===== */</span>
-<span id="L241"><span class="lineNum">     241</span>                 :             :     /* MISRA C:2012 Rule 10.3: explicit cast to uint8_t essential type. */</span>
-<span id="L242"><span class="lineNum">     242</span>         [<span class="tlaGBC" title="Branch 0 was taken 1712 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 3 times"> + </span>]:<span class="tlaGNC">        3427 :     speed_out_of_range = (uint8_t)((perception-&gt;v_ego &lt; V_EGO_MIN) ||</span></span>
-<span id="L243"><span class="lineNum">     243</span>         [<span class="tlaGBC" title="Branch 0 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 1 was taken 1711 times"> + </span>]:<span class="tlaGNC">        1712 :                                    (perception-&gt;v_ego &gt; V_EGO_MAX));</span></span>
-<span id="L244"><span class="lineNum">     244</span>                 :             : </span>
-<span id="L245"><span class="lineNum">     245</span>         [<span class="tlaGBC" title="Branch 0 was taken 4 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1711 times"> + </span>]:<span class="tlaGNC">        1715 :     if (speed_out_of_range != 0U)</span></span>
-<span id="L246"><span class="lineNum">     246</span>                 :             :     {</span>
-<span id="L247"><span class="lineNum">     247</span>   [<span class="tlaGBC" title="Branch 0 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 3 was taken 1 time"> + </span>]:<span class="tlaGNC">           4 :         if ((perception-&gt;v_ego &lt; 0.01f) &amp;&amp; (current_state &gt;= FSM_BRAKE_L1))</span></span>
-<span id="L248"><span class="lineNum">     248</span>                 :             :         {</span>
-<span id="L249"><span class="lineNum">     249</span>                 :<span class="tlaGNC">           1 :             fsm_out-&gt;fsm_state = (uint8_t)FSM_POST_BRAKE;</span></span>
-<span id="L250"><span class="lineNum">     250</span>                 :<span class="tlaGNC">           1 :             m_fsm_mem.post_brake_timer_s = 0.0f;</span></span>
-<span id="L251"><span class="lineNum">     251</span>                 :             :         }</span>
-<span id="L252"><span class="lineNum">     252</span>                 :             :         else</span>
-<span id="L253"><span class="lineNum">     253</span>                 :             :         {</span>
-<span id="L254"><span class="lineNum">     254</span>                 :<span class="tlaGNC">           3 :             fsm_out-&gt;fsm_state = (uint8_t)FSM_STANDBY;</span></span>
-<span id="L255"><span class="lineNum">     255</span>                 :             :         }</span>
-<span id="L256"><span class="lineNum">     256</span>                 :<span class="tlaGNC">           4 :         fsm_out-&gt;brake_active = 0U;</span></span>
-<span id="L257"><span class="lineNum">     257</span>                 :<span class="tlaGNC">           4 :         fsm_out-&gt;alert_level = 0U;</span></span>
-<span id="L258"><span class="lineNum">     258</span>                 :<span class="tlaGNC">           4 :         fsm_out-&gt;decel_target = 0.0f;</span></span>
-<span id="L259"><span class="lineNum">     259</span>                 :<span class="tlaGNC">           4 :         fsm_out-&gt;state_timer += delta_t_s;</span></span>
-<span id="L260"><span class="lineNum">     260</span>                 :<span class="tlaGNC">           4 :         return;</span></span>
-<span id="L261"><span class="lineNum">     261</span>                 :             :     }</span>
-<span id="L262"><span class="lineNum">     262</span>                 :             : </span>
-<span id="L263"><span class="lineNum">     263</span>                 :             :     /* ===== PRIORITY 4: State Transition Logic ===== */</span>
-<span id="L264"><span class="lineNum">     264</span>                 :<span class="tlaGNC">        1711 :     new_state = current_state;</span></span>
-<span id="L265"><span class="lineNum">     265</span>                 :             : </span>
-<span id="L266"><span class="lineNum">     266</span>   [<span class="tlaGBC" title="Branch 0 was taken 304 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1333 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 44 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 30 times"> + </span>]:<span class="tlaGNC">        1711 :     switch (current_state)</span></span>
-<span id="L267"><span class="lineNum">     267</span>                 :             :     {</span>
-<span id="L268"><span class="lineNum">     268</span>                 :<span class="tlaGNC">         304 :         case FSM_POST_BRAKE:</span></span>
-<span id="L269"><span class="lineNum">     269</span>                 :<span class="tlaGNC">         304 :             m_fsm_mem.post_brake_timer_s += delta_t_s;</span></span>
-<span id="L270"><span class="lineNum">     270</span>         [<span class="tlaGBC" title="Branch 0 was taken 303 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1 time"> + </span>]:<span class="tlaGNC">         304 :             if ((m_fsm_mem.post_brake_timer_s &gt;= 2.0f) ||</span></span>
-<span id="L271"><span class="lineNum">     271</span>         [<span class="tlaGBC" title="Branch 0 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 1 was taken 302 times"> + </span>]:<span class="tlaGNC">         303 :                 (driver-&gt;accel_pedal != 0U))</span></span>
-<span id="L272"><span class="lineNum">     272</span>                 :             :             {</span>
-<span id="L273"><span class="lineNum">     273</span>                 :<span class="tlaGNC">           2 :                 new_state = FSM_STANDBY;</span></span>
-<span id="L274"><span class="lineNum">     274</span>                 :<span class="tlaGNC">           2 :                 m_fsm_mem.post_brake_timer_s = 0.0f;</span></span>
-<span id="L275"><span class="lineNum">     275</span>                 :             :             }</span>
-<span id="L276"><span class="lineNum">     276</span>                 :<span class="tlaGNC">         304 :             break;</span></span>
-<span id="L277"><span class="lineNum">     277</span>                 :             : </span>
-<span id="L278"><span class="lineNum">     278</span>                 :<span class="tlaGNC">        1333 :         case FSM_WARNING:</span></span>
-<span id="L279"><span class="lineNum">     279</span>                 :<span class="tlaGNC">        1333 :             m_fsm_mem.warn_timer_s += delta_t_s;</span></span>
-<span id="L280"><span class="lineNum">     280</span>         [<span class="tlaGBC" title="Branch 0 was taken 50 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1283 times"> + </span>]:<span class="tlaGNC">        1333 :             if (desired_state == FSM_STANDBY)</span></span>
-<span id="L281"><span class="lineNum">     281</span>                 :             :             {</span>
-<span id="L282"><span class="lineNum">     282</span>                 :<span class="tlaGNC">          50 :                 m_fsm_mem.debounce_timer_s += delta_t_s;</span></span>
-<span id="L283"><span class="lineNum">     283</span>         [<span class="tlaGBC" title="Branch 0 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 48 times"> + </span>]:<span class="tlaGNC">          50 :                 if (m_fsm_mem.debounce_timer_s &gt;= 0.2f)</span></span>
-<span id="L284"><span class="lineNum">     284</span>                 :             :                 {</span>
-<span id="L285"><span class="lineNum">     285</span>                 :<span class="tlaGNC">           2 :                     new_state = desired_state;</span></span>
-<span id="L286"><span class="lineNum">     286</span>                 :<span class="tlaGNC">           2 :                     m_fsm_mem.warn_timer_s = 0.0f;</span></span>
-<span id="L287"><span class="lineNum">     287</span>                 :<span class="tlaGNC">           2 :                     m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
-<span id="L288"><span class="lineNum">     288</span>                 :             :                 }</span>
-<span id="L289"><span class="lineNum">     289</span>                 :             :             }</span>
-<span id="L290"><span class="lineNum">     290</span>   [<span class="tlaGBC" title="Branch 0 was taken 1281 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 1279 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 2 times"> + </span>]:<span class="tlaGNC">        1283 :             else if ((desired_state == FSM_BRAKE_L1) ||</span></span>
-<span id="L291"><span class="lineNum">     291</span>         [<span class="tlaGBC" title="Branch 0 was taken 84 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1195 times"> + </span>]:<span class="tlaGNC">        1279 :                      (desired_state == FSM_BRAKE_L2) ||</span></span>
-<span id="L292"><span class="lineNum">     292</span>                 :             :                      (desired_state == FSM_BRAKE_L3))</span>
-<span id="L293"><span class="lineNum">     293</span>                 :             :             {</span>
-<span id="L294"><span class="lineNum">     294</span>         [<span class="tlaGBC" title="Branch 0 was taken 8 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 80 times"> + </span>]:<span class="tlaGNC">          88 :                 if (m_fsm_mem.warn_timer_s &gt;= 0.8f)</span></span>
-<span id="L295"><span class="lineNum">     295</span>                 :             :                 {</span>
-<span id="L296"><span class="lineNum">     296</span>                 :<span class="tlaGNC">           8 :                     new_state = desired_state;</span></span>
-<span id="L297"><span class="lineNum">     297</span>                 :<span class="tlaGNC">           8 :                     m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
-<span id="L298"><span class="lineNum">     298</span>                 :             :                 }</span>
-<span id="L299"><span class="lineNum">     299</span>                 :             :             }</span>
-<span id="L300"><span class="lineNum">     300</span>                 :             :             else</span>
-<span id="L301"><span class="lineNum">     301</span>                 :             :             {</span>
-<span id="L302"><span class="lineNum">     302</span>                 :             :                 /* MISRA C:2012 Rule 15.7: terminal else clause.</span>
-<span id="L303"><span class="lineNum">     303</span>                 :             :                  * Reached when desired_state is WARNING (same as current)</span>
-<span id="L304"><span class="lineNum">     304</span>                 :             :                  * — no state change, no timer reset. */</span>
-<span id="L305"><span class="lineNum">     305</span>                 :             :             }</span>
-<span id="L306"><span class="lineNum">     306</span>                 :<span class="tlaGNC">        1333 :             break;</span></span>
-<span id="L307"><span class="lineNum">     307</span>                 :             : </span>
-<span id="L308"><span class="lineNum">     308</span>                 :<span class="tlaGNC">          44 :         case FSM_BRAKE_L1:</span></span>
-<span id="L309"><span class="lineNum">     309</span>                 :             :         case FSM_BRAKE_L2:</span>
-<span id="L310"><span class="lineNum">     310</span>                 :             :         case FSM_BRAKE_L3:</span>
-<span id="L311"><span class="lineNum">     311</span>                 :             :             /* D3: the former `if (perception-&gt;v_ego &lt; 0.01f)` branch</span>
-<span id="L312"><span class="lineNum">     312</span>                 :             :              * that transitioned to FSM_POST_BRAKE was unreachable — it</span>
-<span id="L313"><span class="lineNum">     313</span>                 :             :              * is dominated by the Priority-3 speed guard above, which</span>
-<span id="L314"><span class="lineNum">     314</span>                 :             :              * fires on v_ego &lt; V_EGO_MIN = 2.78 m/s before control</span>
-<span id="L315"><span class="lineNum">     315</span>                 :             :              * ever reaches this switch. Removed per V&amp;V report Sec. 7.5</span>
-<span id="L316"><span class="lineNum">     316</span>                 :             :              * desvio D3 (MISRA C:2012 Rule 2.1). Low-speed exit into</span>
-<span id="L317"><span class="lineNum">     317</span>                 :             :              * POST_BRAKE is now handled exclusively by the speed guard. */</span>
-<span id="L318"><span class="lineNum">     318</span>         [<span class="tlaGBC" title="Branch 0 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 1 was taken 43 times"> + </span>]:<span class="tlaGNC">          44 :             if (desired_state &gt; current_state)</span></span>
-<span id="L319"><span class="lineNum">     319</span>                 :             :             {</span>
-<span id="L320"><span class="lineNum">     320</span>                 :             :                 /* Escalation: immediate */</span>
-<span id="L321"><span class="lineNum">     321</span>                 :<span class="tlaGNC">           1 :                 new_state = desired_state;</span></span>
-<span id="L322"><span class="lineNum">     322</span>                 :<span class="tlaGNC">           1 :                 m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
-<span id="L323"><span class="lineNum">     323</span>                 :             :             }</span>
-<span id="L324"><span class="lineNum">     324</span>         [<span class="tlaGBC" title="Branch 0 was taken 20 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 23 times"> + </span>]:<span class="tlaGNC">          43 :             else if (desired_state &lt; current_state)</span></span>
-<span id="L325"><span class="lineNum">     325</span>                 :             :             {</span>
-<span id="L326"><span class="lineNum">     326</span>                 :             :                 /* De-escalation: requires 200ms debounce */</span>
-<span id="L327"><span class="lineNum">     327</span>                 :<span class="tlaGNC">          20 :                 m_fsm_mem.debounce_timer_s += delta_t_s;</span></span>
-<span id="L328"><span class="lineNum">     328</span>         [<span class="tlaGBC" title="Branch 0 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 1 was taken 19 times"> + </span>]:<span class="tlaGNC">          20 :                 if (m_fsm_mem.debounce_timer_s &gt;= 0.2f)</span></span>
-<span id="L329"><span class="lineNum">     329</span>                 :             :                 {</span>
-<span id="L330"><span class="lineNum">     330</span>                 :<span class="tlaGNC">           1 :                     new_state = desired_state;</span></span>
-<span id="L331"><span class="lineNum">     331</span>                 :<span class="tlaGNC">           1 :                     m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
-<span id="L332"><span class="lineNum">     332</span>                 :             :                 }</span>
-<span id="L333"><span class="lineNum">     333</span>                 :             :             }</span>
-<span id="L334"><span class="lineNum">     334</span>                 :             :             else</span>
-<span id="L335"><span class="lineNum">     335</span>                 :             :             {</span>
-<span id="L336"><span class="lineNum">     336</span>                 :<span class="tlaGNC">          23 :                 m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
-<span id="L337"><span class="lineNum">     337</span>                 :             :             }</span>
-<span id="L338"><span class="lineNum">     338</span>                 :<span class="tlaGNC">          44 :             break;</span></span>
-<span id="L339"><span class="lineNum">     339</span>                 :             : </span>
-<span id="L340"><span class="lineNum">     340</span>                 :<span class="tlaGNC">          30 :         case FSM_STANDBY:</span></span>
-<span id="L341"><span class="lineNum">     341</span>                 :             :         default:</span>
-<span id="L342"><span class="lineNum">     342</span>                 :<span class="tlaGNC">          30 :             m_fsm_mem.warn_timer_s = 0.0f;</span></span>
-<span id="L343"><span class="lineNum">     343</span>                 :<span class="tlaGNC">          30 :             m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
-<span id="L344"><span class="lineNum">     344</span>                 :             :             /* FR-DEC-011: STANDBY must go to WARNING first */</span>
-<span id="L345"><span class="lineNum">     345</span>         [<span class="tlaGBC" title="Branch 0 was taken 15 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 15 times"> + </span>]:<span class="tlaGNC">          30 :             if (desired_state == FSM_WARNING)</span></span>
-<span id="L346"><span class="lineNum">     346</span>                 :             :             {</span>
-<span id="L347"><span class="lineNum">     347</span>                 :<span class="tlaGNC">          15 :                 new_state = FSM_WARNING;</span></span>
-<span id="L348"><span class="lineNum">     348</span>                 :             :             }</span>
-<span id="L349"><span class="lineNum">     349</span>   [<span class="tlaGBC" title="Branch 0 was taken 14 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 2 was taken 13 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 1 time"> + </span>]:<span class="tlaGNC">          15 :             else if ((desired_state == FSM_BRAKE_L1) ||</span></span>
-<span id="L350"><span class="lineNum">     350</span>         [<span class="tlaGBC" title="Branch 0 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 11 times"> + </span>]:<span class="tlaGNC">          13 :                      (desired_state == FSM_BRAKE_L2) ||</span></span>
-<span id="L351"><span class="lineNum">     351</span>                 :             :                      (desired_state == FSM_BRAKE_L3))</span>
-<span id="L352"><span class="lineNum">     352</span>                 :             :             {</span>
-<span id="L353"><span class="lineNum">     353</span>                 :             :                 /* Force pass through WARNING (FR-DEC-011) */</span>
-<span id="L354"><span class="lineNum">     354</span>                 :<span class="tlaGNC">           4 :                 new_state = FSM_WARNING;</span></span>
-<span id="L355"><span class="lineNum">     355</span>                 :             :             }</span>
-<span id="L356"><span class="lineNum">     356</span>                 :             :             else</span>
-<span id="L357"><span class="lineNum">     357</span>                 :             :             {</span>
-<span id="L358"><span class="lineNum">     358</span>                 :             :                 /* MISRA C:2012 Rule 15.7: terminal else clause.</span>
-<span id="L359"><span class="lineNum">     359</span>                 :             :                  * Reached when desired_state is STANDBY or POST_BRAKE</span>
-<span id="L360"><span class="lineNum">     360</span>                 :             :                  * — no transition, stay in STANDBY. */</span>
-<span id="L361"><span class="lineNum">     361</span>                 :             :             }</span>
-<span id="L362"><span class="lineNum">     362</span>                 :<span class="tlaGNC">          30 :             break;</span></span>
-<span id="L363"><span class="lineNum">     363</span>                 :             :     }</span>
-<span id="L364"><span class="lineNum">     364</span>                 :             : </span>
-<span id="L365"><span class="lineNum">     365</span>                 :             :     /* Update timers */</span>
-<span id="L366"><span class="lineNum">     366</span>         [<span class="tlaGBC" title="Branch 0 was taken 33 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1678 times"> + </span>]:<span class="tlaGNC">        1711 :     if (new_state != current_state)</span></span>
-<span id="L367"><span class="lineNum">     367</span>                 :             :     {</span>
-<span id="L368"><span class="lineNum">     368</span>                 :<span class="tlaGNC">          33 :         fsm_out-&gt;state_timer = 0.0f;</span></span>
-<span id="L369"><span class="lineNum">     369</span>                 :             :     }</span>
-<span id="L370"><span class="lineNum">     370</span>                 :             :     else</span>
-<span id="L371"><span class="lineNum">     371</span>                 :             :     {</span>
-<span id="L372"><span class="lineNum">     372</span>                 :<span class="tlaGNC">        1678 :         fsm_out-&gt;state_timer += delta_t_s;</span></span>
-<span id="L373"><span class="lineNum">     373</span>                 :             :     }</span>
-<span id="L374"><span class="lineNum">     374</span>                 :             : </span>
-<span id="L375"><span class="lineNum">     375</span>                 :             :     /* Write outputs */</span>
-<span id="L376"><span class="lineNum">     376</span>                 :<span class="tlaGNC">        1711 :     fsm_out-&gt;fsm_state = (uint8_t)new_state;</span></span>
-<span id="L377"><span class="lineNum">     377</span>                 :<span class="tlaGNC">        1711 :     fsm_out-&gt;warn_timer = m_fsm_mem.warn_timer_s;</span></span>
-<span id="L378"><span class="lineNum">     378</span>   [<span class="tlaGBC" title="Branch 0 was taken 354 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1357 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 52 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 302 times"> + </span>]:<span class="tlaGNC">        1711 :     fsm_out-&gt;brake_active = ((new_state &gt;= FSM_BRAKE_L1) &amp;&amp; (new_state &lt;= FSM_BRAKE_L3)) ? 1U : 0U;</span></span>
-<span id="L379"><span class="lineNum">     379</span>                 :<span class="tlaGNC">        1711 :     fsm_out-&gt;alert_level = state_to_alert_level(new_state);</span></span>
-<span id="L380"><span class="lineNum">     380</span>                 :<span class="tlaGNC">        1711 :     fsm_out-&gt;decel_target = state_to_decel_target(new_state);</span></span>
-<span id="L381"><span class="lineNum">     381</span>                 :             : }</span>
+<span id="L204"><span class="lineNum">     204</span>                 :<span class="tlaGNC tlaBgGNC">        1720 :     desired_state = evaluate_desired_state(perception, ttc_in);</span></span>
+<span id="L205"><span class="lineNum">     205</span>                 :             : </span>
+<span id="L206"><span class="lineNum">     206</span>                 :             :     /* ===== PRIORITY 1: Fault and Safety ===== */</span>
+<span id="L207"><span class="lineNum">     207</span>   [<span class="tlaGBC" title="Branch 0 was taken 1719 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 2 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 3 was taken 1718 times"> + </span>]:<span class="tlaGNC">        1720 :     if ((perception-&gt;fault_flag != 0U) || (aeb_enabled_norm == 0U))</span></span>
+<span id="L208"><span class="lineNum">     208</span>                 :             :     {</span>
+<span id="L209"><span class="lineNum">     209</span>                 :<span class="tlaGNC">           2 :         fsm_out-&gt;fsm_state = (uint8_t)FSM_OFF;</span></span>
+<span id="L210"><span class="lineNum">     210</span>                 :<span class="tlaGNC">           2 :         fsm_out-&gt;brake_active = 0U;</span></span>
+<span id="L211"><span class="lineNum">     211</span>                 :<span class="tlaGNC">           2 :         fsm_out-&gt;alert_level = 0U;</span></span>
+<span id="L212"><span class="lineNum">     212</span>                 :<span class="tlaGNC">           2 :         fsm_out-&gt;decel_target = 0.0f;</span></span>
+<span id="L213"><span class="lineNum">     213</span>                 :<span class="tlaGNC">           2 :         fsm_out-&gt;warn_timer = 0.0f;</span></span>
+<span id="L214"><span class="lineNum">     214</span>                 :<span class="tlaGNC">           2 :         fsm_out-&gt;state_timer = 0.0f;</span></span>
+<span id="L215"><span class="lineNum">     215</span>                 :<span class="tlaGNC">           2 :         m_fsm_mem.warn_timer_s = 0.0f;</span></span>
+<span id="L216"><span class="lineNum">     216</span>                 :<span class="tlaGNC">           2 :         m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
+<span id="L217"><span class="lineNum">     217</span>                 :<span class="tlaGNC">           2 :         m_fsm_mem.post_brake_timer_s = 0.0f;</span></span>
+<span id="L218"><span class="lineNum">     218</span>                 :<span class="tlaGNC">           2 :         return;</span></span>
+<span id="L219"><span class="lineNum">     219</span>                 :             :     }</span>
+<span id="L220"><span class="lineNum">     220</span>                 :             : </span>
+<span id="L221"><span class="lineNum">     221</span>                 :             :     /* ===== PRIORITY 2: Driver Override ===== */</span>
+<span id="L222"><span class="lineNum">     222</span>         [<span class="tlaGBC" title="Branch 0 was taken 1716 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span>]:<span class="tlaGNC">        3434 :     driver_override = ((driver-&gt;brake_pedal != 0U) ||</span></span>
+<span id="L223"><span class="lineNum">     223</span>         [<span class="tlaGBC" title="Branch 0 was taken 1714 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span>]:<span class="tlaGNC">        1716 :                        (driver-&gt;steering_angle &gt; STEERING_OVERRIDE_DEG) ||</span></span>
+<span id="L224"><span class="lineNum">     224</span>         [<span class="tlaGBC" title="Branch 0 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 1 was taken 1713 times"> + </span>]:<span class="tlaGNC">        1714 :                        (driver-&gt;steering_angle &lt; -STEERING_OVERRIDE_DEG)) ? 1U : 0U;</span></span>
+<span id="L225"><span class="lineNum">     225</span>                 :             : </span>
+<span id="L226"><span class="lineNum">     226</span>   [<span class="tlaGBC" title="Branch 0 was taken 5 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1713 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 3 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 2 times"> + </span>]:<span class="tlaGNC">        1718 :     if ((driver_override != 0U) &amp;&amp; (current_state != FSM_POST_BRAKE))</span></span>
+<span id="L227"><span class="lineNum">     227</span>                 :             :     {</span>
+<span id="L228"><span class="lineNum">     228</span>                 :<span class="tlaGNC">           3 :         fsm_out-&gt;fsm_state = (uint8_t)FSM_STANDBY;</span></span>
+<span id="L229"><span class="lineNum">     229</span>                 :<span class="tlaGNC">           3 :         fsm_out-&gt;brake_active = 0U;</span></span>
+<span id="L230"><span class="lineNum">     230</span>                 :<span class="tlaGNC">           3 :         fsm_out-&gt;alert_level = 0U;</span></span>
+<span id="L231"><span class="lineNum">     231</span>                 :<span class="tlaGNC">           3 :         fsm_out-&gt;decel_target = 0.0f;</span></span>
+<span id="L232"><span class="lineNum">     232</span>                 :<span class="tlaGNC">           3 :         fsm_out-&gt;warn_timer = 0.0f;</span></span>
+<span id="L233"><span class="lineNum">     233</span>                 :<span class="tlaGNC">           3 :         fsm_out-&gt;state_timer = 0.0f;</span></span>
+<span id="L234"><span class="lineNum">     234</span>                 :<span class="tlaGNC">           3 :         m_fsm_mem.warn_timer_s = 0.0f;</span></span>
+<span id="L235"><span class="lineNum">     235</span>                 :<span class="tlaGNC">           3 :         m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
+<span id="L236"><span class="lineNum">     236</span>                 :<span class="tlaGNC">           3 :         return;</span></span>
+<span id="L237"><span class="lineNum">     237</span>                 :             :     }</span>
+<span id="L238"><span class="lineNum">     238</span>                 :             : </span>
+<span id="L239"><span class="lineNum">     239</span>                 :             :     /* ===== PRIORITY 3: Speed Range Validation ===== */</span>
+<span id="L240"><span class="lineNum">     240</span>         [<span class="tlaGBC" title="Branch 0 was taken 1712 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 3 times"> + </span>]:<span class="tlaGNC">        3427 :     speed_out_of_range = ((perception-&gt;v_ego &lt; V_EGO_MIN) ||</span></span>
+<span id="L241"><span class="lineNum">     241</span>         [<span class="tlaGBC" title="Branch 0 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 1 was taken 1711 times"> + </span>]:<span class="tlaGNC">        1712 :                           (perception-&gt;v_ego &gt; V_EGO_MAX)) ? 1U : 0U;</span></span>
+<span id="L242"><span class="lineNum">     242</span>                 :             : </span>
+<span id="L243"><span class="lineNum">     243</span>         [<span class="tlaGBC" title="Branch 0 was taken 4 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1711 times"> + </span>]:<span class="tlaGNC">        1715 :     if (speed_out_of_range != 0U)</span></span>
+<span id="L244"><span class="lineNum">     244</span>                 :             :     {</span>
+<span id="L245"><span class="lineNum">     245</span>   [<span class="tlaGBC" title="Branch 0 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 3 was taken 1 time"> + </span>]:<span class="tlaGNC">           4 :         if ((perception-&gt;v_ego &lt; 0.01f) &amp;&amp; (current_state &gt;= FSM_BRAKE_L1))</span></span>
+<span id="L246"><span class="lineNum">     246</span>                 :             :         {</span>
+<span id="L247"><span class="lineNum">     247</span>                 :<span class="tlaGNC">           1 :             fsm_out-&gt;fsm_state = (uint8_t)FSM_POST_BRAKE;</span></span>
+<span id="L248"><span class="lineNum">     248</span>                 :<span class="tlaGNC">           1 :             m_fsm_mem.post_brake_timer_s = 0.0f;</span></span>
+<span id="L249"><span class="lineNum">     249</span>                 :             :         }</span>
+<span id="L250"><span class="lineNum">     250</span>                 :             :         else</span>
+<span id="L251"><span class="lineNum">     251</span>                 :             :         {</span>
+<span id="L252"><span class="lineNum">     252</span>                 :<span class="tlaGNC">           3 :             fsm_out-&gt;fsm_state = (uint8_t)FSM_STANDBY;</span></span>
+<span id="L253"><span class="lineNum">     253</span>                 :             :         }</span>
+<span id="L254"><span class="lineNum">     254</span>                 :<span class="tlaGNC">           4 :         fsm_out-&gt;brake_active = 0U;</span></span>
+<span id="L255"><span class="lineNum">     255</span>                 :<span class="tlaGNC">           4 :         fsm_out-&gt;alert_level = 0U;</span></span>
+<span id="L256"><span class="lineNum">     256</span>                 :<span class="tlaGNC">           4 :         fsm_out-&gt;decel_target = 0.0f;</span></span>
+<span id="L257"><span class="lineNum">     257</span>                 :<span class="tlaGNC">           4 :         fsm_out-&gt;state_timer += delta_t_s;</span></span>
+<span id="L258"><span class="lineNum">     258</span>                 :<span class="tlaGNC">           4 :         return;</span></span>
+<span id="L259"><span class="lineNum">     259</span>                 :             :     }</span>
+<span id="L260"><span class="lineNum">     260</span>                 :             : </span>
+<span id="L261"><span class="lineNum">     261</span>                 :             :     /* ===== PRIORITY 4: State Transition Logic ===== */</span>
+<span id="L262"><span class="lineNum">     262</span>                 :<span class="tlaGNC">        1711 :     new_state = current_state;</span></span>
+<span id="L263"><span class="lineNum">     263</span>                 :             : </span>
+<span id="L264"><span class="lineNum">     264</span>   [<span class="tlaGBC" title="Branch 0 was taken 304 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1333 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 44 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 30 times"> + </span>]:<span class="tlaGNC">        1711 :     switch (current_state)</span></span>
+<span id="L265"><span class="lineNum">     265</span>                 :             :     {</span>
+<span id="L266"><span class="lineNum">     266</span>                 :<span class="tlaGNC">         304 :         case FSM_POST_BRAKE:</span></span>
+<span id="L267"><span class="lineNum">     267</span>                 :<span class="tlaGNC">         304 :             m_fsm_mem.post_brake_timer_s += delta_t_s;</span></span>
+<span id="L268"><span class="lineNum">     268</span>         [<span class="tlaGBC" title="Branch 0 was taken 303 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1 time"> + </span>]:<span class="tlaGNC">         304 :             if ((m_fsm_mem.post_brake_timer_s &gt;= 2.0f) ||</span></span>
+<span id="L269"><span class="lineNum">     269</span>         [<span class="tlaGBC" title="Branch 0 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 1 was taken 302 times"> + </span>]:<span class="tlaGNC">         303 :                 (driver-&gt;accel_pedal != 0U))</span></span>
+<span id="L270"><span class="lineNum">     270</span>                 :             :             {</span>
+<span id="L271"><span class="lineNum">     271</span>                 :<span class="tlaGNC">           2 :                 new_state = FSM_STANDBY;</span></span>
+<span id="L272"><span class="lineNum">     272</span>                 :<span class="tlaGNC">           2 :                 m_fsm_mem.post_brake_timer_s = 0.0f;</span></span>
+<span id="L273"><span class="lineNum">     273</span>                 :             :             }</span>
+<span id="L274"><span class="lineNum">     274</span>                 :<span class="tlaGNC">         304 :             break;</span></span>
+<span id="L275"><span class="lineNum">     275</span>                 :             : </span>
+<span id="L276"><span class="lineNum">     276</span>                 :<span class="tlaGNC">        1333 :         case FSM_WARNING:</span></span>
+<span id="L277"><span class="lineNum">     277</span>                 :<span class="tlaGNC">        1333 :             m_fsm_mem.warn_timer_s += delta_t_s;</span></span>
+<span id="L278"><span class="lineNum">     278</span>         [<span class="tlaGBC" title="Branch 0 was taken 50 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1283 times"> + </span>]:<span class="tlaGNC">        1333 :             if (desired_state == FSM_STANDBY)</span></span>
+<span id="L279"><span class="lineNum">     279</span>                 :             :             {</span>
+<span id="L280"><span class="lineNum">     280</span>                 :<span class="tlaGNC">          50 :                 m_fsm_mem.debounce_timer_s += delta_t_s;</span></span>
+<span id="L281"><span class="lineNum">     281</span>         [<span class="tlaGBC" title="Branch 0 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 48 times"> + </span>]:<span class="tlaGNC">          50 :                 if (m_fsm_mem.debounce_timer_s &gt;= 0.2f)</span></span>
+<span id="L282"><span class="lineNum">     282</span>                 :             :                 {</span>
+<span id="L283"><span class="lineNum">     283</span>                 :<span class="tlaGNC">           2 :                     new_state = desired_state;</span></span>
+<span id="L284"><span class="lineNum">     284</span>                 :<span class="tlaGNC">           2 :                     m_fsm_mem.warn_timer_s = 0.0f;</span></span>
+<span id="L285"><span class="lineNum">     285</span>                 :<span class="tlaGNC">           2 :                     m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
+<span id="L286"><span class="lineNum">     286</span>                 :             :                 }</span>
+<span id="L287"><span class="lineNum">     287</span>                 :             :             }</span>
+<span id="L288"><span class="lineNum">     288</span>   [<span class="tlaGBC" title="Branch 0 was taken 1281 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 1279 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 2 times"> + </span>]:<span class="tlaGNC">        1283 :             else if ((desired_state == FSM_BRAKE_L1) ||</span></span>
+<span id="L289"><span class="lineNum">     289</span>         [<span class="tlaGBC" title="Branch 0 was taken 84 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1195 times"> + </span>]:<span class="tlaGNC">        1279 :                      (desired_state == FSM_BRAKE_L2) ||</span></span>
+<span id="L290"><span class="lineNum">     290</span>                 :             :                      (desired_state == FSM_BRAKE_L3))</span>
+<span id="L291"><span class="lineNum">     291</span>                 :             :             {</span>
+<span id="L292"><span class="lineNum">     292</span>         [<span class="tlaGBC" title="Branch 0 was taken 8 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 80 times"> + </span>]:<span class="tlaGNC">          88 :                 if (m_fsm_mem.warn_timer_s &gt;= 0.8f)</span></span>
+<span id="L293"><span class="lineNum">     293</span>                 :             :                 {</span>
+<span id="L294"><span class="lineNum">     294</span>                 :<span class="tlaGNC">           8 :                     new_state = desired_state;</span></span>
+<span id="L295"><span class="lineNum">     295</span>                 :<span class="tlaGNC">           8 :                     m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
+<span id="L296"><span class="lineNum">     296</span>                 :             :                 }</span>
+<span id="L297"><span class="lineNum">     297</span>                 :             :             }</span>
+<span id="L298"><span class="lineNum">     298</span>                 :             :             else</span>
+<span id="L299"><span class="lineNum">     299</span>                 :             :             {</span>
+<span id="L300"><span class="lineNum">     300</span>                 :             :                 /* MISRA C:2012 Rule 15.7: terminal else clause.</span>
+<span id="L301"><span class="lineNum">     301</span>                 :             :                  * Reached when desired_state is WARNING (same as current)</span>
+<span id="L302"><span class="lineNum">     302</span>                 :             :                  * — no state change, no timer reset. */</span>
+<span id="L303"><span class="lineNum">     303</span>                 :             :             }</span>
+<span id="L304"><span class="lineNum">     304</span>                 :<span class="tlaGNC">        1333 :             break;</span></span>
+<span id="L305"><span class="lineNum">     305</span>                 :             : </span>
+<span id="L306"><span class="lineNum">     306</span>                 :<span class="tlaGNC">          44 :         case FSM_BRAKE_L1:</span></span>
+<span id="L307"><span class="lineNum">     307</span>                 :             :         case FSM_BRAKE_L2:</span>
+<span id="L308"><span class="lineNum">     308</span>                 :             :         case FSM_BRAKE_L3:</span>
+<span id="L309"><span class="lineNum">     309</span>                 :             :             /* D3: the former `if (perception-&gt;v_ego &lt; 0.01f)` branch</span>
+<span id="L310"><span class="lineNum">     310</span>                 :             :              * that transitioned to FSM_POST_BRAKE was unreachable — it</span>
+<span id="L311"><span class="lineNum">     311</span>                 :             :              * is dominated by the Priority-3 speed guard above, which</span>
+<span id="L312"><span class="lineNum">     312</span>                 :             :              * fires on v_ego &lt; V_EGO_MIN = 2.78 m/s before control</span>
+<span id="L313"><span class="lineNum">     313</span>                 :             :              * ever reaches this switch. Removed per V&amp;V report Sec. 7.5</span>
+<span id="L314"><span class="lineNum">     314</span>                 :             :              * desvio D3 (MISRA C:2012 Rule 2.1). Low-speed exit into</span>
+<span id="L315"><span class="lineNum">     315</span>                 :             :              * POST_BRAKE is now handled exclusively by the speed guard. */</span>
+<span id="L316"><span class="lineNum">     316</span>         [<span class="tlaGBC" title="Branch 0 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 1 was taken 43 times"> + </span>]:<span class="tlaGNC">          44 :             if (desired_state &gt; current_state)</span></span>
+<span id="L317"><span class="lineNum">     317</span>                 :             :             {</span>
+<span id="L318"><span class="lineNum">     318</span>                 :             :                 /* Escalation: immediate */</span>
+<span id="L319"><span class="lineNum">     319</span>                 :<span class="tlaGNC">           1 :                 new_state = desired_state;</span></span>
+<span id="L320"><span class="lineNum">     320</span>                 :<span class="tlaGNC">           1 :                 m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
+<span id="L321"><span class="lineNum">     321</span>                 :             :             }</span>
+<span id="L322"><span class="lineNum">     322</span>         [<span class="tlaGBC" title="Branch 0 was taken 20 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 23 times"> + </span>]:<span class="tlaGNC">          43 :             else if (desired_state &lt; current_state)</span></span>
+<span id="L323"><span class="lineNum">     323</span>                 :             :             {</span>
+<span id="L324"><span class="lineNum">     324</span>                 :             :                 /* De-escalation: requires 200ms debounce */</span>
+<span id="L325"><span class="lineNum">     325</span>                 :<span class="tlaGNC">          20 :                 m_fsm_mem.debounce_timer_s += delta_t_s;</span></span>
+<span id="L326"><span class="lineNum">     326</span>         [<span class="tlaGBC" title="Branch 0 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 1 was taken 19 times"> + </span>]:<span class="tlaGNC">          20 :                 if (m_fsm_mem.debounce_timer_s &gt;= 0.2f)</span></span>
+<span id="L327"><span class="lineNum">     327</span>                 :             :                 {</span>
+<span id="L328"><span class="lineNum">     328</span>                 :<span class="tlaGNC">           1 :                     new_state = desired_state;</span></span>
+<span id="L329"><span class="lineNum">     329</span>                 :<span class="tlaGNC">           1 :                     m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
+<span id="L330"><span class="lineNum">     330</span>                 :             :                 }</span>
+<span id="L331"><span class="lineNum">     331</span>                 :             :             }</span>
+<span id="L332"><span class="lineNum">     332</span>                 :             :             else</span>
+<span id="L333"><span class="lineNum">     333</span>                 :             :             {</span>
+<span id="L334"><span class="lineNum">     334</span>                 :<span class="tlaGNC">          23 :                 m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
+<span id="L335"><span class="lineNum">     335</span>                 :             :             }</span>
+<span id="L336"><span class="lineNum">     336</span>                 :<span class="tlaGNC">          44 :             break;</span></span>
+<span id="L337"><span class="lineNum">     337</span>                 :             : </span>
+<span id="L338"><span class="lineNum">     338</span>                 :<span class="tlaGNC">          30 :         case FSM_STANDBY:</span></span>
+<span id="L339"><span class="lineNum">     339</span>                 :             :         default:</span>
+<span id="L340"><span class="lineNum">     340</span>                 :<span class="tlaGNC">          30 :             m_fsm_mem.warn_timer_s = 0.0f;</span></span>
+<span id="L341"><span class="lineNum">     341</span>                 :<span class="tlaGNC">          30 :             m_fsm_mem.debounce_timer_s = 0.0f;</span></span>
+<span id="L342"><span class="lineNum">     342</span>                 :             :             /* FR-DEC-011: STANDBY must go to WARNING first */</span>
+<span id="L343"><span class="lineNum">     343</span>         [<span class="tlaGBC" title="Branch 0 was taken 15 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 15 times"> + </span>]:<span class="tlaGNC">          30 :             if (desired_state == FSM_WARNING)</span></span>
+<span id="L344"><span class="lineNum">     344</span>                 :             :             {</span>
+<span id="L345"><span class="lineNum">     345</span>                 :<span class="tlaGNC">          15 :                 new_state = FSM_WARNING;</span></span>
+<span id="L346"><span class="lineNum">     346</span>                 :             :             }</span>
+<span id="L347"><span class="lineNum">     347</span>   [<span class="tlaGBC" title="Branch 0 was taken 14 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1 time"> + </span><span class="tlaGBC" title="Branch 2 was taken 13 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 1 time"> + </span>]:<span class="tlaGNC">          15 :             else if ((desired_state == FSM_BRAKE_L1) ||</span></span>
+<span id="L348"><span class="lineNum">     348</span>         [<span class="tlaGBC" title="Branch 0 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 11 times"> + </span>]:<span class="tlaGNC">          13 :                      (desired_state == FSM_BRAKE_L2) ||</span></span>
+<span id="L349"><span class="lineNum">     349</span>                 :             :                      (desired_state == FSM_BRAKE_L3))</span>
+<span id="L350"><span class="lineNum">     350</span>                 :             :             {</span>
+<span id="L351"><span class="lineNum">     351</span>                 :             :                 /* Force pass through WARNING (FR-DEC-011) */</span>
+<span id="L352"><span class="lineNum">     352</span>                 :<span class="tlaGNC">           4 :                 new_state = FSM_WARNING;</span></span>
+<span id="L353"><span class="lineNum">     353</span>                 :             :             }</span>
+<span id="L354"><span class="lineNum">     354</span>                 :             :             else</span>
+<span id="L355"><span class="lineNum">     355</span>                 :             :             {</span>
+<span id="L356"><span class="lineNum">     356</span>                 :             :                 /* MISRA C:2012 Rule 15.7: terminal else clause.</span>
+<span id="L357"><span class="lineNum">     357</span>                 :             :                  * Reached when desired_state is STANDBY or POST_BRAKE</span>
+<span id="L358"><span class="lineNum">     358</span>                 :             :                  * — no transition, stay in STANDBY. */</span>
+<span id="L359"><span class="lineNum">     359</span>                 :             :             }</span>
+<span id="L360"><span class="lineNum">     360</span>                 :<span class="tlaGNC">          30 :             break;</span></span>
+<span id="L361"><span class="lineNum">     361</span>                 :             :     }</span>
+<span id="L362"><span class="lineNum">     362</span>                 :             : </span>
+<span id="L363"><span class="lineNum">     363</span>                 :             :     /* Update timers */</span>
+<span id="L364"><span class="lineNum">     364</span>         [<span class="tlaGBC" title="Branch 0 was taken 33 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1678 times"> + </span>]:<span class="tlaGNC">        1711 :     if (new_state != current_state)</span></span>
+<span id="L365"><span class="lineNum">     365</span>                 :             :     {</span>
+<span id="L366"><span class="lineNum">     366</span>                 :<span class="tlaGNC">          33 :         fsm_out-&gt;state_timer = 0.0f;</span></span>
+<span id="L367"><span class="lineNum">     367</span>                 :             :     }</span>
+<span id="L368"><span class="lineNum">     368</span>                 :             :     else</span>
+<span id="L369"><span class="lineNum">     369</span>                 :             :     {</span>
+<span id="L370"><span class="lineNum">     370</span>                 :<span class="tlaGNC">        1678 :         fsm_out-&gt;state_timer += delta_t_s;</span></span>
+<span id="L371"><span class="lineNum">     371</span>                 :             :     }</span>
+<span id="L372"><span class="lineNum">     372</span>                 :             : </span>
+<span id="L373"><span class="lineNum">     373</span>                 :             :     /* Write outputs */</span>
+<span id="L374"><span class="lineNum">     374</span>                 :<span class="tlaGNC">        1711 :     fsm_out-&gt;fsm_state = (uint8_t)new_state;</span></span>
+<span id="L375"><span class="lineNum">     375</span>                 :<span class="tlaGNC">        1711 :     fsm_out-&gt;warn_timer = m_fsm_mem.warn_timer_s;</span></span>
+<span id="L376"><span class="lineNum">     376</span>   [<span class="tlaGBC" title="Branch 0 was taken 354 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1357 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 52 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 302 times"> + </span>]:<span class="tlaGNC">        1711 :     fsm_out-&gt;brake_active = ((new_state &gt;= FSM_BRAKE_L1) &amp;&amp; (new_state &lt;= FSM_BRAKE_L3)) ? 1U : 0U;</span></span>
+<span id="L377"><span class="lineNum">     377</span>                 :<span class="tlaGNC">        1711 :     fsm_out-&gt;alert_level = state_to_alert_level(new_state);</span></span>
+<span id="L378"><span class="lineNum">     378</span>                 :<span class="tlaGNC">        1711 :     fsm_out-&gt;decel_target = state_to_decel_target(new_state);</span></span>
+<span id="L379"><span class="lineNum">     379</span>                 :             : }</span>
         </pre>
               </td>
             </tr>

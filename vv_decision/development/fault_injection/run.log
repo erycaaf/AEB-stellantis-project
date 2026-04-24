@@ -22,7 +22,6 @@
   [fault_c1_fsm_state_42]
   [fault_c2_fsm_state_255]
   [fault_c3_aeb_enabled_0xAA]
-    FAIL  fault_c3_aeb_enabled_0xAA  C3: 0xAA treated as disabled
   [fault_c4_fault_flag_0xFF]
   [fault_c5_is_closing_0x80]
 
@@ -33,6 +32,6 @@
   [fault_d4_debounce_oscillation]
 
 ==========================================================
- Results: 32 run, 31 passed, 1 failed
+ Results: 32 run, 32 passed, 0 failed
 ==========================================================
 
