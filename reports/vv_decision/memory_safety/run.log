@@ -1,0 +1,28 @@
+# Valgrind on unsanitised binaries
+gcc -Wall -std=c99 -O0 -g -Iinclude -Istubs \
+	-o reports/vv_decision/memory_safety/test_decision_val \
+	src/decision/aeb_ttc.c src/decision/aeb_fsm.c tests/test_decision.c -lm
+gcc -Wall -std=c99 -O0 -g -Iinclude -Istubs \
+	-o reports/vv_decision/memory_safety/test_decision_mcdc_val \
+	src/decision/aeb_ttc.c src/decision/aeb_fsm.c tests/test_decision_mcdc.c -lm
+gcc -Wall -std=c99 -O0 -g -Iinclude -Istubs \
+	-o reports/vv_decision/memory_safety/test_decision_fault_val \
+	src/decision/aeb_ttc.c src/decision/aeb_fsm.c tests/test_decision_fault.c -lm
+--- Valgrind: test_decision (nominal) ---
+(clean)
+--- Valgrind: test_decision_mcdc ---
+(clean)
+--- Valgrind: test_decision_fault ---
+(clean)
+# ASan + UBSan (sanitised binaries)
+gcc -Wall -Wextra -Wpedantic -std=c99 -O0 -g -Iinclude -Istubs -fsanitize=address -fsanitize=undefined -fsanitize=float-cast-overflow -fno-omit-frame-pointer -o reports/vv_decision/memory_safety/test_decision_san \
+	src/decision/aeb_ttc.c src/decision/aeb_fsm.c tests/test_decision.c -lm
+gcc -Wall -Wextra -Wpedantic -std=c99 -O0 -g -Iinclude -Istubs -fsanitize=address -fsanitize=undefined -fsanitize=float-cast-overflow -fno-omit-frame-pointer -o reports/vv_decision/memory_safety/test_decision_mcdc_san \
+	src/decision/aeb_ttc.c src/decision/aeb_fsm.c tests/test_decision_mcdc.c -lm
+gcc -Wall -Wextra -Wpedantic -std=c99 -O0 -g -Iinclude -Istubs -fsanitize=address -fsanitize=undefined -fsanitize=float-cast-overflow -fno-omit-frame-pointer -o reports/vv_decision/memory_safety/test_decision_fault_san \
+	src/decision/aeb_ttc.c src/decision/aeb_fsm.c tests/test_decision_fault.c -lm
+--- ASan+UBSan: test_decision (nominal) ---
+(clean)
+--- ASan+UBSan: test_decision_mcdc ---
+(clean)
+--- ASan+UBSan: test_decision_fault (UB reports expected until bugs are patched) ---
