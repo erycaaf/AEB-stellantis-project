@@ -509,7 +509,7 @@ memory-pid-alert:
 	@echo "=== Valgrind ==="
 	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs -o $(VV_REPORT_DIR)/memory_safety/test_pid_val   $(SRC_PID_TEST)   $(LDFLAGS)
 	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs -o $(VV_REPORT_DIR)/memory_safety/test_alert_val $(SRC_ALERT_TEST) $(LDFLAGS)
-	@valgrind --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=1 \
+	@valgrind --quiet --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=1 \
 		$(VV_REPORT_DIR)/memory_safety/test_pid_val > /dev/null \
 		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_pid.log; \
 		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_pid.log; \
