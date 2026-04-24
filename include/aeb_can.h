@@ -14,15 +14,18 @@
 
 #include "aeb_types.h"
 #include "aeb_config.h"
+#include "aeb_uds.h"
 #include <stdint.h>
 
 /* ── CAN Message IDs (from aeb_system.dbc) ───────────────────────────── */
-#define CAN_ID_BRAKE_CMD      (0x080U)   /**< 128 — AEB_BrakeCmd  TX     */
-#define CAN_ID_EGO_VEHICLE    (0x100U)   /**< 256 — AEB_EgoVehicle RX    */
-#define CAN_ID_DRIVER_INPUT   (0x101U)   /**< 257 — AEB_DriverInput RX   */
-#define CAN_ID_RADAR_TARGET   (0x120U)   /**< 288 — AEB_RadarTarget RX   */
-#define CAN_ID_FSM_STATE      (0x200U)   /**< 512 — AEB_FSMState TX      */
-#define CAN_ID_ALERT          (0x300U)   /**< 768 — AEB_Alert TX         */
+#define CAN_ID_BRAKE_CMD      (0x080U)   /**< 128  — AEB_BrakeCmd   TX    */
+#define CAN_ID_EGO_VEHICLE    (0x100U)   /**< 256  — AEB_EgoVehicle RX    */
+#define CAN_ID_DRIVER_INPUT   (0x101U)   /**< 257  — AEB_DriverInput RX   */
+#define CAN_ID_RADAR_TARGET   (0x120U)   /**< 288  — AEB_RadarTarget RX   */
+#define CAN_ID_FSM_STATE      (0x200U)   /**< 512  — AEB_FSMState   TX    */
+#define CAN_ID_ALERT          (0x300U)   /**< 768  — AEB_Alert      TX    */
+#define CAN_ID_UDS_REQUEST    (0x7DFU)   /**< 2015 — UDS_Request    RX    */
+#define CAN_ID_UDS_RESPONSE   (0x7E8U)   /**< 2024 — UDS_Response   TX    */
 
 /* ── CAN Frame Lengths (bytes) ───────────────────────────────────────── */
 #define CAN_DLC_BRAKE_CMD     (4U)
@@ -31,6 +34,8 @@
 #define CAN_DLC_RADAR_TARGET  (8U)
 #define CAN_DLC_FSM_STATE     (4U)
 #define CAN_DLC_ALERT         (2U)
+#define CAN_DLC_UDS_REQUEST   (4U)
+#define CAN_DLC_UDS_RESPONSE  (8U)
 
 /* ── RX Timeout ──────────────────────────────────────────────────────── */
 #define CAN_RX_TIMEOUT_CYCLES (3U)  /**< 3 missed frames → fault        */
@@ -70,6 +75,11 @@ typedef struct
     uint8_t   aeb_enable;        /**< 0/1                                */
     uint8_t   driver_override;   /**< 0/1                                */
 
+    /* From UDS_Request (0x7DF) — FR-UDS-005 */
+    uds_request_t uds_request;         /**< Decoded UDS request frame    */
+    uint8_t       uds_request_pending; /**< 1 when a new request arrived;
+                                            cleared by can_ack_uds_request() */
+
     /* Status */
     uint8_t   rx_timeout_flag;   /**< 1 if radar RX timed out            */
 } can_rx_data_t;
@@ -103,8 +113,9 @@ int32_t can_init(can_state_t *state);
 /**
  * @brief Process a single received CAN frame (called from RX callback).
  *
- * Decodes EgoVehicle (0x100) or RadarTarget (0x120) per DBC layout.
- * Resets the RX miss counter on valid frame.
+ * Decodes EgoVehicle (0x100), RadarTarget (0x120), DriverInput (0x101)
+ * or UDS_Request (0x7DF) per DBC layout.  Resets the RX miss counter
+ * on valid radar frame.  A valid 0x7DF frame sets uds_request_pending.
  *
  * @param[in,out] state  Module state.
  * @param[in]     id     CAN message ID.
@@ -113,6 +124,7 @@ int32_t can_init(can_state_t *state);
  *
  * @req FR-CAN-002  Receive radar target data.
  * @req FR-CAN-003  DBC signal encoding.
+ * @req FR-UDS-005  Receive UDS request on 0x7DF.
  */
 void can_rx_process(can_state_t *state,
                     uint32_t     id,
@@ -175,6 +187,31 @@ int32_t can_tx_alert(const alert_output_t *alert_out);
  */
 void can_get_rx_data(const can_state_t *state,
                      can_rx_data_t     *out);
+
+/**
+ * @brief Transmit a UDS response frame on CAN_ID_UDS_RESPONSE (0x7E8).
+ *
+ * Packs the 8-byte uds_response_t into a CAN frame and sends via HAL.
+ * Called from aeb_core_step() after uds_process_request() produces a
+ * response for a pending 0x7DF request.
+ *
+ * @param[in] resp  UDS response to transmit.
+ * @return CAN_OK on success, CAN_ERR_TX on failure.
+ *
+ * @req FR-UDS-005  UDS request/response via CAN within one cycle.
+ */
+int32_t can_tx_uds_response(const uds_response_t *resp);
+
+/**
+ * @brief Acknowledge the pending UDS request.
+ *
+ * Clears the uds_request_pending flag after aeb_core_step() has serviced
+ * the request.  Must be called exactly once per request to prevent
+ * double-processing on the next cycle.
+ *
+ * @param[in,out] state  Module state.
+ */
+void can_ack_uds_request(can_state_t *state);
 
 /* ── Signal encode/decode helpers (FR-CAN-003) ───────────────────────── */
 

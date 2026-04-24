@@ -17,6 +17,7 @@
 #include <string.h>
 #include "aeb_core.h"
 #include "aeb_config.h"
+#include "can_hal_test.h"
 
 static int g_test_count  = 0;
 static int g_pass_count  = 0;
@@ -203,6 +204,74 @@ static void test_sensor_fault_to_off(void)
         "brake output is zero in OFF state");
 }
 
+/* Scan the HAL TX capture buffer for a frame with the given CAN ID.
+ * Returns the matching record, or NULL if not present. */
+static const tx_record_t *find_tx(uint32_t id)
+{
+    uint32_t n = can_hal_test_get_tx_count();
+    uint32_t i = 0U;
+    const tx_record_t *hit = NULL;
+
+    for (i = 0U; i < n; i++)
+    {
+        const tx_record_t *rec = can_hal_test_get_tx(i);
+        if ((rec != NULL) && (rec->id == id))
+        {
+            hit = rec;
+        }
+    }
+    return hit;
+}
+
+static void test_uds_request_response_roundtrip(void)
+{
+    aeb_core_state_t state;
+    raw_sensor_input_t raw;
+
+    printf("\n[TEST] UDS request/response round-trip (0x7DF -> 0x7E8)\n");
+    (void)aeb_core_init(&state);
+    can_hal_test_reset();
+
+    /* Benign scenario — AEB enabled, stopped ego, far non-closing target.
+     * FSM stays in STANDBY so DID 0xF101 returns a known value.
+     * The roundtrip contract we care about is CAN path, not FSM dynamics. */
+    {
+        uint8_t enable_frame[8] = {0};
+        can_pack_signal(enable_frame, 16, 1, 1U);   /* aeb_enable */
+        can_rx_process(&state.can, 0x101U, enable_frame, 8U);
+    }
+    inject_can_frames(&state, 100.0F, 0.0F);
+
+    uint8_t req[4] = { 0x22U, 0xF1U, 0x01U, 0x00U };
+    can_rx_process(&state.can, CAN_ID_UDS_REQUEST, req, CAN_DLC_UDS_REQUEST);
+
+    /* Run one full cycle — step 10 services the request,
+     * step 11 transmits.  We scan the TX buffer for the 0x7E8 record. */
+    raw = make_raw(100.0F, 0.0F, 0.0F);
+    aeb_core_step(&state, &raw);
+
+    const tx_record_t *resp = find_tx(CAN_ID_UDS_RESPONSE);
+    TEST_ASSERT(resp != NULL,
+        "UDS response frame 0x7E8 was transmitted in same cycle");
+    if (resp != NULL)
+    {
+        TEST_ASSERT(resp->dlc == CAN_DLC_UDS_RESPONSE,
+            "UDS response DLC is 8");
+        TEST_ASSERT(resp->data[0] == 0x62U,
+            "positive ReadDID response SID (0x62)");
+        TEST_ASSERT(resp->data[1] == 0xF1U && resp->data[2] == 0x01U,
+            "response echoes DID 0xF101");
+        TEST_ASSERT(resp->data[3] == (uint8_t)FSM_STANDBY,
+            "response reports current FSM state (STANDBY) in data1");
+    }
+
+    /* After service, the pending flag must be cleared. */
+    can_rx_data_t rx;
+    can_get_rx_data(&state.can, &rx);
+    TEST_ASSERT(rx.uds_request_pending == 0U,
+        "pending flag cleared after one cycle");
+}
+
 static void test_speed_out_of_range(void)
 {
     aeb_core_state_t state;
@@ -239,6 +308,7 @@ int main(void)
     test_driver_override();
     test_sensor_fault_to_off();
     test_speed_out_of_range();
+    test_uds_request_response_roundtrip();
 
     printf("\n========================================\n");
     printf("  Results: %d/%d passed, %d failed\n",

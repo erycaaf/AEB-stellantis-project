@@ -8,6 +8,7 @@
 
 #include "aeb_can.h"
 #include "can_hal.h"
+#include "can_hal_test.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -33,11 +34,7 @@ static int32_t tests_failed = 0;
 #define TEST(name) static void name(void)
 #define RUN(name) do { printf("  [TEST] %s\n", #name); name(); } while (0)
 
-/* ── Extern test helpers from can_hal.c stub ────────────────────────── */
-extern uint32_t       can_hal_test_get_tx_count(void);
-extern void           can_hal_test_reset(void);
-extern void           can_hal_test_force_init_fail(int32_t fail);
-extern void           can_hal_test_force_send_fail(int32_t fail);
+/* Test helpers from the CAN HAL stub are declared in can_hal_test.h */
 
 /* ═══════════════════════════════════════════════════════════════════════
  *  TEST: Signal pack/unpack round-trip  (FR-CAN-003)
@@ -336,6 +333,84 @@ TEST(test_tx_send_failure)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: RX decode — UDS Request (0x7DF)  (FR-UDS-005)
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_rx_uds_request)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    /* ReadDID 0xF101 (FSM state) — 4 bytes: {SID, DID_H, DID_L, value} */
+    uint8_t frame[4] = { 0x22U, 0xF1U, 0x01U, 0x00U };
+
+    can_rx_process(&state, CAN_ID_UDS_REQUEST, frame, CAN_DLC_UDS_REQUEST);
+
+    can_rx_data_t rx;
+    can_get_rx_data(&state, &rx);
+
+    ASSERT_EQ(rx.uds_request_pending, 1U);
+    ASSERT_EQ(rx.uds_request.sid, 0x22U);
+    ASSERT_EQ(rx.uds_request.did_high, 0xF1U);
+    ASSERT_EQ(rx.uds_request.did_low, 0x01U);
+    ASSERT_EQ(rx.uds_request.value, 0x00U);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: TX UDS Response (0x7E8)  (FR-UDS-005)
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_tx_uds_response)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    uds_response_t resp;
+    resp.response_sid   = 0x62U;   /* Positive response to 0x22 */
+    resp.did_high_resp  = 0xF1U;
+    resp.did_low_resp   = 0x01U;
+    resp.data1          = (uint8_t)FSM_STANDBY;
+    resp.data2          = 0x00U;
+    resp.data3          = 0x00U;
+    resp.data4          = 0x00U;
+    resp.data5          = 0x00U;
+
+    int32_t rc = can_tx_uds_response(&resp);
+    ASSERT_EQ(rc, CAN_OK);
+    ASSERT_EQ(can_hal_test_get_tx_count(), 1U);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    ASSERT_EQ(tx->id, (uint32_t)CAN_ID_UDS_RESPONSE);
+    ASSERT_EQ(tx->dlc, CAN_DLC_UDS_RESPONSE);
+    ASSERT_EQ(tx->data[0], 0x62U);
+    ASSERT_EQ(tx->data[1], 0xF1U);
+    ASSERT_EQ(tx->data[2], 0x01U);
+    ASSERT_EQ(tx->data[3], (uint8_t)FSM_STANDBY);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: UDS request ack clears the pending flag
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_uds_request_ack)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    uint8_t frame[4] = { 0x22U, 0xF1U, 0x01U, 0x00U };
+    can_rx_process(&state, CAN_ID_UDS_REQUEST, frame, CAN_DLC_UDS_REQUEST);
+
+    can_rx_data_t rx;
+    can_get_rx_data(&state, &rx);
+    ASSERT_EQ(rx.uds_request_pending, 1U);
+
+    can_ack_uds_request(&state);
+
+    can_get_rx_data(&state, &rx);
+    ASSERT_EQ(rx.uds_request_pending, 0U);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
  *  MAIN
  * ═══════════════════════════════════════════════════════════════════════ */
 int main(void)
@@ -355,6 +430,9 @@ int main(void)
     RUN(test_tx_brake_cmd);
     RUN(test_tx_fsm_period);
     RUN(test_tx_send_failure);
+    RUN(test_rx_uds_request);
+    RUN(test_tx_uds_response);
+    RUN(test_uds_request_ack);
 
     printf("\n=== Results: %d run, %d passed, %d failed ===\n",
            tests_run, tests_passed, tests_failed);
