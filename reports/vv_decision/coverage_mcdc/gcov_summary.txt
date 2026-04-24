@@ -1,0 +1,18 @@
+# gcov-14 per-binary metrics (test_decision_mcdc).
+# See coverage_summary.txt for the merged view across both binaries.
+File 'src/decision/aeb_ttc.c'
+Lines executed:52.38% of 21
+Branches executed:62.50% of 16
+Taken at least once:43.75% of 16
+Calls executed:0.00% of 2
+Creating 'aeb_ttc.c.gcov'
+
+Lines executed:52.38% of 21
+File 'src/decision/aeb_fsm.c'
+Lines executed:98.72% of 156
+Branches executed:100.00% of 108
+Taken at least once:95.37% of 108
+Calls executed:100.00% of 3
+Creating 'aeb_fsm.c.gcov'
+
+Lines executed:98.72% of 156

@@ -1,0 +1,69 @@
+Requirement,Test function,Input,Expected,P/F,Evidence
+FR-DEC-001,test_ttc_normal,"distance=50 m; v_ego=20 m/s; v_rel=10 m/s","TTC = 5.0 s (± 0.05)",P,reports/vv_decision/coverage_mcdc/run.log
+FR-DEC-001,test_ttc_critical,"distance=10 m; v_ego=20 m/s; v_rel=20 m/s","TTC = 0.5 s (± 0.05)",P,reports/vv_decision/coverage_mcdc/run.log
+FR-DEC-001,test_ttc_not_closing,"distance=50 m; v_rel=0.4 m/s (below V_REL_MIN)","TTC saturates to TTC_MAX = 10.0 s",P,reports/vv_decision/coverage_mcdc/run.log
+FR-DEC-002,test_dbrake_normal,"v_ego=13.89 m/s (50 km/h)","d_brake = v² / (2·DECEL_L3) (± 0.5 m)",P,reports/vv_decision/coverage_mcdc/run.log
+FR-DEC-002,test_dbrake_zero,"v_ego=0 m/s","d_brake = 0 m",P,reports/vv_decision/coverage_mcdc/run.log
+FR-FSM-001,test_fsm_initial,"fresh fsm_init()","fsm_state = FSM_STANDBY",P,reports/vv_decision/coverage_mcdc/run.log
+FR-FSM-005,test_fsm_fault,"running system; inject perception.fault_flag = 1","fsm_state transitions to FSM_OFF within 1 cycle",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-DEC-006, FR-PER-004",test_fsm_override,"braking active; driver applies brake_pedal = 1","fsm_state returns to FSM_STANDBY within 1 cycle",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-DEC-004, Table 10",test_deceleration_values,"DECEL_L1 / DECEL_L2 / DECEL_L3 configuration constants","values equal 2.0 / 4.0 / 6.0 m/s²",P,reports/vv_decision/coverage_mcdc/run.log
+FR-DEC-001,test_A1_ttc_clamp_max,"ttc_calc(100 m, 1 m/s) → raw 100 s","clamped to TTC_MAX = 10.0 s",P,reports/vv_decision/coverage_mcdc/run.log
+NFR-SAF-ROB,test_A2_ttc_distance_zero,"ttc_calc(0 m, 5 m/s)","TTC_MAX (no division)",P,reports/vv_decision/coverage_mcdc/run.log
+NFR-SAF-ROB,test_A3_ttc_distance_negative,"ttc_calc(-5 m, 5 m/s)","TTC_MAX (defensive)",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-PER-006, NFR-SAF-ROB",test_A4_ttc_process_null_perception,"ttc_process(NULL, &out)","no-op; output unchanged",P,reports/vv_decision/coverage_mcdc/run.log
+NFR-SAF-ROB,test_A5_ttc_process_null_output,"ttc_process(&perc, NULL)","no crash",P,reports/vv_decision/coverage_mcdc/run.log
+NFR-SAF-ROB,test_B1_fsm_delta_zero,"fsm_step(delta_t = 0)","no-op; fsm_state unchanged",P,reports/vv_decision/coverage_mcdc/run.log
+NFR-SAF-ROB,test_B2_fsm_delta_negative,"fsm_step(delta_t = -0.01)","no-op; fsm_state unchanged",P,reports/vv_decision/coverage_mcdc/run.log
+NFR-SAF-ROB,test_B3_fsm_null_perception,"fsm_step(NULL perception)","no-op; fsm_state unchanged",P,reports/vv_decision/coverage_mcdc/run.log
+NFR-SAF-ROB,test_B4_fsm_null_driver,"fsm_step(NULL driver)","no-op; fsm_state unchanged",P,reports/vv_decision/coverage_mcdc/run.log
+NFR-SAF-ROB,test_B5_fsm_null_ttc,"fsm_step(NULL ttc_in)","no-op; fsm_state unchanged",P,reports/vv_decision/coverage_mcdc/run.log
+NFR-SAF-ROB,test_B6_fsm_null_output,"fsm_step(NULL fsm_out)","no crash",P,reports/vv_decision/coverage_mcdc/run.log
+FR-DEC-001,test_C1_desired_not_closing,"WARNING state; is_closing = 0; 0.2 s debounce","transitions to FSM_STANDBY",P,reports/vv_decision/coverage_mcdc/run.log
+FR-DEC-003,test_C2_desired_dbrake_ge_distance,"WARNING state; d_brake = 20 m ≥ distance = 15 m","transitions to FSM_BRAKE_L3",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-DEC-004, Table 10",test_C3_distance_floor_L3,"WARNING state; distance = 4 m (≤ 5 m)","transitions to FSM_BRAKE_L3 (distance floor)",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-DEC-004, Table 10",test_C4_distance_floor_L2,"WARNING state; distance = 8 m (5 < d ≤ 10)","transitions to FSM_BRAKE_L2 (distance floor)",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-DEC-004, Table 10",test_C5_distance_floor_L1,"WARNING state; distance = 15 m (10 < d ≤ 20)","transitions to FSM_BRAKE_L1 (distance floor)",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-DEC-004, Table 10",test_C6_ttc_band_L3,"WARNING state; distance = 25 m; ttc = 1.5 s (≤ TTC_BRAKE_L3)","transitions to FSM_BRAKE_L3 (TTC band)",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-DEC-004, Table 10",test_C7_ttc_band_L2,"WARNING state; distance = 25 m; ttc = 2.0 s (TTC_BRAKE_L3 < ttc ≤ TTC_BRAKE_L2)","transitions to FSM_BRAKE_L2 (TTC band)",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-DEC-004, Table 10",test_C8_ttc_band_L1,"WARNING state; distance = 30 m; ttc = 2.5 s (TTC_BRAKE_L2 < ttc ≤ TTC_BRAKE_L1)","transitions to FSM_BRAKE_L1 (TTC band)",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-DEC-004, Table 10",test_C9_ttc_band_warning,"WARNING state; distance = 50 m; ttc = 4.0 s (ttc ≤ TTC_WARNING)","stays in FSM_WARNING",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-DEC-004, Table 10",test_C10_ttc_above_warning,"WARNING state; distance = 60 m; ttc = 5.0 s (ttc > TTC_WARNING); 0.2 s debounce","transitions to FSM_STANDBY",P,reports/vv_decision/coverage_mcdc/run.log
+FR-DEC-008,test_D1_speed_below_min,"v_ego = 2.0 m/s (< V_EGO_MIN = 2.78); STANDBY","stays FSM_STANDBY; brake_active = 0",P,reports/vv_decision/coverage_mcdc/run.log
+FR-DEC-008,test_D2_speed_above_max,"v_ego = 20.0 m/s (> V_EGO_MAX = 16.67); STANDBY","stays FSM_STANDBY",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-FSM-003, FR-BRK-005",test_D3_stop_during_braking,"FSM in FSM_BRAKE_L3; v_ego = 0.005 m/s","transitions to FSM_POST_BRAKE",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-FSM-006, FR-BRK-005",test_E1_postbrake_timeout,"FSM in FSM_POST_BRAKE; hold > 2.0 s","transitions to FSM_STANDBY",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-FSM-006, FR-BRK-006",test_E2_postbrake_accel_release,"FSM in FSM_POST_BRAKE; driver accel_pedal = 1","transitions to FSM_STANDBY within 1 cycle",P,reports/vv_decision/coverage_mcdc/run.log
+FR-BRK-005,test_E3_postbrake_holds,"FSM in FSM_POST_BRAKE; hold 1.0 s (< 2.0 s); no accel","stays FSM_POST_BRAKE",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-DEC-010, FR-FSM-004",test_F1_warning_debounce_progress,"WARNING state; desired = STANDBY; hold 0.1 s (< 0.2 s debounce)","stays FSM_WARNING (debounce not elapsed)",P,reports/vv_decision/coverage_mcdc/run.log
+FR-FSM-004,test_G2_brake_escalate,"FSM in FSM_BRAKE_L1; desired = BRAKE_L3","immediate transition to FSM_BRAKE_L3",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-FSM-004, FR-DEC-010",test_G3_brake_deescalate,"FSM in FSM_BRAKE_L3; desired = BRAKE_L1; 0.25 s (> 0.2 s debounce)","transitions to FSM_BRAKE_L1",P,reports/vv_decision/coverage_mcdc/run.log
+FR-DEC-004,test_H1_standby_to_warning,"STANDBY; ttc = 3.5 s (WARNING band)","transitions to FSM_WARNING",P,reports/vv_decision/coverage_mcdc/run.log
+FR-DEC-011,test_H2_standby_forces_warning_before_brake,"STANDBY; desired = BRAKE_L3 (distance floor)","transitions to FSM_WARNING first (mandatory pass-through)",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-DEC-007, FR-PER-005",test_I1_steering_override_positive,"WARNING state; steering_angle = +6° (> +5°)","transitions to FSM_STANDBY",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-DEC-007, FR-PER-005",test_I2_steering_override_negative,"WARNING state; steering_angle = -6° (< -5°)","transitions to FSM_STANDBY",P,reports/vv_decision/coverage_mcdc/run.log
+"FR-FSM-002, FR-UDS-004",test_J1_aeb_disabled_to_off,"running system; driver.aeb_enabled = 0","transitions to FSM_OFF",P,reports/vv_decision/coverage_mcdc/run.log
+FR-FSM-006,test_K1_post_brake_ignores_brake_pedal,"FSM in FSM_POST_BRAKE; driver.brake_pedal = 1","stays FSM_POST_BRAKE (brake pedal is not override in POST_BRAKE)",P,reports/vv_decision/coverage_mcdc/run.log
+FR-FSM-006,test_K2_post_brake_ignores_steering,"FSM in FSM_POST_BRAKE; steering_angle = 10°","stays FSM_POST_BRAKE (steering is not override in POST_BRAKE)",P,reports/vv_decision/coverage_mcdc/run.log
+FR-DEC-008,test_K3_speed_below_stop_in_standby,"STANDBY; v_ego = 0.005 m/s (< V_STOP_THRESHOLD)","stays FSM_STANDBY; brake_active = 0",P,reports/vv_decision/coverage_mcdc/run.log
+FR-DEC-011,test_K4_standby_to_brake_l1_via_warning,"STANDBY; distance = 15 m (floor L1)","transitions to FSM_WARNING (mandatory pass-through for BRAKE_L1)",P,reports/vv_decision/coverage_mcdc/run.log
+NFR-SAF-ROB,fault_a1_ttc_calc_nan_distance,"ttc_calc(NaN, 5.0)","output finite and in [0, TTC_MAX]",P,reports/vv_decision/fault_injection/run.log
+NFR-SAF-ROB,fault_a2_ttc_calc_nan_vrel,"ttc_calc(10.0, NaN)","output finite and in [0, TTC_MAX]",P,reports/vv_decision/fault_injection/run.log
+NFR-SAF-ROB,fault_a3_ttc_calc_inf_vrel,"ttc_calc(10.0, +Inf)","output finite and in [0, TTC_MAX]",P,reports/vv_decision/fault_injection/run.log
+NFR-SAF-ROB,fault_a4_dbrake_calc_nan,"d_brake_calc(NaN)","output finite and non-negative",F,"reports/vv_decision/fault_injection/run.log — bug #1 (d_brake_calc propagates NaN)"
+NFR-SAF-ROB,fault_a5_dbrake_calc_inf,"d_brake_calc(+Inf)","output finite",F,"reports/vv_decision/fault_injection/run.log — bug #1 (d_brake_calc propagates +Inf)"
+NFR-SAF-ROB,fault_a6_fsm_delta_t_nan,"fsm_step(delta_t = NaN); FSM in WARNING","warn_timer remains finite; fsm output valid",F,"reports/vv_decision/fault_injection/run.log — bug #3 (NaN bypasses delta_t guard)"
+"FR-PER-006, NFR-SAF-ROB",fault_a7_ttc_process_nan_distance,"ttc_process with perception.distance = NaN","ttc_output passes fail-safe predicate",P,reports/vv_decision/fault_injection/run.log
+"FR-DEC-001, NFR-SAF-ROB",fault_b1_ttc_calc_neg_distance,"ttc_calc(-50.0, 5.0)","TTC saturates to TTC_MAX",P,reports/vv_decision/fault_injection/run.log
+NFR-SAF-ROB,fault_b2_dbrake_calc_fltmax,"d_brake_calc(FLT_MAX)","output finite",F,"reports/vv_decision/fault_injection/run.log — bug #1 (v² overflows to +Inf)"
+NFR-SAF-ROB,fault_b3_dbrake_calc_large_neg,"d_brake_calc(-100.0)","output finite and non-negative",P,reports/vv_decision/fault_injection/run.log
+NFR-SAF-ROB,fault_b4_fsm_delta_t_huge,"fsm_step(delta_t = 1e20); FSM in WARNING","warn_timer finite; fsm output valid",P,reports/vv_decision/fault_injection/run.log
+NFR-SAF-ROB,fault_c1_fsm_state_42,"fsm_out.fsm_state = 42 (outside enum range)","fsm_state normalized to valid enum",F,"reports/vv_decision/fault_injection/run.log — bug #4 (corrupted state propagates via new_state)"
+NFR-SAF-ROB,fault_c2_fsm_state_255,"fsm_out.fsm_state = 255 (outside enum range)","fsm_state normalized to valid enum",F,"reports/vv_decision/fault_injection/run.log — bug #4 (corrupted state propagates via new_state)"
+NFR-SAF-ROB,fault_c3_aeb_enabled_0xAA,"driver.aeb_enabled = 0xAA (non-canonical bool); threat injected","treated as disabled; FSM_OFF",F,"reports/vv_decision/fault_injection/run.log — bug #2 (aeb_enabled not normalized)"
+"FR-FSM-005, NFR-SAF-ROB",fault_c4_fault_flag_0xFF,"perception.fault_flag = 0xFF","transitions to FSM_OFF",P,reports/vv_decision/fault_injection/run.log
+"FR-DEC-001, NFR-SAF-ROB",fault_c5_is_closing_0x80,"ttc_in.is_closing = 0x80 (non-canonical bool); ttc in WARNING band","treated as closing; transitions to FSM_WARNING",P,reports/vv_decision/fault_injection/run.log
+"FR-FSM-002, NFR-SAF-ROB",fault_d1_rapid_toggle,"100× toggle of driver.aeb_enabled; end with aeb_enabled = 0","FSM_OFF; fsm output valid",P,reports/vv_decision/fault_injection/run.log
+"FR-ALR-003, NFR-SAF-ROB",fault_d2_warning_persist_long,"hold WARNING for 2 s; inject BRAKE_L2 threat","transitions to FSM_BRAKE_L2; warn_timer finite",P,reports/vv_decision/fault_injection/run.log
+"FR-FSM-006, FR-BRK-005, NFR-SAF-ROB",fault_d3_post_brake_exit,"FSM in POST_BRAKE via BRAKE_L3; hold > 2 s","auto-exit to FSM_STANDBY",P,reports/vv_decision/fault_injection/run.log
+"FR-DEC-010, NFR-SAF-ROB",fault_d4_debounce_oscillation,"oscillate ttc between BRAKE_L3 / BRAKE_L2 bands 50 cycles","fsm output valid; state remains in a braking level",P,reports/vv_decision/fault_injection/run.log
