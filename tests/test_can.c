@@ -313,6 +313,96 @@ TEST(test_tx_fsm_period)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+ *  TESTS: encode_unsigned robustness — exercised through can_tx_brake_cmd,
+ *  which feeds pid_out->brake_bar into encode_unsigned for the 15-bit
+ *  BrakePressure field at bits 1..15. Lock the post-fix contract so any
+ *  future regression at the cast boundary is caught at unit level instead
+ *  of waiting for fault-injection.
+ *
+ *  The legitimate-input path is already covered by test_tx_brake_cmd
+ *  above; these four tests cover the four UB-inducing input classes the
+ *  cross-validation report flagged on PR #89.
+ *
+ *  NaN / ±Inf -> encode_unsigned returns 0 -> BrakePressure raw == 0.
+ *  Finite > UINT32_MAX ceiling -> saturates to UINT32_MAX -> 15-bit
+ *  field masked to 0x7FFF (all-ones).
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+/** Helper — extract the 15-bit BrakePressure field from a captured frame. */
+static uint32_t extract_brake_pressure(const tx_record_t *tx)
+{
+    return can_unpack_signal(tx->data, 1U, 15U);
+}
+
+TEST(test_tx_brake_cmd_nan_brake_bar)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = NAN };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+    ASSERT_EQ(can_hal_test_get_tx_count(), 1U);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    ASSERT_EQ(extract_brake_pressure(tx), 0U);
+}
+
+TEST(test_tx_brake_cmd_pos_inf_brake_bar)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = INFINITY };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    ASSERT_EQ(extract_brake_pressure(tx), 0U);
+}
+
+TEST(test_tx_brake_cmd_neg_inf_brake_bar)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = -INFINITY };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    ASSERT_EQ(extract_brake_pressure(tx), 0U);
+}
+
+TEST(test_tx_brake_cmd_overflow_brake_bar)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    /* 1e20 / 0.1 = 1e21 — far above the 4294967040.0F cast ceiling.
+     * encode_unsigned must saturate at UINT32_MAX; can_pack_signal
+     * then masks to the 15-bit field width = 0x7FFF (all-ones). */
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = 1.0e20F };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    ASSERT_EQ(extract_brake_pressure(tx), 0x7FFFU);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
  *  TEST: TX failure handling
  * ═══════════════════════════════════════════════════════════════════════ */
 TEST(test_tx_send_failure)
@@ -454,6 +544,10 @@ int main(void)
     RUN(test_rx_timeout);
     RUN(test_rx_timeout_reset_on_valid_frame);
     RUN(test_tx_brake_cmd);
+    RUN(test_tx_brake_cmd_nan_brake_bar);
+    RUN(test_tx_brake_cmd_pos_inf_brake_bar);
+    RUN(test_tx_brake_cmd_neg_inf_brake_bar);
+    RUN(test_tx_brake_cmd_overflow_brake_bar);
     RUN(test_tx_fsm_period);
     RUN(test_tx_send_failure);
     RUN(test_rx_uds_request);
