@@ -14,6 +14,7 @@
 
 #include "aeb_can.h"
 #include "can_hal.h"   /* Zephyr CAN HAL stub / real driver */
+#include <math.h>      /* isfinite() — NaN / ±Inf guard on encode_unsigned */
 #include <string.h>
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -77,16 +78,44 @@ static uint32_t encode_unsigned(float32_t physical,
                                 float32_t factor,
                                 float32_t offset)
 {
-    float32_t raw_f = (physical - offset) / factor;
-    uint32_t  raw   = 0U;
+    /* Robust float-to-uint32 conversion for DBC signal packing.
+     *
+     * IEEE 754 NaN compares false to everything, so a naive
+     * `raw_f < 0.0F` guard lets NaN fall through to
+     * `(uint32_t)(raw_f + 0.5F)` — undefined behaviour per C11
+     * §6.3.1.4. ±Inf and very large finite floats hit the same UB.
+     * Division by zero in (physical - offset) / factor also produces
+     * ±Inf → UB.
+     *
+     * This function guarantees deterministic output for any float
+     * input: finite in-range values encode normally; non-finite or
+     * out-of-range values saturate to 0 (negative / NaN) or
+     * UINT32_MAX (positive overflow) so the resulting CAN frame is
+     * always well-defined — never UB, never toolchain-dependent.
+     *
+     * Upper bound 4294967040.0F (= UINT32_MAX - 255) is the largest
+     * float32 value that, after +0.5F rounding, still casts into
+     * uint32 without overflow. Values above that saturate.
+     *
+     * Single exit point (MISRA C:2012 Rule 15.5).
+     * Surfaced by V&V cross-validation on PR #89 (Bug 1). */
+    uint32_t raw = 0U;
 
-    if (raw_f < 0.0F)
+    if (isfinite(physical))
     {
-        raw = 0U;
-    }
-    else
-    {
-        raw = (uint32_t)(raw_f + 0.5F);  /* round to nearest */
+        const float32_t raw_f = (physical - offset) / factor;
+
+        if (isfinite(raw_f) && (raw_f >= 0.0F))
+        {
+            if (raw_f > 4294967040.0F)
+            {
+                raw = UINT32_MAX;           /* saturate at cast ceiling */
+            }
+            else
+            {
+                raw = (uint32_t)(raw_f + 0.5F);  /* round to nearest */
+            }
+        }
     }
 
     return raw;
