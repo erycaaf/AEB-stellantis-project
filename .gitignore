@@ -19,3 +19,13 @@ test_integration
 # OS
 Thumbs.db
 .DS_Store
+
+# V&V CAN artifacts
+reports/vv_can/*
+!reports/vv_can/README.md
+
+*.gcda
+*.gcno
+*.gcov
+*.log
+*.csv
