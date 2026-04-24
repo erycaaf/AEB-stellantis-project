@@ -75,7 +75,27 @@ typedef struct
     uint8_t   aeb_enable;        /**< 0/1                                */
     uint8_t   driver_override;   /**< 0/1                                */
 
-    /* From UDS_Request (0x7DF) — FR-UDS-005 */
+    /* From UDS_Request (0x7DF) — FR-UDS-005
+     *
+     * Concurrency contract (IMPORTANT on Zephyr target):
+     *   can_rx_process()           writes uds_request_pending = 1 from the
+     *                              CAN RX callback context.
+     *   aeb_core_step()            reads-and-clears it from the 10 ms cycle
+     *                              thread.
+     *
+     *   On the host stub the two are called sequentially from the same
+     *   thread, so there is no race.  On the real Zephyr driver the RX
+     *   callback runs in a separate context; the driver integration layer
+     *   MUST serialise access — either by marshalling RX frames into a
+     *   message queue consumed by the core tick, by protecting this flag
+     *   with an atomic operation / brief interrupt disable around the
+     *   read-and-clear pair, or equivalent.
+     *
+     *   Without such synchronisation, a request arriving between the
+     *   read of uds_request_pending and the call to
+     *   can_clear_uds_request_pending() is silently dropped.  This is
+     *   not catchable at unit-test level because the host stub never
+     *   exercises the race — hence the documentation here. */
     uds_request_t uds_request;         /**< Decoded UDS request frame    */
     uint8_t       uds_request_pending; /**< 1 when a new request arrived;
                                             cleared by can_clear_uds_request_pending()
