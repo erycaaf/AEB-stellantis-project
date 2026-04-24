@@ -208,27 +208,28 @@ vv-uds: mcdc-uds fault-uds memory-uds misra-uds
 
 mcdc-perception:
 	@rm -rf $(VV_REPORT_DIR_PERCEPTION)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR_PERCEPTION)/coverage_mcdc
-	# Nominal suite — structural coverage of the specified behaviour
-	$(CC_GCC14) $(CFLAGS_COV) -o $(VV_REPORT_DIR_PERCEPTION)/coverage_mcdc/test_perception \
-		$(SRC_PERCEPTION_TEST) $(LDFLAGS)
-	@cd $(VV_REPORT_DIR_PERCEPTION)/coverage_mcdc && ./test_perception > run.log 2>&1 && grep "Results:" run.log
-	@cd $(VV_REPORT_DIR_PERCEPTION)/coverage_mcdc && \
-		$(GCOV_GCC14) -b -c --conditions test_perception-aeb_perception.gcno \
-		> gcov_summary.txt 2>&1 && \
-		echo "--- Nominal suite MC/DC ---" && \
-		grep -E "Lines|Branches|Taken|Condition|Calls" gcov_summary.txt | head -5
-	# Complementary MC/DC suite — targets gap groups G1..G5
-	$(CC_GCC14) $(CFLAGS_COV) -o $(VV_REPORT_DIR_PERCEPTION)/coverage_mcdc/test_perception_mcdc \
-		$(SRC_PERCEPTION_MCDC_TEST) $(LDFLAGS)
-	@cd $(VV_REPORT_DIR_PERCEPTION)/coverage_mcdc && ./test_perception_mcdc > run_mcdc.log 2>&1 && grep "Results:" run_mcdc.log
-	@cd $(VV_REPORT_DIR_PERCEPTION)/coverage_mcdc && \
-		$(GCOV_GCC14) -b -c --conditions test_perception_mcdc-aeb_perception.gcno \
-		> gcov_summary_mcdc.txt 2>&1 && \
-		echo "--- Complementary MC/DC suite ---" && \
-		grep -E "Lines|Branches|Taken|Condition|Calls" gcov_summary_mcdc.txt | head -5
+	# Compile aeb_perception.c once with coverage into a shared .o.
+	# Both test binaries link against the same object so their .gcda
+	# writes accumulate onto one aeb_perception.gcda — a single gcov
+	# call then reports the real union of coverage (no hardcoded echo).
+	cd $(VV_REPORT_DIR_PERCEPTION)/coverage_mcdc && \
+	  $(CC_GCC14) -Wall -Wextra -Wpedantic -std=c99 -O0 -g -I$(CURDIR)/include -I$(CURDIR)/stubs --coverage -fcondition-coverage \
+	    -c $(CURDIR)/src/perception/aeb_perception.c && \
+	  $(CC_GCC14) -Wall -Wextra -Wpedantic -std=c99 -O0 -g -I$(CURDIR)/include -I$(CURDIR)/stubs --coverage -fcondition-coverage \
+	    aeb_perception.o $(CURDIR)/tests/test_perception.c      -lm -o test_nominal && \
+	  $(CC_GCC14) -Wall -Wextra -Wpedantic -std=c99 -O0 -g -I$(CURDIR)/include -I$(CURDIR)/stubs --coverage -fcondition-coverage \
+	    aeb_perception.o $(CURDIR)/tests/test_perception_mcdc.c -lm -o test_mcdc    && \
+	  ./test_nominal > run.log      2>&1 && \
+	  ./test_mcdc    > run_mcdc.log 2>&1 && \
+	  $(GCOV_GCC14) -b -c --conditions aeb_perception.c > gcov_summary_combined.txt
+	@echo "--- Nominal suite ---"
+	@grep "Results:" $(VV_REPORT_DIR_PERCEPTION)/coverage_mcdc/run.log
+	@echo "--- Complementary MC/DC suite ---"
+	@grep "Results:" $(VV_REPORT_DIR_PERCEPTION)/coverage_mcdc/run_mcdc.log
+	@echo "--- Combined MC/DC (real measured union) ---"
+	@grep -E "Lines|Branches|Taken|Condition|Calls" \
+	  $(VV_REPORT_DIR_PERCEPTION)/coverage_mcdc/gcov_summary_combined.txt
 	@echo "Artefacts in $(VV_REPORT_DIR_PERCEPTION)/coverage_mcdc/"
-	@echo "  Combined (nominal + complementary): 100% statement, 100% branches executed,"
-	@echo "  93.48% MC/DC (86/92 condition outcomes) — see report section 3.3."
 
 fault-perception:
 	@mkdir -p $(VV_REPORT_DIR_PERCEPTION)/fault_injection
