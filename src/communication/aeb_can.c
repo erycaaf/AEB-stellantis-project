@@ -14,6 +14,7 @@
 
 #include "aeb_can.h"
 #include "can_hal.h"   /* Zephyr CAN HAL stub / real driver */
+#include <math.h>      /* isfinite() — NaN / ±Inf guard on encode_unsigned */
 #include <string.h>
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -77,16 +78,27 @@ static uint32_t encode_unsigned(float32_t physical,
                                 float32_t factor,
                                 float32_t offset)
 {
-    float32_t raw_f = (physical - offset) / factor;
-    uint32_t  raw   = 0U;
+    /* NaN / ±Inf / overflow on the float→uint32 cast is UB per C11
+     * §6.3.1.4; saturate at 4294967040.0F (UINT32_MAX − 255, largest
+     * float32 that rounds cleanly into range). See commit body for
+     * full rationale. */
+    uint32_t raw = 0U;
 
-    if (raw_f < 0.0F)
+    if (isfinite(physical))
     {
-        raw = 0U;
-    }
-    else
-    {
-        raw = (uint32_t)(raw_f + 0.5F);  /* round to nearest */
+        const float32_t raw_f = (physical - offset) / factor;
+
+        if (isfinite(raw_f) && (raw_f >= 0.0F))
+        {
+            if (raw_f > 4294967040.0F)
+            {
+                raw = UINT32_MAX;           /* saturate at cast ceiling */
+            }
+            else
+            {
+                raw = (uint32_t)(raw_f + 0.5F);  /* round to nearest */
+            }
+        }
     }
 
     return raw;

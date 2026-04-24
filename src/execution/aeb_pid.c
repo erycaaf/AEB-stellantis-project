@@ -32,6 +32,7 @@
 
 #include "aeb_pid.h"
 #include "aeb_config.h"
+#include <math.h>   /* isfinite() — NaN/Inf guard */
 
 /* ========================================================================= */
 /*  Module-internal persistent state                                         */
@@ -101,24 +102,21 @@ void pid_brake_step(const float32_t decel_target, const float32_t a_ego,
     }
     else
     {
-        /* ------------------------------------------------------------------
-         * Guard: controller is only active in braking states (L1, L2, L3)
-         * and POST_BRAKE. In all other states, reset and output zero.
-         *
-         * FSM_BRAKE_L1 = 3, FSM_BRAKE_L2 = 4, FSM_BRAKE_L3 = 5,
-         * FSM_POST_BRAKE = 6
-         *
-         * Rationale: decel_target is zero outside braking states, but we
-         * also reset the integrator to avoid wind-up carry-over.
-         * FR-BRK-006 is handled by the FSM module: when the driver presses
-         * the accelerator in POST_BRAKE, the FSM transitions to STANDBY
-         * and decel_target becomes 0, so the controller resets here.
-         *
-         * MISRA C:2012 Rule 15.5: single exit point — no early return.
-         * ---------------------------------------------------------------- */
-        if ((fsm_state < (uint8_t)FSM_BRAKE_L1) || (decel_target <= 0.0F))
+        /* Guard: controller active only in {L1, L2, L3, POST_BRAKE} with finite inputs.
+         * Whitelist (not `< FSM_BRAKE_L1`) blocks SEU-corrupted out-of-range values;
+         * isfinite() blocks NaN, which bypasses clamp_f32 via IEEE 754 compare-false.
+         * Reset integrator to avoid wind-up across the fail-safe branch. */
+        const uint8_t fsm_valid =
+            ((fsm_state == (uint8_t)FSM_BRAKE_L1)   ||
+             (fsm_state == (uint8_t)FSM_BRAKE_L2)   ||
+             (fsm_state == (uint8_t)FSM_BRAKE_L3)   ||
+             (fsm_state == (uint8_t)FSM_POST_BRAKE)) ? 1U : 0U;
+        const uint8_t inputs_finite =
+            ((isfinite(decel_target) != 0) && (isfinite(a_ego) != 0)) ? 1U : 0U;
+
+        if ((fsm_valid == 0U) || (inputs_finite == 0U) || (decel_target <= 0.0F))
         {
-            /* Reset controller state */
+            /* Reset controller state (fail-safe: zero brake, integrator cleared) */
             s_integral       = 0.0F;
             s_prev_brake_pct = 0.0F;
         }

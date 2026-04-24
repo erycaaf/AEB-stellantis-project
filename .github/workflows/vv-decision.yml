@@ -1,10 +1,12 @@
 name: Decision V&V
 
 # Runs the ASIL-D V&V stack scoped to the Decision module (TTC + FSM).
-# On PRs to development/main the blocking gates (MC/DC, memory safety,
-# MISRA) must pass; fault-decision is non-blocking until the robustness
-# bugs are patched on fix/decision-robustness — flip `continue-on-error`
-# to `false` after that PR lands.
+# On PRs to development/main, four blocking gates must pass: MC/DC
+# coverage, dynamic memory safety, MISRA C:2012 conformance, and fault
+# injection. The fault-injection and MISRA Required gates became
+# blocking after PR #107 (fix/decision-robustness) and PR #111
+# (fix/decision-review-followup) closed all V&V findings; any new
+# regression is now treated as a CI failure, mirroring vv-uds.
 #
 # Reports are published as workflow artefacts on every run and to
 # GitHub Pages on push to development/main under
@@ -139,15 +141,14 @@ jobs:
             fi
           done
 
-      # ─── Non-blocking until fix/decision-misra lands ──────────────────────
-      # The 5 MISRA Required findings in aeb_ttc.c / aeb_fsm.c are tracked in
-      # a follow-up issue and will be patched on fix/decision-misra. After
-      # that PR merges, flip continue-on-error to false (or remove) so this
-      # gate becomes blocking again. The 7 Advisory findings (Rules 15.5,
-      # 8.7) are documented as deviations per ISO 26262-8 §9.4.2 in the
-      # consolidated V&V report §6.
-      - name: MISRA required/mandatory (0 findings in aeb_ttc/aeb_fsm)
-        continue-on-error: true
+      # ─── Blocking gate 3: MISRA C:2012 Required (0 findings in scope) ────
+      # Promoted to blocking after PR #107 (fix/decision-robustness) closed
+      # the 5 Required findings from issue #92 and PR #111 eliminated the
+      # Rule 10.5 cascade. The Advisory findings (Rules 15.5, 8.7) remain
+      # documented as deviations per ISO 26262-8 §9.4.2 in the consolidated
+      # V&V report §6 and are filtered out below via the `accepted_deviations`
+      # set.
+      - name: MISRA Required/Mandatory (0 findings in aeb_ttc/aeb_fsm)
         run: |
           make misra-decision
           DEC_ISSUES=$(python3 - <<'PY'
@@ -184,9 +185,13 @@ jobs:
             exit 1
           fi
 
-      # ─── Non-blocking (reports-only) until fix/decision-robustness lands ──
-      - name: Fault injection (non-blocking until bugs patched)
-        continue-on-error: true
+      # ─── Blocking gate 4: fault injection (32/32 required) ────────────────
+      # Promoted to blocking after PR #107 (fix/decision-robustness) patched
+      # the four robustness bugs and PR #111 corrected the aeb_enabled SEU
+      # semantic. Any new fault-injection regression is now treated as a CI
+      # failure — this gate guards against the exact classes of defects that
+      # V&V cross-validation originally surfaced.
+      - name: Fault injection
         run: make fault-decision
 
       - name: Generate HTML reports
