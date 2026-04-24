@@ -179,9 +179,11 @@ void fsm_step(float32_t delta_t_s,
     /* Bug #2 SEU hardening: normalise driver->aeb_enabled to a strict
      * Boolean at entry. A bit-flip that turns 1U into (say) 0xAA would
      * otherwise make (aeb_enabled == 0U) false and leave the FSM running
-     * on corrupted state. Any non-zero bit pattern is treated as enabled;
-     * any zero is treated as disabled. */
-    aeb_enabled_norm = (driver->aeb_enabled != 0U) ? 1U : 0U;
+     * on corrupted state. Strict match: only the canonical 1U bit pattern
+     * counts as enabled. Any other value (0U, SEU-corrupted bit patterns,
+     * garbage from uninitialised memory) falls safe to disabled → FSM_OFF
+     * via the Priority-1 check below. */
+    aeb_enabled_norm = (driver->aeb_enabled == 1U) ? 1U : 0U;
 
     current_state = (fsm_state_e)fsm_out->fsm_state;
 
@@ -217,12 +219,9 @@ void fsm_step(float32_t delta_t_s,
     }
 
     /* ===== PRIORITY 2: Driver Override ===== */
-    /* MISRA C:2012 Rule 10.3: the Boolean expression on the right-hand
-     * side must be explicitly cast to the uint8_t essential type of
-     * the lvalue. */
-    driver_override = (uint8_t)((driver->brake_pedal != 0U) ||
-                                (driver->steering_angle > STEERING_OVERRIDE_DEG) ||
-                                (driver->steering_angle < -STEERING_OVERRIDE_DEG));
+    driver_override = ((driver->brake_pedal != 0U) ||
+                       (driver->steering_angle > STEERING_OVERRIDE_DEG) ||
+                       (driver->steering_angle < -STEERING_OVERRIDE_DEG)) ? 1U : 0U;
 
     if ((driver_override != 0U) && (current_state != FSM_POST_BRAKE))
     {
@@ -238,9 +237,8 @@ void fsm_step(float32_t delta_t_s,
     }
 
     /* ===== PRIORITY 3: Speed Range Validation ===== */
-    /* MISRA C:2012 Rule 10.3: explicit cast to uint8_t essential type. */
-    speed_out_of_range = (uint8_t)((perception->v_ego < V_EGO_MIN) ||
-                                   (perception->v_ego > V_EGO_MAX));
+    speed_out_of_range = ((perception->v_ego < V_EGO_MIN) ||
+                          (perception->v_ego > V_EGO_MAX)) ? 1U : 0U;
 
     if (speed_out_of_range != 0U)
     {
