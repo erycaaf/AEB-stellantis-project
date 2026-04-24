@@ -1,7 +1,0 @@
-=== AEB Smoke Tests ===
-
-  [TEST] test_types_instantiation
-  [TEST] test_can_init_stub
-  [TEST] test_fsm_enum_values
-
-=== Results: 14 run, 14 passed, 0 failed ===
