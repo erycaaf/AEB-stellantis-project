@@ -1,0 +1,268 @@
+name: PID + Alert V&V
+
+# Runs the ASIL-D V&V stack scoped to the PID and Alert modules.
+#
+# Triggers only on paths that can affect PID/Alert behaviour. On PRs to
+# development/main, the blocking gates (MC/DC, memory safety, MISRA) must
+# pass; fault-pid-alert is intentionally non-blocking until the six
+# robustness bugs documented in reports/vv_pid_alert/fault_injection/run.log
+# are patched on fix/pid-robustness. After that PR lands, flip
+# `continue-on-error` on the fault-injection step to `false`. This mirrors
+# the same staged rollout done by vv-uds.yml during the fix/uds-robustness
+# cycle.
+#
+# Reports are published in two layers:
+#   1. Workflow Artifacts on every run (PR or push), retention 30 days.
+#   2. GitHub Pages (gh-pages branch) on push to development/main —
+#      navigable HTML reports under
+#      https://erycaaf.github.io/AEB-stellantis-project/vv_pid_alert/<branch>/.
+
+on:
+  pull_request:
+    branches: [development, main]
+    paths:
+      - 'src/execution/aeb_pid.c'
+      - 'src/execution/aeb_alert.c'
+      - 'include/aeb_pid.h'
+      - 'include/aeb_alert.h'
+      - 'include/aeb_types.h'
+      - 'include/aeb_config.h'
+      - 'tests/test_pid.c'
+      - 'tests/test_pid_fault.c'
+      - 'tests/test_pid_mcdc.c'
+      - 'tests/test_alert.c'
+      - 'tests/test_alert_fault.c'
+      - 'tests/test_alert_mcdc.c'
+      - 'Makefile'
+      - 'scripts/wrap_memory.sh'
+      - 'scripts/wrap_fault.py'
+      - 'docker/Dockerfile.vv'
+      - '.github/workflows/vv-pid-alert.yml'
+  push:
+    branches: [development, main]
+    paths:
+      - 'src/execution/aeb_pid.c'
+      - 'src/execution/aeb_alert.c'
+      - 'include/aeb_pid.h'
+      - 'include/aeb_alert.h'
+      - 'include/aeb_types.h'
+      - 'include/aeb_config.h'
+      - 'tests/test_pid.c'
+      - 'tests/test_pid_fault.c'
+      - 'tests/test_pid_mcdc.c'
+      - 'tests/test_alert.c'
+      - 'tests/test_alert_fault.c'
+      - 'tests/test_alert_mcdc.c'
+      - 'Makefile'
+      - 'scripts/wrap_memory.sh'
+      - 'scripts/wrap_fault.py'
+      - 'docker/Dockerfile.vv'
+      - '.github/workflows/vv-pid-alert.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: vv-pid-alert-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  vv-pid-alert:
+    name: PID + Alert V&V stack
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install V&V toolchain (matches docker/Dockerfile.vv)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-14 g++-14 make libc6-dev \
+            cppcheck python3-pygments \
+            valgrind lcov gcovr python3-minimal bc
+          sudo ln -sf /usr/bin/gcc-14  /usr/local/bin/gcc
+          sudo ln -sf /usr/bin/g++-14  /usr/local/bin/g++
+          sudo ln -sf /usr/bin/gcov-14 /usr/local/bin/gcov
+          sudo curl -fsSL \
+            https://raw.githubusercontent.com/danmar/cppcheck/2.13.0/htmlreport/cppcheck-htmlreport \
+            -o /usr/local/bin/cppcheck-htmlreport
+          sudo chmod +x /usr/local/bin/cppcheck-htmlreport
+          gcc --version | head -1
+          gcov --version | head -1
+          cppcheck --version
+          cppcheck-htmlreport --help | head -1
+          valgrind --version
+
+      # ─── Blocking gate 1: structural coverage ─────────────────────────────
+      # Uses gcovr's aggregated Cobertura XML (line-rate / branch-rate over
+      # both aeb_pid.c and aeb_alert.c combined) instead of the per-binary
+      # gcov_summary.txt. The per-binary text summary shows each *_mcdc
+      # binary in isolation — that binary only exercises the complementary
+      # MC/DC cases and therefore reports a low percentage by design; the
+      # union of nominal + complementary suites (which is what Cobertura
+      # aggregates) is the relevant number for ASIL-D Tab. 12.
+      - name: MC/DC coverage (gate ≥ 95%)
+        run: |
+          make mcdc-pid-alert
+          XML="reports/vv_pid_alert/coverage_mcdc/coverage.xml"
+          if [ ! -s "$XML" ]; then
+            echo "::error title=PID/Alert coverage::coverage.xml not produced by mcdc-pid-alert"
+            exit 1
+          fi
+          read LINE BRCH MCDC < <(python3 - <<'PY'
+          import re, xml.etree.ElementTree as ET
+          root = ET.parse("reports/vv_pid_alert/coverage_mcdc/coverage.xml").getroot()
+          line = float(root.get("line-rate")) * 100.0
+          brch = float(root.get("branch-rate")) * 100.0
+          cov_total = 0; cov_hit = 0
+          for ln in root.iter("line"):
+              cc = ln.get("condition-coverage")
+              if not cc:
+                  continue
+              m = re.search(r"\((\d+)/(\d+)\)", cc)
+              if m:
+                  cov_hit   += int(m.group(1))
+                  cov_total += int(m.group(2))
+          mcdc = (cov_hit / cov_total * 100.0) if cov_total else 100.0
+          print(f"{line:.2f} {brch:.2f} {mcdc:.2f}")
+          PY
+          )
+          echo "PID+Alert coverage — stmt=${LINE}% branch=${BRCH}% mcdc=${MCDC}%"
+          for metric in "Statement:$LINE" "Branch:$BRCH" "MC/DC:$MCDC"; do
+            name="${metric%%:*}"; value="${metric##*:}"
+            if [ "$(echo "$value < 95.0" | bc -l)" = "1" ]; then
+              echo "::error title=PID/Alert coverage regression::${name} dropped to ${value}% (required ≥95%)"
+              exit 1
+            fi
+          done
+
+      # ─── Blocking gate 2: dynamic memory safety on nominal suite ──────────
+      - name: Memory safety (Valgrind + ASan + UBSan)
+        run: |
+          make memory-pid-alert
+          MS="reports/vv_pid_alert/memory_safety"
+          for mod in pid alert; do
+            if [ -s "$MS/valgrind_test_${mod}.log" ]; then
+              echo "::error title=Valgrind regression::Errors on nominal ${mod} suite"
+              cat "$MS/valgrind_test_${mod}.log"; exit 1
+            fi
+            if [ -s "$MS/ubsan_test_${mod}.log" ]; then
+              echo "::error title=UBSan regression::Errors on nominal ${mod} suite"
+              cat "$MS/ubsan_test_${mod}.log"; exit 1
+            fi
+          done
+
+      # ─── Blocking gate 3: MISRA C:2012 (PID + Alert scope only) ───────────
+      - name: MISRA (0 issues in aeb_pid.{c,h} + aeb_alert.{c,h})
+        run: |
+          make misra-pid-alert
+          PIDALERT_ISSUES=$(python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          t = ET.parse("reports/vv_pid_alert/misra/cppcheck_pid_alert.xml")
+          target = ("src/execution/aeb_pid.c", "include/aeb_pid.h",
+                    "src/execution/aeb_alert.c", "include/aeb_alert.h")
+          n = 0
+          for e in t.findall(".//error"):
+              if not e.get("id", "").startswith("misra-c2012"):
+                  continue
+              loc = e.find("location")
+              if loc is not None and loc.get("file", "") in target:
+                  n += 1
+          print(n)
+          PY
+          )
+          echo "MISRA issues in aeb_pid/aeb_alert scope: $PIDALERT_ISSUES"
+          if [ "$PIDALERT_ISSUES" != "0" ]; then
+            echo "::error title=MISRA regression::$PIDALERT_ISSUES issue(s) in aeb_pid/aeb_alert scope"
+            exit 1
+          fi
+
+      ## ─── Non-blocking (reports-only) until fix/pid-robustness lands ───────
+      # The fault-injection suite currently reports 6 PID failures
+      # (NaN guards on a_ego / decel_target; fail-safe on invalid
+      # fsm_state). These are real bugs in aeb_pid.c that mirror the
+      # pattern found on aeb_uds.c and documented in the consolidated
+      # V&V report. Once fix/pid-robustness patches the module, flip
+      # `continue-on-error` on this step to `false` so regressions
+      # start blocking PRs again.
+      - name: Fault injection (non-blocking until bugs patched)
+        continue-on-error: true
+        run: make fault-pid-alert
+
+      - name: Generate HTML reports
+        if: always()
+        run: make html-pid-alert
+
+      - name: Step summary
+        if: always()
+        run: |
+          {
+            echo "## PID + Alert V&V — run #${{ github.run_number }}"
+            echo ""
+            if [ "${{ github.event_name }}" = "push" ]; then
+              echo "📊 **Browse reports:** https://erycaaf.github.io/AEB-stellantis-project/vv_pid_alert/${{ github.ref_name }}/"
+              echo ""
+            fi
+            echo "### Structural coverage"
+            echo '```'
+            cat reports/vv_pid_alert/coverage_mcdc/gcov_summary.txt
+            echo '```'
+            echo ""
+            echo "### Fault injection"
+            echo '```'
+            tail -5 reports/vv_pid_alert/fault_injection/run.log
+            echo '```'
+            echo ""
+            echo "### Memory safety"
+            for f in reports/vv_pid_alert/memory_safety/valgrind_test_pid.log \
+                     reports/vv_pid_alert/memory_safety/valgrind_test_alert.log \
+                     reports/vv_pid_alert/memory_safety/ubsan_test_pid.log \
+                     reports/vv_pid_alert/memory_safety/ubsan_test_alert.log; do
+              name=$(basename "$f")
+              if [ -s "$f" ]; then
+                echo "**${name}:**"
+                echo '```'
+                head -20 "$f"
+                echo '```'
+              else
+                echo "**${name}:** _clean_"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vv-pid-alert-reports-run${{ github.run_number }}
+          path: reports/vv_pid_alert/
+          retention-days: 30
+
+  publish-pages:
+    needs: vv-pid-alert
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-pages-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Download reports
+        uses: actions/download-artifact@v4
+        with:
+          name: vv-pid-alert-reports-run${{ github.run_number }}
+          path: site/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          destination_dir: vv_pid_alert/${{ github.ref_name }}
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: '41898282+github-actions[bot]@users.noreply.github.com'
+          commit_message: 'docs(vv-pid-alert): publish reports from run #${{ github.run_number }} (${{ github.ref_name }})'
