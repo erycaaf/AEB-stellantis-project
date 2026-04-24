@@ -514,7 +514,7 @@ memory-pid-alert:
 		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_pid.log; \
 		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_pid.log; \
 		[ ! -s $(VV_REPORT_DIR)/memory_safety/valgrind_test_pid.log ] && echo "(clean)" || true
-	@valgrind --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=1 \
+	@valgrind --quiet --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=1 \
 		$(VV_REPORT_DIR)/memory_safety/test_alert_val > /dev/null \
 		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_alert.log; \
 		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_alert.log; \
