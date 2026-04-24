@@ -21,6 +21,13 @@
 #   make misra-decision    — cppcheck MISRA scoped to aeb_ttc / aeb_fsm
 #   make vv-decision       — full V&V stack
 #
+# Targets (ASIL-D V&V — CAN module, cross-validation by Lourenço):
+#   make mcdc-can          — MC/DC coverage (gcc-14 + gcov-14 + lcov)
+#   make fault-can         — systematic fault-injection suite
+#   make memory-can        — Valgrind + ASan + UBSan on CAN suites
+#   make misra-can         — cppcheck MISRA scoped to aeb_can.{c,h}
+#   make vv-can            — full V&V stack
+#
 # V&V artefacts land under reports/vv_<module>/. Consolidated reports
 # live in the team documentation area, outside this repo.
 
@@ -43,12 +50,14 @@ CFLAGS_SAN = -Wall -Wextra -Wpedantic -std=c99 -O0 -g -Iinclude -Istubs \
 GCOV       = gcov-14
 GCOVR     ?= $(if $(wildcard venv/bin/gcovr),venv/bin/gcovr,gcovr)
 
-# Per-target V&V report directory — keeps the UDS and Decision stacks
-# from overwriting each other when both are invoked in the same workflow.
+# Per-target V&V report directory — keeps the UDS, Decision and CAN stacks
+# from overwriting each other when they are invoked in the same workflow.
 mcdc-uds fault-uds memory-uds misra-uds html-uds vv-uds: \
         VV_REPORT_DIR := reports/vv_uds
 mcdc-decision fault-decision memory-decision misra-decision html-decision vv-decision: \
         VV_REPORT_DIR := reports/vv_decision
+mcdc-can fault-can memory-can misra-can vv-can: \
+        VV_REPORT_DIR := reports/vv_can
 
 # All sources (stubs + real code)
 SRC_ALL = src/communication/aeb_can.c \
@@ -65,7 +74,9 @@ SRC_ALL = src/communication/aeb_can.c \
 
 SRC_SMOKE = src/communication/aeb_can.c stubs/can_hal.c tests/test_smoke.c
 
-SRC_CAN_TEST = src/communication/aeb_can.c stubs/can_hal.c tests/test_can.c
+SRC_CAN_TEST        = src/communication/aeb_can.c stubs/can_hal.c tests/test_can.c
+SRC_CAN_FAULT_TEST  = src/communication/aeb_can.c stubs/can_hal.c tests/test_can_fault.c
+SRC_CAN_STRUCT_TEST = src/communication/aeb_can.c stubs/can_hal.c tests/test_can_struct.c
 
 SRC_PERCEPTION_TEST = src/perception/aeb_perception.c tests/test_perception.c
 
@@ -109,6 +120,7 @@ TEST_BINS = test_smoke test_can test_perception test_decision \
 .PHONY: build test misra clean vv-clean \
         mcdc-uds fault-uds memory-uds misra-uds html-uds vv-uds \
         mcdc-decision fault-decision memory-decision misra-decision html-decision vv-decision \
+        mcdc-can fault-can memory-can misra-can vv-can \
         mcdc-pid-alert fault-pid-alert memory-pid-alert misra-pid-alert vv-pid-alert
 
 build:
@@ -150,146 +162,6 @@ misra:
 	cppcheck --addon=misra --std=c99 -Iinclude -Istubs \
 		--suppress=unusedFunction --suppress=missingIncludeSystem \
 		--enable=all $(SRC_MISRA)
-
-# ═══════════════════════════════════════════════════════════════════════════
-#  V&V — CAN module  (cross-validation by Lourenço; original author: Renato)
-#
-#  Mirrors the `vv-uds` target set produced by Renato for the UDS module.
-#  ISO 26262-6:2018 activities exercised:
-#     - Table 10 item 1b   — nominal unit tests (test_can.c, Lourenço)
-#     - Table 12 item 1c   — MC/DC coverage    (mcdc-can)
-#     - Table 11 item 1e   — fault injection   (fault-can)
-#     - Table  8 item 1d   — memory safety     (memory-can)
-#     - Table  8 item 1b   — MISRA static scan (misra-can)
-#
-#  Toolchain: gcc-14 (for -fcondition-coverage), gcov-14, lcov 2.0,
-#             cppcheck 2.13 + misra addon, valgrind 3.22, AddressSanitizer,
-#             UndefinedBehaviorSanitizer.
-#
-#  All reports land under reports/vv_can/ so they can be zipped or
-#  attached to the V&V wiki §6 (Coverage consolidated) as-is.
-# ═══════════════════════════════════════════════════════════════════════════
-
-GCC14        ?= gcc-14
-GCOV14       ?= gcov-14
-
-VV_CAN_DIR    = reports/vv_can
-CAN_SRC       = src/communication/aeb_can.c stubs/can_hal.c
-CAN_TEST_SRC  = tests/test_can.c
-CAN_FAULT_SRC = tests/test_can_fault.c
-CAN_STRUCT_SRC = tests/test_can_struct.c
-
-.PHONY: mcdc-can fault-can memory-can misra-can vv-can vv-can-clean
-
-# ── MC/DC coverage (Table 12 item 1c) ────────────────────────────────────
-#
-# Coverage is measured with BOTH the nominal suite (Lourenço) and the
-# fault injection suite (Eryca) running against the same instrumented
-# binary.  This mirrors Renato's approach for UDS and is the legitimate
-# way to report structural coverage: a requirement-based test that
-# traverses the defensive-branch can only be the fault test, so the
-# two suites must be merged for a fair number.
-mcdc-can:
-	@mkdir -p $(VV_CAN_DIR)/coverage_mcdc
-	@echo "=== MC/DC coverage — aeb_can.c (nominal + fault suites) ==="
-	$(GCC14) -Wall -Wextra -std=c99 -O0 -g \
-		-fprofile-arcs -ftest-coverage -fcondition-coverage \
-		-Iinclude -Istubs \
-		$(CAN_SRC) $(CAN_TEST_SRC) \
-		-o $(VV_CAN_DIR)/coverage_mcdc/test_can_cov $(LDFLAGS)
-	$(GCC14) -Wall -Wextra -std=c99 -O0 -g \
-		-fprofile-arcs -ftest-coverage -fcondition-coverage \
-		-Iinclude -Istubs \
-		$(CAN_SRC) $(CAN_FAULT_SRC) \
-		-o $(VV_CAN_DIR)/coverage_mcdc/test_can_fault_cov $(LDFLAGS)
-	$(GCC14) -Wall -Wextra -std=c99 -O0 -g \
-		-fprofile-arcs -ftest-coverage -fcondition-coverage \
-		-Iinclude -Istubs \
-		$(CAN_SRC) $(CAN_STRUCT_SRC) \
-		-o $(VV_CAN_DIR)/coverage_mcdc/test_can_struct_cov $(LDFLAGS)
-	cd $(VV_CAN_DIR)/coverage_mcdc && \
-		./test_can_cov        > run_nominal.log 2>&1 || true ; \
-		./test_can_fault_cov  > run_fault.log   2>&1 || true ; \
-		./test_can_struct_cov > run_struct.log  2>&1 || true
-	cd $(VV_CAN_DIR)/coverage_mcdc && \
-		$(GCOV14) --conditions --branch-probabilities --branch-counts \
-		          test_can_cov-aeb_can.gcno \
-		          > gcov_summary.txt 2>&1 || true
-	cd $(VV_CAN_DIR)/coverage_mcdc && \
-		lcov --capture --directory . --rc geninfo_unexecuted_blocks=1 \
-		     --gcov-tool $(GCOV14) --output-file can.info 2>/dev/null || true
-	cd $(VV_CAN_DIR)/coverage_mcdc && \
-		genhtml can.info --output-directory html 2>/dev/null || true
-	@echo "Artefacts: $(VV_CAN_DIR)/coverage_mcdc/"
-
-# ── Fault injection (Table 11 item 1e) ───────────────────────────────────
-fault-can:
-	@mkdir -p $(VV_CAN_DIR)/fault_injection
-	@echo "=== Fault injection — aeb_can.c ==="
-	$(CC) $(CFLAGS) -o $(VV_CAN_DIR)/fault_injection/test_can_fault \
-		$(CAN_SRC) $(CAN_FAULT_SRC) $(LDFLAGS)
-	cd $(VV_CAN_DIR)/fault_injection && ./test_can_fault > run.log 2>&1 || true
-	@echo "Artefacts: $(VV_CAN_DIR)/fault_injection/run.log"
-
-# ── Memory safety (Table 8 item 1d): Valgrind + ASan + UBSan ─────────────
-memory-can:
-	@mkdir -p $(VV_CAN_DIR)/memory_safety
-	@echo "=== Memory safety — Valgrind on test_can ==="
-	$(CC) -g -O0 -Wall -Wextra -std=c99 -Iinclude -Istubs \
-		$(CAN_SRC) $(CAN_TEST_SRC) -o $(VV_CAN_DIR)/memory_safety/test_can_dbg $(LDFLAGS)
-	valgrind --leak-check=full --error-exitcode=0 --track-origins=yes \
-		$(VV_CAN_DIR)/memory_safety/test_can_dbg \
-		> $(VV_CAN_DIR)/memory_safety/valgrind_nominal.log 2>&1 || true
-	@echo "=== Memory safety — Valgrind on test_can_fault ==="
-	$(CC) -g -O0 -Wall -Wextra -std=c99 -Iinclude -Istubs \
-		$(CAN_SRC) $(CAN_FAULT_SRC) -o $(VV_CAN_DIR)/memory_safety/test_can_fault_dbg $(LDFLAGS)
-	valgrind --leak-check=full --error-exitcode=0 --track-origins=yes \
-		$(VV_CAN_DIR)/memory_safety/test_can_fault_dbg \
-		> $(VV_CAN_DIR)/memory_safety/valgrind_fault.log 2>&1 || true
-	@echo "=== Memory safety — ASan + UBSan on test_can ==="
-	$(CC) -g -O0 -Wall -Wextra -std=c99 -Iinclude -Istubs \
-		-fsanitize=address,undefined -fsanitize=float-cast-overflow \
-		-fno-sanitize-recover=float-cast-overflow \
-		$(CAN_SRC) $(CAN_TEST_SRC) -o $(VV_CAN_DIR)/memory_safety/test_can_san $(LDFLAGS)
-	$(VV_CAN_DIR)/memory_safety/test_can_san \
-		> $(VV_CAN_DIR)/memory_safety/ubsan_nominal.log 2>&1 || true
-	@echo "=== Memory safety — ASan + UBSan on test_can_fault ==="
-	$(CC) -g -O0 -Wall -Wextra -std=c99 -Iinclude -Istubs \
-		-fsanitize=address,undefined -fsanitize=float-cast-overflow \
-		$(CAN_SRC) $(CAN_FAULT_SRC) -o $(VV_CAN_DIR)/memory_safety/test_can_fault_san $(LDFLAGS)
-	$(VV_CAN_DIR)/memory_safety/test_can_fault_san \
-		> $(VV_CAN_DIR)/memory_safety/ubsan_fault.log 2>&1 || true
-	@echo "Artefacts: $(VV_CAN_DIR)/memory_safety/*.log"
-
-# ── MISRA static analysis (Table 8 item 1b) — scoped to aeb_can.{c,h} ────
-misra-can:
-	@mkdir -p $(VV_CAN_DIR)/misra
-	@echo "=== MISRA static scan — aeb_can.{c,h} (scoped) ==="
-	cppcheck --addon=misra --std=c99 -Iinclude -Istubs \
-		--suppress=unusedFunction --suppress=missingIncludeSystem \
-		--enable=all --xml --xml-version=2 \
-		src/communication/aeb_can.c include/aeb_can.h \
-		2> $(VV_CAN_DIR)/misra/cppcheck.xml || true
-	cppcheck --addon=misra --std=c99 -Iinclude -Istubs \
-		--suppress=unusedFunction --suppress=missingIncludeSystem \
-		--enable=all \
-		src/communication/aeb_can.c include/aeb_can.h \
-		> $(VV_CAN_DIR)/misra/cppcheck.log 2>&1 || true
-	@echo "Artefacts: $(VV_CAN_DIR)/misra/cppcheck.{xml,log}"
-
-# ── Full V&V bundle — one command reproduces every artefact ──────────────
-vv-can: mcdc-can fault-can memory-can misra-can
-	@echo ""
-	@echo "=== V&V CAN bundle complete.  Artefacts: $(VV_CAN_DIR)/ ==="
-
-# vv-can-clean removes generated artefacts but KEEPS hand-written files
-# (the .tex/.pdf report, the CSV, the README).  Use `rm -rf reports/vv_can/`
-# if you want a full wipe.
-vv-can-clean:
-	rm -rf $(VV_CAN_DIR)/coverage_mcdc
-	rm -rf $(VV_CAN_DIR)/fault_injection
-	rm -rf $(VV_CAN_DIR)/memory_safety
-	rm -rf $(VV_CAN_DIR)/misra
 
 # ── ASIL-D V&V targets (UDS) ────────────────────────────────────────────
 
@@ -541,6 +413,115 @@ vv-decision: mcdc-decision fault-decision memory-decision misra-decision html-de
 	@echo ""
 	@echo "=== Decision V&V stack complete — artefacts in $(VV_REPORT_DIR)/ ==="
 
+# ═══════════════════════════════════════════════════════════════════════════
+#  V&V — CAN module  (cross-validation by Lourenço; original author: Renato)
+#
+#  Mirrors the `vv-uds` target set produced by Renato for the UDS module.
+#  ISO 26262-6:2018 activities exercised:
+#     - Table 10 item 1b   — nominal unit tests (test_can.c, Lourenço)
+#     - Table 12 item 1c   — MC/DC coverage    (mcdc-can)
+#     - Table 11 item 1e   — fault injection   (fault-can)
+#     - Table  8 item 1d   — memory safety     (memory-can)
+#     - Table  8 item 1b   — MISRA static scan (misra-can)
+#
+#  Toolchain: gcc-14 (for -fcondition-coverage), gcov-14, lcov 2.0,
+#             cppcheck 2.13 + misra addon, valgrind 3.22, AddressSanitizer,
+#             UndefinedBehaviorSanitizer.
+#
+#  All reports land under reports/vv_can/ (set via target-local
+#  VV_REPORT_DIR binding above) so they can be zipped or attached to the
+#  V&V wiki §6 (Coverage consolidated) as-is.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── MC/DC coverage (Table 12 item 1c) ────────────────────────────────────
+#
+# Coverage is measured with BOTH the nominal suite (Lourenço) and the
+# fault injection suite (Eryca) running against the same instrumented
+# binary.  This mirrors Renato's approach for UDS and is the legitimate
+# way to report structural coverage: a requirement-based test that
+# traverses the defensive-branch can only be the fault test, so the
+# two suites must be merged for a fair number.
+mcdc-can:
+	@rm -rf $(VV_REPORT_DIR)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR)/coverage_mcdc
+	@echo "=== MC/DC coverage — aeb_can.c (nominal + fault + struct suites) ==="
+	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_cov \
+		$(SRC_CAN_TEST) $(LDFLAGS)
+	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_fault_cov \
+		$(SRC_CAN_FAULT_TEST) $(LDFLAGS)
+	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_struct_cov \
+		$(SRC_CAN_STRUCT_TEST) $(LDFLAGS)
+	cd $(VV_REPORT_DIR)/coverage_mcdc && \
+		./test_can_cov        > run_nominal.log 2>&1 || true ; \
+		./test_can_fault_cov  > run_fault.log   2>&1 || true ; \
+		./test_can_struct_cov > run_struct.log  2>&1 || true
+	cd $(VV_REPORT_DIR)/coverage_mcdc && \
+		$(GCOV) --conditions --branch-probabilities --branch-counts \
+		        test_can_cov-aeb_can.gcno \
+		        > gcov_summary.txt 2>&1 || true
+	cd $(VV_REPORT_DIR)/coverage_mcdc && \
+		lcov --capture --directory . --rc geninfo_unexecuted_blocks=1 \
+		     --gcov-tool $(GCOV) --output-file can.info 2>/dev/null || true
+	cd $(VV_REPORT_DIR)/coverage_mcdc && \
+		genhtml can.info --output-directory html 2>/dev/null || true
+	@echo "Artefacts: $(VV_REPORT_DIR)/coverage_mcdc/"
+
+# ── Fault injection (Table 11 item 1e) ───────────────────────────────────
+fault-can:
+	@mkdir -p $(VV_REPORT_DIR)/fault_injection
+	@echo "=== Fault injection — aeb_can.c ==="
+	$(CC) $(CFLAGS) -o $(VV_REPORT_DIR)/fault_injection/test_can_fault \
+		$(SRC_CAN_FAULT_TEST) $(LDFLAGS)
+	cd $(VV_REPORT_DIR)/fault_injection && ./test_can_fault > run.log 2>&1 || true
+	@echo "Artefacts: $(VV_REPORT_DIR)/fault_injection/run.log"
+
+# ── Memory safety (Table 8 item 1d): Valgrind + ASan + UBSan ─────────────
+memory-can:
+	@mkdir -p $(VV_REPORT_DIR)/memory_safety
+	@echo "=== Memory safety — Valgrind on test_can ==="
+	$(CC) -g -O0 -Wall -Wextra -std=c99 -Iinclude -Istubs \
+		$(SRC_CAN_TEST) -o $(VV_REPORT_DIR)/memory_safety/test_can_dbg $(LDFLAGS)
+	valgrind --leak-check=full --error-exitcode=0 --track-origins=yes \
+		$(VV_REPORT_DIR)/memory_safety/test_can_dbg \
+		> $(VV_REPORT_DIR)/memory_safety/valgrind_nominal.log 2>&1 || true
+	@echo "=== Memory safety — Valgrind on test_can_fault ==="
+	$(CC) -g -O0 -Wall -Wextra -std=c99 -Iinclude -Istubs \
+		$(SRC_CAN_FAULT_TEST) -o $(VV_REPORT_DIR)/memory_safety/test_can_fault_dbg $(LDFLAGS)
+	valgrind --leak-check=full --error-exitcode=0 --track-origins=yes \
+		$(VV_REPORT_DIR)/memory_safety/test_can_fault_dbg \
+		> $(VV_REPORT_DIR)/memory_safety/valgrind_fault.log 2>&1 || true
+	@echo "=== Memory safety — ASan + UBSan on test_can ==="
+	$(CC) $(CFLAGS_SAN) -fno-sanitize-recover=float-cast-overflow \
+		$(SRC_CAN_TEST) -o $(VV_REPORT_DIR)/memory_safety/test_can_san $(LDFLAGS)
+	$(VV_REPORT_DIR)/memory_safety/test_can_san \
+		> $(VV_REPORT_DIR)/memory_safety/ubsan_nominal.log 2>&1 || true
+	@echo "=== Memory safety — ASan + UBSan on test_can_fault ==="
+	$(CC) $(CFLAGS_SAN) \
+		$(SRC_CAN_FAULT_TEST) -o $(VV_REPORT_DIR)/memory_safety/test_can_fault_san $(LDFLAGS)
+	$(VV_REPORT_DIR)/memory_safety/test_can_fault_san \
+		> $(VV_REPORT_DIR)/memory_safety/ubsan_fault.log 2>&1 || true
+	@echo "Artefacts: $(VV_REPORT_DIR)/memory_safety/*.log"
+
+# ── MISRA static analysis (Table 8 item 1b) — scoped to aeb_can.{c,h} ────
+misra-can:
+	@mkdir -p $(VV_REPORT_DIR)/misra
+	@echo "=== MISRA static scan — aeb_can.{c,h} (scoped) ==="
+	cppcheck --addon=misra --std=c99 -Iinclude -Istubs \
+		--suppress=unusedFunction --suppress=missingIncludeSystem \
+		--enable=all --xml --xml-version=2 \
+		src/communication/aeb_can.c include/aeb_can.h \
+		2> $(VV_REPORT_DIR)/misra/cppcheck.xml || true
+	cppcheck --addon=misra --std=c99 -Iinclude -Istubs \
+		--suppress=unusedFunction --suppress=missingIncludeSystem \
+		--enable=all \
+		src/communication/aeb_can.c include/aeb_can.h \
+		> $(VV_REPORT_DIR)/misra/cppcheck.log 2>&1 || true
+	@echo "Artefacts: $(VV_REPORT_DIR)/misra/cppcheck.{xml,log}"
+
+# ── Full V&V bundle — one command reproduces every artefact ──────────────
+vv-can: mcdc-can fault-can memory-can misra-can
+	@echo ""
+	@echo "=== V&V CAN bundle complete.  Artefacts: $(VV_REPORT_DIR)/ ==="
+
 # ── ASIL-D V&V targets (Execution: PID + Alert) ────────────────────────
 
 mcdc-pid-alert fault-pid-alert memory-pid-alert misra-pid-alert vv-pid-alert: \
@@ -663,9 +644,12 @@ vv-clean:
 	       reports/vv_decision/memory_html \
 	       reports/vv_decision/fault_html \
 	       reports/vv_can/coverage_mcdc/test_can* \
+	       reports/vv_can/coverage_mcdc/*.gcda \
+	       reports/vv_can/coverage_mcdc/*.gcno \
+	       reports/vv_can/coverage_mcdc/*.gcov \
+	       reports/vv_can/coverage_mcdc/html \
 	       reports/vv_can/fault_injection/test_can* \
 	       reports/vv_can/memory_safety/test_can* \
-	       reports/vv_can/coverage_mcdc/html \
 	       reports/vv_can/misra
 
 clean: vv-clean
