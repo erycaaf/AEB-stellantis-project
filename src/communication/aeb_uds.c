@@ -17,6 +17,7 @@
 
 #include "aeb_uds.h"
 #include "aeb_config.h"
+#include <math.h>   /* isfinite() — Bug #1 defensive clamping */
 
 /* ===================================================================
  * Static helpers
@@ -79,6 +80,20 @@ static void uds_handle_read_did(const uds_request_t *request,
     {
         case UDS_DID_TTC_VAL:           /* 0xF100 */
         {
+            /* Bug #1 fix: validate float before cast to uint16_t.
+             * C11 §6.3.1.4: float->int cast is UB if out of range.
+             * Guards NaN, +/-Inf, negatives, and values exceeding
+             * UINT16_MAX after the x100 scaling (i.e. > 655.35). */
+            if (!isfinite(ttc_out->ttc) ||
+                (ttc_out->ttc < 0.0f)   ||
+                (ttc_out->ttc > 655.35f))
+            {
+                uds_send_negative(response,
+                                  UDS_SID_READ_DID,
+                                  UDS_NRC_REQUEST_OOR);
+                break;
+            }
+
             scaled_val = (uint16_t)(ttc_out->ttc * 100.0f);
 
             response->response_sid  = UDS_SID_READ_DID_RESP;
@@ -100,6 +115,19 @@ static void uds_handle_read_did(const uds_request_t *request,
 
         case UDS_DID_BRAKE_PRESS_VAL:   /* 0xF102 */
         {
+            /* Bug #1 fix: validate float before cast to uint16_t.
+             * Guards NaN, +/-Inf, negatives, and values exceeding
+             * UINT16_MAX after the x10 scaling (i.e. > 6553.5). */
+            if (!isfinite(pid_out->brake_pct) ||
+                (pid_out->brake_pct < 0.0f)   ||
+                (pid_out->brake_pct > 6553.5f))
+            {
+                uds_send_negative(response,
+                                  UDS_SID_READ_DID,
+                                  UDS_NRC_REQUEST_OOR);
+                break;
+            }
+
             scaled_val = (uint16_t)(pid_out->brake_pct * 10.0f);
 
             response->response_sid  = UDS_SID_READ_DID_RESP;
@@ -270,19 +298,21 @@ void uds_process_request(uds_state_t *state,
 
 void uds_get_output(const uds_state_t *state, uds_output_t *output)
 {
-    uint8_t count;
+    /* Bugs #2 and #3 fix: Boolean normalisation against SEU (single-event upset).
+     * Each flag is specified as Boolean (0 or 1), but a bit-flip from EMI,
+     * voltage glitch, or cosmic radiation may corrupt the raw byte to values
+     * like 0xAA or 0xFF. Without normalisation:
+     *   - aeb_enabled could be propagated as a non-Boolean, mis-read by
+     *     consumers using "== 1U" vs implicit truthiness tests.
+     *   - dtc_count (uint8_t sum of three flags) could overflow/wrap
+     *     (e.g. 3*0xFF = 0x2FD -> 0xFD), producing a nonsensical count.
+     * Normalising each flag via (x != 0U) ? 1U : 0U bounds the sum to [0..3]
+     * and delivers deterministic Boolean semantics to downstream consumers. */
+    uint8_t s = (state->dtc_sensor   != 0U) ? 1U : 0U;
+    uint8_t c = (state->dtc_crc      != 0U) ? 1U : 0U;
+    uint8_t a = (state->dtc_actuator != 0U) ? 1U : 0U;
 
-    output->aeb_enabled = state->aeb_enabled;
-
-    count = state->dtc_sensor + state->dtc_crc + state->dtc_actuator;
-    output->dtc_count = count;
-
-    if (count > 0U)
-    {
-        output->fault_lamp = 1U;
-    }
-    else
-    {
-        output->fault_lamp = 0U;
-    }
+    output->aeb_enabled = (state->aeb_enabled != 0U) ? 1U : 0U;
+    output->dtc_count   = (uint8_t)(s + c + a);                /* <= 3 */
+    output->fault_lamp  = (output->dtc_count > 0U) ? 1U : 0U;
 }

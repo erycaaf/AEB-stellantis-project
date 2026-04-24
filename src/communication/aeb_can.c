@@ -166,10 +166,11 @@ int32_t can_init(can_state_t *state)
     }
     else
     {
-        /* Register RX filters for the three messages we receive */
+        /* Register RX filters for the messages we receive */
         (void)can_hal_add_rx_filter(CAN_ID_EGO_VEHICLE);
         (void)can_hal_add_rx_filter(CAN_ID_DRIVER_INPUT);
         (void)can_hal_add_rx_filter(CAN_ID_RADAR_TARGET);
+        (void)can_hal_add_rx_filter(CAN_ID_UDS_REQUEST);
 
         state->initialised = 1U;
     }
@@ -255,6 +256,20 @@ void can_rx_process(can_state_t   *state,
             /* Valid frame received — reset miss counter */
             state->rx_miss_count = 0U;
             state->last_rx.rx_timeout_flag = 0U;
+        }
+    }
+    else if (id == CAN_ID_UDS_REQUEST)
+    {
+        /* UDS_Request (0x7DF) — ISO 14229 functional broadcast.
+         * 4-byte payload mapped directly to uds_request_t.
+         * FR-UDS-005: request serviced within same 10 ms cycle. */
+        if (dlc >= CAN_DLC_UDS_REQUEST)
+        {
+            state->last_rx.uds_request.sid      = data[0];
+            state->last_rx.uds_request.did_high = data[1];
+            state->last_rx.uds_request.did_low  = data[2];
+            state->last_rx.uds_request.value    = data[3];
+            state->last_rx.uds_request_pending  = 1U;
         }
     }
     else
@@ -457,5 +472,54 @@ void can_get_rx_data(const can_state_t *state,
     if ((state != NULL) && (out != NULL))
     {
         (void)memcpy(out, &state->last_rx, sizeof(can_rx_data_t));
+    }
+}
+
+/**
+ * @brief Transmit UDS_Response (0x7E8).
+ * @req FR-UDS-005
+ */
+int32_t can_tx_uds_response(const uds_response_t *resp)
+{
+    int32_t result = CAN_OK;
+
+    if (resp == NULL)
+    {
+        result = CAN_ERR_TX;
+    }
+    else
+    {
+        uint8_t frame[8];
+
+        /* uds_response_t is an 8-byte wire-format struct — map 1:1. */
+        frame[0] = resp->response_sid;
+        frame[1] = resp->did_high_resp;
+        frame[2] = resp->did_low_resp;
+        frame[3] = resp->data1;
+        frame[4] = resp->data2;
+        frame[5] = resp->data3;
+        frame[6] = resp->data4;
+        frame[7] = resp->data5;
+
+        if (can_hal_send(CAN_ID_UDS_RESPONSE, frame, CAN_DLC_UDS_RESPONSE) != 0)
+        {
+            result = CAN_ERR_TX;
+        }
+    }
+
+    return result;
+}
+
+/**
+ * @brief Clear the pending UDS request flag after it has been serviced.
+ *
+ * Must only be called after can_tx_uds_response() reported CAN_OK.
+ * See aeb_can.h for the retry semantics rationale.
+ */
+void can_clear_uds_request_pending(can_state_t *state)
+{
+    if (state != NULL)
+    {
+        state->last_rx.uds_request_pending = 0U;
     }
 }

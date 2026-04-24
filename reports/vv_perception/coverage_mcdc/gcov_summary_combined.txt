@@ -1,0 +1,9 @@
+File '/workspaces/AEB-stellantis-project/src/perception/aeb_perception.c'
+Lines executed:100.00% of 162
+Branches executed:100.00% of 92
+Taken at least once:93.48% of 92
+Calls executed:100.00% of 10
+Condition outcomes covered:93.48% of 92
+Creating 'aeb_perception.c.gcov'
+
+Lines executed:100.00% of 162
