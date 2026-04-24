@@ -60,15 +60,16 @@ int32_t aeb_core_init(aeb_core_state_t *state);
  * @brief Execute one 10 ms AEB cycle.
  *
  * Pipeline order:
- *   1. CAN RX timeout check
- *   2. Perception (sensor fusion + fault detection)
- *   3. TTC and braking distance calculation
- *   4. Override detection
- *   5. FSM state evaluation
- *   6. PID brake controller
- *   7. Alert mapping
- *   8. UDS fault monitoring
- *   9. CAN TX (brake command, FSM state, alerts)
+ *   1.  CAN RX timeout check
+ *   2.  Perception (sensor fusion + fault detection)
+ *   3.  TTC and braking distance calculation
+ *   4.  Override detection
+ *   5.  FSM state evaluation
+ *   6.  PID brake controller
+ *   7.  Alert mapping
+ *   8.  UDS fault monitoring
+ *   9.  UDS request service (0x7DF → 0x7E8, FR-UDS-005)
+ *   10. CAN TX (brake command, FSM state, alerts)
  *
  * @param[in,out] state  Pointer to core state.
  * @param[in]     raw    Raw sensor inputs for this cycle.

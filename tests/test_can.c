@@ -8,6 +8,7 @@
 
 #include "aeb_can.h"
 #include "can_hal.h"
+#include "can_hal_test.h"
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -33,11 +34,7 @@ static int32_t tests_failed = 0;
 #define TEST(name) static void name(void)
 #define RUN(name) do { printf("  [TEST] %s\n", #name); name(); } while (0)
 
-/* ── Extern test helpers from can_hal.c stub ────────────────────────── */
-extern uint32_t       can_hal_test_get_tx_count(void);
-extern void           can_hal_test_reset(void);
-extern void           can_hal_test_force_init_fail(int32_t fail);
-extern void           can_hal_test_force_send_fail(int32_t fail);
+/* Test helpers from the CAN HAL stub are declared in can_hal_test.h */
 
 /* ═══════════════════════════════════════════════════════════════════════
  *  TEST: Signal pack/unpack round-trip  (FR-CAN-003)
@@ -316,6 +313,96 @@ TEST(test_tx_fsm_period)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+ *  TESTS: encode_unsigned robustness — exercised through can_tx_brake_cmd,
+ *  which feeds pid_out->brake_bar into encode_unsigned for the 15-bit
+ *  BrakePressure field at bits 1..15. Lock the post-fix contract so any
+ *  future regression at the cast boundary is caught at unit level instead
+ *  of waiting for fault-injection.
+ *
+ *  The legitimate-input path is already covered by test_tx_brake_cmd
+ *  above; these four tests cover the four UB-inducing input classes the
+ *  cross-validation report flagged on PR #89.
+ *
+ *  NaN / ±Inf -> encode_unsigned returns 0 -> BrakePressure raw == 0.
+ *  Finite > UINT32_MAX ceiling -> saturates to UINT32_MAX -> 15-bit
+ *  field masked to 0x7FFF (all-ones).
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+/** Helper — extract the 15-bit BrakePressure field from a captured frame. */
+static uint32_t extract_brake_pressure(const tx_record_t *tx)
+{
+    return can_unpack_signal(tx->data, 1U, 15U);
+}
+
+TEST(test_tx_brake_cmd_nan_brake_bar)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = NAN };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+    ASSERT_EQ(can_hal_test_get_tx_count(), 1U);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    ASSERT_EQ(extract_brake_pressure(tx), 0U);
+}
+
+TEST(test_tx_brake_cmd_pos_inf_brake_bar)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = INFINITY };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    ASSERT_EQ(extract_brake_pressure(tx), 0U);
+}
+
+TEST(test_tx_brake_cmd_neg_inf_brake_bar)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = -INFINITY };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    ASSERT_EQ(extract_brake_pressure(tx), 0U);
+}
+
+TEST(test_tx_brake_cmd_overflow_brake_bar)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    /* 1e20 / 0.1 = 1e21 — far above the 4294967040.0F cast ceiling.
+     * encode_unsigned must saturate at UINT32_MAX; can_pack_signal
+     * then masks to the 15-bit field width = 0x7FFF (all-ones). */
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = 1.0e20F };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    ASSERT_EQ(extract_brake_pressure(tx), 0x7FFFU);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
  *  TEST: TX failure handling
  * ═══════════════════════════════════════════════════════════════════════ */
 TEST(test_tx_send_failure)
@@ -336,6 +423,110 @@ TEST(test_tx_send_failure)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: RX decode — UDS Request (0x7DF)  (FR-UDS-005)
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_rx_uds_request)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    /* ReadDID 0xF101 (FSM state) — 4 bytes: {SID, DID_H, DID_L, value} */
+    uint8_t frame[4] = { 0x22U, 0xF1U, 0x01U, 0x00U };
+
+    can_rx_process(&state, CAN_ID_UDS_REQUEST, frame, CAN_DLC_UDS_REQUEST);
+
+    can_rx_data_t rx;
+    can_get_rx_data(&state, &rx);
+
+    ASSERT_EQ(rx.uds_request_pending, 1U);
+    ASSERT_EQ(rx.uds_request.sid, 0x22U);
+    ASSERT_EQ(rx.uds_request.did_high, 0xF1U);
+    ASSERT_EQ(rx.uds_request.did_low, 0x01U);
+    ASSERT_EQ(rx.uds_request.value, 0x00U);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: TX UDS Response (0x7E8)  (FR-UDS-005)
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_tx_uds_response)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    uds_response_t resp;
+    resp.response_sid   = 0x62U;   /* Positive response to 0x22 */
+    resp.did_high_resp  = 0xF1U;
+    resp.did_low_resp   = 0x01U;
+    resp.data1          = (uint8_t)FSM_STANDBY;
+    resp.data2          = 0x00U;
+    resp.data3          = 0x00U;
+    resp.data4          = 0x00U;
+    resp.data5          = 0x00U;
+
+    int32_t rc = can_tx_uds_response(&resp);
+    ASSERT_EQ(rc, CAN_OK);
+    ASSERT_EQ(can_hal_test_get_tx_count(), 1U);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    ASSERT_EQ(tx->id, (uint32_t)CAN_ID_UDS_RESPONSE);
+    ASSERT_EQ(tx->dlc, CAN_DLC_UDS_RESPONSE);
+    ASSERT_EQ(tx->data[0], 0x62U);
+    ASSERT_EQ(tx->data[1], 0xF1U);
+    ASSERT_EQ(tx->data[2], 0x01U);
+    ASSERT_EQ(tx->data[3], (uint8_t)FSM_STANDBY);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: RX decode — UDS Request with short DLC is rejected (FR-UDS-005)
+ *
+ *  Contract: can_rx_process() only accepts 0x7DF frames with
+ *  DLC == CAN_DLC_UDS_REQUEST (4). Shorter frames must leave
+ *  uds_request_pending at 0 so aeb_core_step() observes a no-op.
+ *  This locks the malformed-frame behaviour that was previously
+ *  implicit.
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_rx_uds_request_short_dlc)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    /* Only 3 bytes — missing the value field. */
+    uint8_t frame[3] = { 0x22U, 0xF1U, 0x01U };
+
+    can_rx_process(&state, CAN_ID_UDS_REQUEST, frame, 3U);
+
+    can_rx_data_t rx;
+    can_get_rx_data(&state, &rx);
+
+    ASSERT_EQ(rx.uds_request_pending, 0U);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: UDS request ack clears the pending flag
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_uds_request_ack)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    uint8_t frame[4] = { 0x22U, 0xF1U, 0x01U, 0x00U };
+    can_rx_process(&state, CAN_ID_UDS_REQUEST, frame, CAN_DLC_UDS_REQUEST);
+
+    can_rx_data_t rx;
+    can_get_rx_data(&state, &rx);
+    ASSERT_EQ(rx.uds_request_pending, 1U);
+
+    can_clear_uds_request_pending(&state);
+
+    can_get_rx_data(&state, &rx);
+    ASSERT_EQ(rx.uds_request_pending, 0U);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
  *  MAIN
  * ═══════════════════════════════════════════════════════════════════════ */
 int main(void)
@@ -353,8 +544,16 @@ int main(void)
     RUN(test_rx_timeout);
     RUN(test_rx_timeout_reset_on_valid_frame);
     RUN(test_tx_brake_cmd);
+    RUN(test_tx_brake_cmd_nan_brake_bar);
+    RUN(test_tx_brake_cmd_pos_inf_brake_bar);
+    RUN(test_tx_brake_cmd_neg_inf_brake_bar);
+    RUN(test_tx_brake_cmd_overflow_brake_bar);
     RUN(test_tx_fsm_period);
     RUN(test_tx_send_failure);
+    RUN(test_rx_uds_request);
+    RUN(test_rx_uds_request_short_dlc);
+    RUN(test_tx_uds_response);
+    RUN(test_uds_request_ack);
 
     printf("\n=== Results: %d run, %d passed, %d failed ===\n",
            tests_run, tests_passed, tests_failed);

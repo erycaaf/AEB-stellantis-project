@@ -6,6 +6,7 @@
 #include "aeb_perception.h"
 #include "aeb_config.h"
 #include <stddef.h>
+#include <math.h>
 
 #define FABSF(x) (((x) < 0.0f) ? -(x) : (x))
 
@@ -38,7 +39,8 @@ static uint8_t lidar_fault_detect(float32_t d_l)
     uint8_t bad;
     uint8_t fault;
 
-    bad = ((d_l < LIDAR_DIST_MIN) || (d_l > LIDAR_DIST_MAX)) ? 1U : 0U;
+    bad = (!isfinite(d_l) ||
+           (d_l < LIDAR_DIST_MIN) || (d_l > LIDAR_DIST_MAX)) ? 1U : 0U;
 
     if ((s_lidar.is_first == 0U) && (bad == 0U)) {
         if (FABSF(d_l - s_lidar.prev_d) > DIST_ROC_LIMIT) {
@@ -49,11 +51,12 @@ static uint8_t lidar_fault_detect(float32_t d_l)
     if (bad != 0U) {
         if (s_lidar.ctr < 255U) { s_lidar.ctr++; }
     } else {
-        s_lidar.ctr = 0U;
+        /* Update ROC baseline and arm is_first only on trustworthy frames —
+         * prevents a bad first frame from contaminating prev_d. */
+        s_lidar.ctr      = 0U;
+        s_lidar.prev_d   = d_l;
+        s_lidar.is_first = 0U;
     }
-
-    s_lidar.prev_d   = d_l;
-    s_lidar.is_first = 0U;
 
     fault = (s_lidar.ctr >= (uint8_t)SENSOR_FAULT_CYCLES) ? 1U : 0U;
     return fault;
@@ -83,7 +86,8 @@ static uint8_t radar_fault_detect(float32_t d_r, float32_t vr_r)
     uint8_t bad;
     uint8_t fault;
 
-    bad = ((d_r < RADAR_DIST_MIN) || (d_r > RADAR_DIST_MAX) ||
+    bad = (!isfinite(d_r) || !isfinite(vr_r) ||
+           (d_r < RADAR_DIST_MIN) || (d_r > RADAR_DIST_MAX) ||
            (FABSF(vr_r) > MAX_REL_VEL)) ? 1U : 0U;
 
     if ((s_radar.is_first == 0U) && (bad == 0U)) {
@@ -96,12 +100,13 @@ static uint8_t radar_fault_detect(float32_t d_r, float32_t vr_r)
     if (bad != 0U) {
         if (s_radar.ctr < 255U) { s_radar.ctr++; }
     } else {
-        s_radar.ctr = 0U;
+        /* Update ROC baseline and arm is_first only on trustworthy frames —
+         * prevents a bad first frame from contaminating prev_d/prev_vr. */
+        s_radar.ctr      = 0U;
+        s_radar.prev_d   = d_r;
+        s_radar.prev_vr  = vr_r;
+        s_radar.is_first = 0U;
     }
-
-    s_radar.prev_d   = d_r;
-    s_radar.prev_vr  = vr_r;
-    s_radar.is_first = 0U;
 
     fault = (s_radar.ctr >= (uint8_t)SENSOR_FAULT_CYCLES) ? 1U : 0U;
     return fault;
@@ -143,11 +148,13 @@ static void kalman_fusion(
     uint8_t l_fault, uint8_t r_fault, uint8_t fi,
     float32_t *out_d, float32_t *out_v, float32_t *out_conf)
 {
-    uint8_t l_ok = ((l_fault == 0U) && (fi == 0U)) ? 1U : 0U;
-    uint8_t r_ok = ((r_fault == 0U) && (fi == 0U)) ? 1U : 0U;
+    uint8_t l_ok = ((l_fault == 0U) && (fi == 0U) && isfinite(d_l)) ? 1U : 0U;
+    uint8_t r_ok = ((r_fault == 0U) && (fi == 0U) &&
+                    isfinite(d_r) && isfinite(vr_r)) ? 1U : 0U;
 
-    /* Seed state on first call: x = [d_r, vr_r] */
-    if (s_kalman.initialized == 0U) {
+    /* Seed deferred until a finite radar frame; until then, l_ok/r_ok are
+     * both 0 and *out_conf below is forced to 0.0f — "no information" signalled. */
+    if ((s_kalman.initialized == 0U) && isfinite(d_r) && isfinite(vr_r)) {
         s_kalman.x[0] = d_r;
         s_kalman.x[1] = vr_r;
         s_kalman.initialized = 1U;
@@ -283,8 +290,14 @@ void perception_step(const raw_sensor_input_t *in, perception_output_t *out)
     float32_t fused_v;
     float32_t conf;
 
-    out->v_ego      = in->v_ego;
     out->fault_flag = 0U;
+
+    if (isfinite(in->v_ego)) {
+        out->v_ego = in->v_ego;
+    } else {
+        out->v_ego       = 0.0f;
+        out->fault_flag |= AEB_FAULT_CAN_TO;
+    }
 
     /* CAN timeout: hold last Kalman estimate, flag all faults */
     if (in->can_timeout != 0U) {
