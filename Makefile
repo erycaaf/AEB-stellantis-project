@@ -21,6 +21,13 @@
 #   make misra-decision    — cppcheck MISRA scoped to aeb_ttc / aeb_fsm
 #   make vv-decision       — full V&V stack
 #
+# Targets (ASIL-D V&V — Perception module):
+#   make mcdc-perception   — MC/DC coverage (nominal + complementary combined union)
+#   make fault-perception  — systematic fault-injection suite
+#   make memory-perception — Valgrind + ASan + UBSan on Perception suites
+#   make misra-perception  — cppcheck MISRA scoped to aeb_perception.{c,h}
+#   make vv-perception     — full V&V stack
+#
 # V&V artefacts land under reports/vv_<module>/. Consolidated reports
 # live in the team documentation area, outside this repo.
 
@@ -49,6 +56,8 @@ mcdc-uds fault-uds memory-uds misra-uds html-uds vv-uds: \
         VV_REPORT_DIR := reports/vv_uds
 mcdc-decision fault-decision memory-decision misra-decision html-decision vv-decision: \
         VV_REPORT_DIR := reports/vv_decision
+mcdc-perception fault-perception memory-perception misra-perception vv-perception: \
+        VV_REPORT_DIR := reports/vv_perception
 
 # All sources (stubs + real code)
 SRC_ALL = src/communication/aeb_can.c \
@@ -67,7 +76,9 @@ SRC_SMOKE = src/communication/aeb_can.c stubs/can_hal.c tests/test_smoke.c
 
 SRC_CAN_TEST = src/communication/aeb_can.c stubs/can_hal.c tests/test_can.c
 
-SRC_PERCEPTION_TEST = src/perception/aeb_perception.c tests/test_perception.c
+SRC_PERCEPTION_TEST       = src/perception/aeb_perception.c tests/test_perception.c
+SRC_PERCEPTION_FAULT_TEST = src/perception/aeb_perception.c tests/test_perception_fault.c
+SRC_PERCEPTION_MCDC_TEST  = src/perception/aeb_perception.c tests/test_perception_mcdc.c
 
 SRC_DECISION_TEST       = src/decision/aeb_ttc.c src/decision/aeb_fsm.c \
                           tests/test_decision.c
@@ -109,7 +120,8 @@ TEST_BINS = test_smoke test_can test_perception test_decision \
 .PHONY: build test misra clean vv-clean \
         mcdc-uds fault-uds memory-uds misra-uds html-uds vv-uds \
         mcdc-decision fault-decision memory-decision misra-decision html-decision vv-decision \
-        mcdc-pid-alert fault-pid-alert memory-pid-alert misra-pid-alert vv-pid-alert
+        mcdc-pid-alert fault-pid-alert memory-pid-alert misra-pid-alert vv-pid-alert \
+        mcdc-perception fault-perception memory-perception misra-perception vv-perception
 
 build:
 	$(CC) $(CFLAGS) -c $(SRC_ALL)
@@ -500,6 +512,92 @@ vv-pid-alert: mcdc-pid-alert fault-pid-alert memory-pid-alert misra-pid-alert
 	@echo ""
 	@echo "=== PID + Alert V&V stack complete — artefacts in $(VV_REPORT_DIR)/ ==="
 
+# ── ASIL-D V&V targets (Perception) ─────────────────────────────────────
+
+mcdc-perception:
+	@rm -rf $(VV_REPORT_DIR)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR)/coverage_mcdc
+	# Compile aeb_perception.c once with coverage into a shared .o.
+	# Both test binaries link against the same object so their .gcda
+	# writes accumulate onto one aeb_perception.gcda — a single gcov
+	# call then reports the real union of coverage (no hardcoded echo).
+	cd $(VV_REPORT_DIR)/coverage_mcdc && \
+	  $(CC_COV) -Wall -Wextra -Wpedantic -std=c99 -O0 -g -I$(CURDIR)/include -I$(CURDIR)/stubs --coverage -fcondition-coverage \
+	    -c $(CURDIR)/src/perception/aeb_perception.c && \
+	  $(CC_COV) -Wall -Wextra -Wpedantic -std=c99 -O0 -g -I$(CURDIR)/include -I$(CURDIR)/stubs --coverage -fcondition-coverage \
+	    aeb_perception.o $(CURDIR)/tests/test_perception.c      -lm -o test_nominal && \
+	  $(CC_COV) -Wall -Wextra -Wpedantic -std=c99 -O0 -g -I$(CURDIR)/include -I$(CURDIR)/stubs --coverage -fcondition-coverage \
+	    aeb_perception.o $(CURDIR)/tests/test_perception_mcdc.c -lm -o test_mcdc    && \
+	  ./test_nominal > run.log      2>&1 && \
+	  ./test_mcdc    > run_mcdc.log 2>&1 && \
+	  $(GCOV) -b -c --conditions aeb_perception.c > gcov_summary_combined.txt
+	@echo "--- Nominal suite ---"
+	@grep "Results:" $(VV_REPORT_DIR)/coverage_mcdc/run.log
+	@echo "--- Complementary MC/DC suite ---"
+	@grep "Results:" $(VV_REPORT_DIR)/coverage_mcdc/run_mcdc.log
+	@echo "--- Combined MC/DC (real measured union) ---"
+	@grep -E "Lines|Branches|Taken|Condition|Calls" \
+	  $(VV_REPORT_DIR)/coverage_mcdc/gcov_summary_combined.txt
+	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
+
+fault-perception:
+	@mkdir -p $(VV_REPORT_DIR)/fault_injection
+	$(CC) $(CFLAGS) -O0 -g -o $(VV_REPORT_DIR)/fault_injection/test_perception_fault \
+		$(SRC_PERCEPTION_FAULT_TEST) $(LDFLAGS)
+	@$(VV_REPORT_DIR)/fault_injection/test_perception_fault \
+		| tee $(VV_REPORT_DIR)/fault_injection/run.log; \
+		echo ""; echo "(non-zero exit expected while bugs are pending patch)"
+
+memory-perception:
+	@mkdir -p $(VV_REPORT_DIR)/memory_safety
+	# Valgrind on unsanitised binaries
+	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs \
+		-o $(VV_REPORT_DIR)/memory_safety/test_perception_val \
+		$(SRC_PERCEPTION_TEST) $(LDFLAGS)
+	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs \
+		-o $(VV_REPORT_DIR)/memory_safety/test_perception_fault_val \
+		$(SRC_PERCEPTION_FAULT_TEST) $(LDFLAGS)
+	@echo "--- Valgrind: test_perception (nominal) ---"
+	@valgrind --error-exitcode=0 --leak-check=full --quiet \
+		$(VV_REPORT_DIR)/memory_safety/test_perception_val > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_perception.log; \
+		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_perception.log; \
+		[ ! -s $(VV_REPORT_DIR)/memory_safety/valgrind_test_perception.log ] && echo "(clean)" || true
+	@echo "--- Valgrind: test_perception_fault ---"
+	@valgrind --error-exitcode=0 --leak-check=full --quiet \
+		$(VV_REPORT_DIR)/memory_safety/test_perception_fault_val > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_perception_fault.log; \
+		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_perception_fault.log; \
+		[ ! -s $(VV_REPORT_DIR)/memory_safety/valgrind_test_perception_fault.log ] && echo "(clean)" || true
+	# ASan + UBSan (sanitised binaries; separate from Valgrind to avoid collisions)
+	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_perception_san \
+		$(SRC_PERCEPTION_TEST) $(LDFLAGS)
+	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_perception_fault_san \
+		$(SRC_PERCEPTION_FAULT_TEST) $(LDFLAGS)
+	@echo "--- ASan+UBSan: test_perception (nominal) ---"
+	@$(VV_REPORT_DIR)/memory_safety/test_perception_san > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_perception.log || true
+	@[ -s $(VV_REPORT_DIR)/memory_safety/ubsan_test_perception.log ] && \
+		cat $(VV_REPORT_DIR)/memory_safety/ubsan_test_perception.log || echo "(clean)"
+	@echo "--- ASan+UBSan: test_perception_fault ---"
+	@$(VV_REPORT_DIR)/memory_safety/test_perception_fault_san > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_perception_fault.log || true
+	@grep "runtime error" $(VV_REPORT_DIR)/memory_safety/ubsan_test_perception_fault.log \
+		| sort -u || echo "(clean)"
+
+misra-perception:
+	@mkdir -p $(VV_REPORT_DIR)/misra
+	cppcheck --addon=misra --std=c99 -Iinclude -Istubs \
+		--suppress=unusedFunction --suppress=missingIncludeSystem \
+		--enable=all \
+		--xml --xml-version=2 \
+		src/perception/aeb_perception.c include/aeb_perception.h \
+		2> $(VV_REPORT_DIR)/misra/cppcheck_perception.xml
+	@echo "cppcheck XML -> $(VV_REPORT_DIR)/misra/cppcheck_perception.xml"
+
+vv-perception: mcdc-perception fault-perception memory-perception misra-perception
+	@echo ""
+	@echo "=== Perception V&V stack complete — artefacts in $(VV_REPORT_DIR)/ ==="
+
 # ── Clean ────────────────────────────────────────────────────────────────
 
 vv-clean:
@@ -521,7 +619,14 @@ vv-clean:
 	       reports/vv_decision/coverage_html \
 	       reports/vv_decision/misra_html \
 	       reports/vv_decision/memory_html \
-	       reports/vv_decision/fault_html
+	       reports/vv_decision/fault_html \
+	       reports/vv_perception/coverage_mcdc/test_nominal \
+	       reports/vv_perception/coverage_mcdc/test_mcdc \
+	       reports/vv_perception/coverage_mcdc/aeb_perception.o \
+	       reports/vv_perception/coverage_mcdc/*.gcda \
+	       reports/vv_perception/coverage_mcdc/*.gcno \
+	       reports/vv_perception/fault_injection/test_perception* \
+	       reports/vv_perception/memory_safety/test_perception*
 
 clean: vv-clean
 	rm -f $(TEST_BINS) test_decision_cov test_decision_mcdc test_decision_fault \
