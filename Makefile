@@ -43,14 +43,12 @@ CFLAGS_SAN = -Wall -Wextra -Wpedantic -std=c99 -O0 -g -Iinclude -Istubs \
 GCOV       = gcov-14
 GCOVR     ?= $(if $(wildcard venv/bin/gcovr),venv/bin/gcovr,gcovr)
 
-# Per-target V&V report directory — keeps the UDS, Decision and CAN stacks
+# Per-target V&V report directory — keeps the UDS and Decision stacks
 # from overwriting each other when both are invoked in the same workflow.
 mcdc-uds fault-uds memory-uds misra-uds html-uds vv-uds: \
         VV_REPORT_DIR := reports/vv_uds
 mcdc-decision fault-decision memory-decision misra-decision html-decision vv-decision: \
         VV_REPORT_DIR := reports/vv_decision
-mcdc-can fault-can memory-can misra-can vv-can: \
-        VV_REPORT_DIR := reports/vv_can
 
 # All sources (stubs + real code)
 SRC_ALL = src/communication/aeb_can.c \
@@ -663,7 +661,12 @@ vv-clean:
 	       reports/vv_decision/coverage_html \
 	       reports/vv_decision/misra_html \
 	       reports/vv_decision/memory_html \
-	       reports/vv_decision/fault_html
+	       reports/vv_decision/fault_html \
+	       reports/vv_can/coverage_mcdc/test_can* \
+	       reports/vv_can/fault_injection/test_can* \
+	       reports/vv_can/memory_safety/test_can* \
+	       reports/vv_can/coverage_mcdc/html \
+	       reports/vv_can/misra
 
 clean: vv-clean
 	rm -f $(TEST_BINS) test_decision_cov test_decision_mcdc test_decision_fault \
