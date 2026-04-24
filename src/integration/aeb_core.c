@@ -122,6 +122,12 @@ void aeb_core_step(aeb_core_state_t *state,
                        0U);  /* actuator_fault: not modelled */
 
     /* ── 10. UDS request service — FR-UDS-005 (same-cycle response) ───── */
+    /* Retry policy: on TX failure (bus-off, TX mailbox full, HAL error)
+     * we leave uds_request_pending = 1 so the next 10 ms tick retries the
+     * transmission. Silently clearing would force the requester into a
+     * P2_server timeout per ISO 14229-2 §6.3 instead of the best-effort
+     * retry at the ECU level that ASIL-D prefers for an idempotent DID
+     * read / short RoutineControl request. */
     if (can_rx.uds_request_pending != 0U)
     {
         uds_response_t uds_resp = {0};
@@ -132,8 +138,10 @@ void aeb_core_step(aeb_core_state_t *state,
                             &state->fsm,
                             &state->pid,
                             &state->ttc);
-        (void)can_tx_uds_response(&uds_resp);
-        can_ack_uds_request(&state->can);
+        if (can_tx_uds_response(&uds_resp) == CAN_OK)
+        {
+            can_clear_uds_request_pending(&state->can);
+        }
     }
 
     /* ── 11. CAN TX ───────────────────────────────────────────────────── */

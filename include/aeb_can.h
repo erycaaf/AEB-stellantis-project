@@ -78,7 +78,8 @@ typedef struct
     /* From UDS_Request (0x7DF) — FR-UDS-005 */
     uds_request_t uds_request;         /**< Decoded UDS request frame    */
     uint8_t       uds_request_pending; /**< 1 when a new request arrived;
-                                            cleared by can_ack_uds_request() */
+                                            cleared by can_clear_uds_request_pending()
+                                            after the response transmits. */
 
     /* Status */
     uint8_t   rx_timeout_flag;   /**< 1 if radar RX timed out            */
@@ -203,15 +204,21 @@ void can_get_rx_data(const can_state_t *state,
 int32_t can_tx_uds_response(const uds_response_t *resp);
 
 /**
- * @brief Acknowledge the pending UDS request.
+ * @brief Mark the current UDS request as serviced and clear the pending flag.
  *
- * Clears the uds_request_pending flag after aeb_core_step() has serviced
- * the request.  Must be called exactly once per request to prevent
- * double-processing on the next cycle.
+ * The caller (aeb_core_step) is responsible for deciding *when* to call
+ * this — typically only after can_tx_uds_response() has confirmed the
+ * response transmitted successfully. Clearing the flag on TX failure
+ * silently drops the response and forces the requester into a P2_server
+ * timeout (ISO 14229-2 §6.3) instead of a best-effort retry at the ECU
+ * level. See aeb_core.c step 10 for the retry policy.
+ *
+ * Must be called exactly once per successfully-serviced request to
+ * prevent double-processing on the next cycle.
  *
  * @param[in,out] state  Module state.
  */
-void can_ack_uds_request(can_state_t *state);
+void can_clear_uds_request_pending(can_state_t *state);
 
 /* ── Signal encode/decode helpers (FR-CAN-003) ───────────────────────── */
 

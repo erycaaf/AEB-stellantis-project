@@ -512,8 +512,11 @@ int32_t can_tx_uds_response(const uds_response_t *resp)
 
 /**
  * @brief Clear the pending UDS request flag after it has been serviced.
+ *
+ * Must only be called after can_tx_uds_response() reported CAN_OK.
+ * See aeb_can.h for the retry semantics rationale.
  */
-void can_ack_uds_request(can_state_t *state)
+void can_clear_uds_request_pending(can_state_t *state)
 {
     if (state != NULL)
     {

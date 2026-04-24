@@ -404,7 +404,7 @@ TEST(test_uds_request_ack)
     can_get_rx_data(&state, &rx);
     ASSERT_EQ(rx.uds_request_pending, 1U);
 
-    can_ack_uds_request(&state);
+    can_clear_uds_request_pending(&state);
 
     can_get_rx_data(&state, &rx);
     ASSERT_EQ(rx.uds_request_pending, 0U);
