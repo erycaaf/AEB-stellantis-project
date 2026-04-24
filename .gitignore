@@ -46,6 +46,18 @@ reports/vv_perception/**/test_mcdc
 reports/vv_perception/**/*.gcda
 reports/vv_perception/**/*.gcno
 
+# V&V intermediate artefacts — CAN
+# Only text/XML/CSV/gcov evidence under reports/vv_can/ is committed.
+reports/vv_can/**/test_can*
+reports/vv_can/**/*.gcda
+reports/vv_can/**/*.gcno
+
+# V&V HTML bundles — CAN — regenerated locally, never committed
+reports/vv_can/coverage_html/
+reports/vv_can/misra_html/
+reports/vv_can/memory_html/
+reports/vv_can/fault_html/
+
 # Consolidated V&V reports live in the team docs area, not in the repo
 reports/vv_uds/*.tex
 reports/vv_uds/*.pdf
@@ -53,6 +65,8 @@ reports/vv_decision/*.tex
 reports/vv_decision/*.pdf
 reports/vv_perception/*.tex
 reports/vv_perception/*.pdf
+reports/vv_can/*.tex
+reports/vv_can/*.pdf
 
 # Legacy top-level V&V directories (pre-refactor — root-anchored)
 /coverage_mcdc/
