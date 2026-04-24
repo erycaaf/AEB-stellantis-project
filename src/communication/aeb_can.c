@@ -78,27 +78,10 @@ static uint32_t encode_unsigned(float32_t physical,
                                 float32_t factor,
                                 float32_t offset)
 {
-    /* Robust float-to-uint32 conversion for DBC signal packing.
-     *
-     * IEEE 754 NaN compares false to everything, so a naive
-     * `raw_f < 0.0F` guard lets NaN fall through to
-     * `(uint32_t)(raw_f + 0.5F)` — undefined behaviour per C11
-     * §6.3.1.4. ±Inf and very large finite floats hit the same UB.
-     * Division by zero in (physical - offset) / factor also produces
-     * ±Inf → UB.
-     *
-     * This function guarantees deterministic output for any float
-     * input: finite in-range values encode normally; non-finite or
-     * out-of-range values saturate to 0 (negative / NaN) or
-     * UINT32_MAX (positive overflow) so the resulting CAN frame is
-     * always well-defined — never UB, never toolchain-dependent.
-     *
-     * Upper bound 4294967040.0F (= UINT32_MAX - 255) is the largest
-     * float32 value that, after +0.5F rounding, still casts into
-     * uint32 without overflow. Values above that saturate.
-     *
-     * Single exit point (MISRA C:2012 Rule 15.5).
-     * Surfaced by V&V cross-validation on PR #89 (Bug 1). */
+    /* NaN / ±Inf / overflow on the float→uint32 cast is UB per C11
+     * §6.3.1.4; saturate at 4294967040.0F (UINT32_MAX − 255, largest
+     * float32 that rounds cleanly into range). See commit body for
+     * full rationale. */
     uint32_t raw = 0U;
 
     if (isfinite(physical))
