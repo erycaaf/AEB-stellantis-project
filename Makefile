@@ -79,6 +79,11 @@ SRC_PID_TEST = src/execution/aeb_pid.c tests/test_pid.c
 
 SRC_ALERT_TEST = src/execution/aeb_alert.c tests/test_alert.c
 
+SRC_PID_MCDC_TEST    = src/execution/aeb_pid.c   tests/test_pid_mcdc.c
+SRC_ALERT_MCDC_TEST  = src/execution/aeb_alert.c tests/test_alert_mcdc.c
+SRC_PID_FAULT_TEST   = src/execution/aeb_pid.c   tests/test_pid_fault.c
+SRC_ALERT_FAULT_TEST = src/execution/aeb_alert.c tests/test_alert_fault.c
+
 SRC_UDS_TEST       = src/communication/aeb_uds.c tests/test_uds.c
 SRC_UDS_FAULT_TEST = src/communication/aeb_uds.c tests/test_uds_fault.c
 
@@ -102,8 +107,8 @@ TEST_BINS = test_smoke test_can test_perception test_decision \
 
 .PHONY: build test misra clean vv-clean \
         mcdc-uds fault-uds memory-uds misra-uds vv-uds \
-        mcdc-decision fault-decision memory-decision misra-decision vv-decision
-
+        mcdc-decision fault-decision memory-decision misra-decision vv-decision \
+        mcdc-pid-alert fault-pid-alert memory-pid-alert misra-pid-alert vv-pid-alert
 build:
 	$(CC) $(CFLAGS) -c $(SRC_ALL)
 	@echo "=== Build OK: zero warnings ==="
@@ -308,6 +313,105 @@ misra-decision:
 vv-decision: mcdc-decision fault-decision memory-decision misra-decision
 	@echo ""
 	@echo "=== Decision V&V stack complete — artefacts in $(VV_REPORT_DIR)/ ==="
+
+	# ── ASIL-D V&V targets (Execution: PID + Alert) ────────────────────────
+
+mcdc-pid-alert fault-pid-alert memory-pid-alert misra-pid-alert vv-pid-alert: \
+	VV_REPORT_DIR := reports/vv_pid_alert
+
+mcdc-pid-alert:
+	@rm -rf $(VV_REPORT_DIR)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR)/coverage_mcdc
+	@echo "=== Building MC/DC test binaries (gcc-14 -fcondition-coverage) ==="
+	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_pid        $(SRC_PID_TEST)        $(LDFLAGS)
+	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_pid_mcdc   $(SRC_PID_MCDC_TEST)   $(LDFLAGS)
+	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_alert      $(SRC_ALERT_TEST)      $(LDFLAGS)
+	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_alert_mcdc $(SRC_ALERT_MCDC_TEST) $(LDFLAGS)
+	@echo "=== Running tests ==="
+	cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_pid        > /dev/null
+	cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_pid_mcdc   > /dev/null
+	cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_alert      > /dev/null
+	cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_alert_mcdc > /dev/null
+	@echo ""
+	@echo "=== Generating .gcov annotated sources (evidence) ==="
+	@(cd $(VV_REPORT_DIR)/coverage_mcdc && \
+	    gcov-14 --conditions -b -c test_pid_mcdc-aeb_pid.gcda     > /dev/null && \
+	    gcov-14 --conditions -b -c test_alert_mcdc-aeb_alert.gcda > /dev/null)
+	@echo "Generated: aeb_pid.c.gcov, aeb_alert.c.gcov"
+	@echo ""
+	@echo "=== MC/DC Summary ==="
+	@{ \
+	  echo "MC/DC Coverage Summary — PID + Alert"; \
+	  echo "Generated: $$(date -Iseconds)"; \
+	  echo "Toolchain: $$(gcc-14 --version | head -1)"; \
+	  echo "=============================================="; \
+	  echo ""; \
+	  echo "-- aeb_pid.c --"; \
+	  (cd $(VV_REPORT_DIR)/coverage_mcdc && gcov-14 --conditions -b -c test_pid_mcdc-aeb_pid.gcda 2>&1 | grep -E "File|Lines|Branches|Condition|Taken"); \
+	  echo ""; \
+	  echo "-- aeb_alert.c --"; \
+	  (cd $(VV_REPORT_DIR)/coverage_mcdc && gcov-14 --conditions -b -c test_alert_mcdc-aeb_alert.gcda 2>&1 | grep -E "File|Lines|Branches|Condition|Taken"); \
+	} > $(VV_REPORT_DIR)/coverage_mcdc/gcov_summary.txt
+	@cat $(VV_REPORT_DIR)/coverage_mcdc/gcov_summary.txt
+	@echo ""
+	@echo "=== Generating HTML report (gcovr) ==="
+	cd $(VV_REPORT_DIR)/coverage_mcdc && gcovr --gcov-executable='gcov-14 --conditions' \
+	                                             --root=../../.. \
+	                                             --filter='.*/src/execution/.*' \
+	                                             --html-details report.html \
+	                                             --xml coverage.xml \
+	                                             --txt-summary
+	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
+
+fault-pid-alert:
+	@mkdir -p $(VV_REPORT_DIR)/fault_injection
+	@echo "=== Building fault injection tests ==="
+	$(CC) $(CFLAGS) -O0 -g -o $(VV_REPORT_DIR)/fault_injection/test_pid_fault   $(SRC_PID_FAULT_TEST)   $(LDFLAGS)
+	$(CC) $(CFLAGS) -O0 -g -o $(VV_REPORT_DIR)/fault_injection/test_alert_fault $(SRC_ALERT_FAULT_TEST) $(LDFLAGS)
+	@echo ""
+	@echo "=== PID Fault Injection Test Suite ==="
+	-$(VV_REPORT_DIR)/fault_injection/test_pid_fault   | tee $(VV_REPORT_DIR)/fault_injection/pid_fault.log
+	@echo ""
+	@echo "=== Alert Fault Injection Test Suite ==="
+	-$(VV_REPORT_DIR)/fault_injection/test_alert_fault | tee $(VV_REPORT_DIR)/fault_injection/alert_fault.log
+	@echo ""
+	@echo "=== Logs saved in $(VV_REPORT_DIR)/fault_injection/ ==="
+
+memory-pid-alert:
+	@mkdir -p $(VV_REPORT_DIR)/memory_safety
+	@echo "=== Valgrind ==="
+	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs -o $(VV_REPORT_DIR)/memory_safety/test_pid_val   $(SRC_PID_TEST)   $(LDFLAGS)
+	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs -o $(VV_REPORT_DIR)/memory_safety/test_alert_val $(SRC_ALERT_TEST) $(LDFLAGS)
+	@valgrind --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=1 \
+		$(VV_REPORT_DIR)/memory_safety/test_pid_val > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_pid.log; \
+		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_pid.log; \
+		[ ! -s $(VV_REPORT_DIR)/memory_safety/valgrind_test_pid.log ] && echo "(clean)" || true
+	@valgrind --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=all --error-exitcode=1 \
+		$(VV_REPORT_DIR)/memory_safety/test_alert_val > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_alert.log; \
+		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_alert.log; \
+		[ ! -s $(VV_REPORT_DIR)/memory_safety/valgrind_test_alert.log ] && echo "(clean)" || true
+	@echo ""
+	@echo "=== ASan + UBSan ==="
+	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_pid_san   $(SRC_PID_TEST)   $(LDFLAGS)
+	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_alert_san $(SRC_ALERT_TEST) $(LDFLAGS)
+	@$(VV_REPORT_DIR)/memory_safety/test_pid_san   > /dev/null 2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_pid.log;   cat $(VV_REPORT_DIR)/memory_safety/ubsan_test_pid.log;   [ ! -s $(VV_REPORT_DIR)/memory_safety/ubsan_test_pid.log ]   && echo "(clean)" || true
+	@$(VV_REPORT_DIR)/memory_safety/test_alert_san > /dev/null 2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_alert.log; cat $(VV_REPORT_DIR)/memory_safety/ubsan_test_alert.log; [ ! -s $(VV_REPORT_DIR)/memory_safety/ubsan_test_alert.log ] && echo "(clean)" || true
+
+misra-pid-alert:
+	@mkdir -p $(VV_REPORT_DIR)/misra
+	cppcheck --addon=misra --std=c99 -Iinclude -Istubs \
+		--suppress=unusedFunction --suppress=missingIncludeSystem \
+		--enable=all \
+		--xml --xml-version=2 \
+		src/execution/aeb_pid.c   include/aeb_pid.h \
+		src/execution/aeb_alert.c include/aeb_alert.h \
+		2> $(VV_REPORT_DIR)/misra/cppcheck_pid_alert.xml
+	@echo "cppcheck XML -> $(VV_REPORT_DIR)/misra/cppcheck_pid_alert.xml"
+
+vv-pid-alert: mcdc-pid-alert fault-pid-alert memory-pid-alert misra-pid-alert
+	@echo ""
+	@echo "=== PID + Alert V&V stack complete — artefacts in $(VV_REPORT_DIR)/ ==="
 
 # ── Clean ────────────────────────────────────────────────────────────────
 

@@ -83,3 +83,11 @@ docs/Memory_Safety_Report.html
 reports/vv_*/coverage_mcdc/test_*
 reports/vv_*/fault_injection/test_*
 reports/vv_*/memory_safety/bin/
+
+# Memory safety instrumented binaries
+reports/vv_*/memory_safety/test_*_san
+reports/vv_*/memory_safety/test_*_val
+
+# Memory safety instrumented binaries (not evidence, regenerated each run)
+reports/vv_*/memory_safety/test_*_san
+reports/vv_*/memory_safety/test_*_val
