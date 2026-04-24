@@ -1,0 +1,1 @@
+genhtml reports/vv_decision/coverage_html/coverage_decision.info --branch-coverage --title 'Decision Coverage' --legend --output-directory reports/vv_decision/coverage_html

@@ -1,0 +1,111 @@
+        -:    0:Source:src/decision/aeb_ttc.c
+        -:    0:Graph:reports/vv_decision/coverage_mcdc/test_decision_mcdc-aeb_ttc.gcno
+        -:    0:Data:reports/vv_decision/coverage_mcdc/test_decision_mcdc-aeb_ttc.gcda
+        -:    0:Runs:1
+        -:    1:/**
+        -:    2: * @file aeb_ttc.c
+        -:    3: * @brief Implementation of TTC and braking distance calculations.
+        -:    4: * @author Lourenço Jamba Mphili
+        -:    5: * @requirements FR-DEC-001, FR-DEC-002, FR-DEC-003
+        -:    6: * @misra Fully compliant with MISRA C:2012
+        -:    7: */
+        -:    8:
+        -:    9:#include "aeb_ttc.h"
+        -:   10:#include "aeb_config.h"
+        -:   11:#include <stddef.h>
+        -:   12:
+function ttc_calc called 3 returned 100% blocks executed 75%
+        3:   13:float32_t ttc_calc(float32_t distance, float32_t v_rel)
+        -:   14:{
+        3:   15:    float32_t ttc_result = TTC_MAX;
+        -:   16:
+        -:   17:    /* Safety check for invalid distance */
+        3:   18:    if (distance > 0.0f)
+branch  0 taken 1 (fallthrough)
+branch  1 taken 2
+condition outcomes covered 2/2
+        -:   19:    {
+        -:   20:        /* FR-DEC-001: Only calculate when approaching (v_rel > V_REL_MIN) */
+        1:   21:        if (v_rel > V_REL_MIN)
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+condition outcomes covered 1/2
+condition  0 not covered (false)
+        -:   22:        {
+        1:   23:            ttc_result = distance / v_rel;
+        -:   24:
+        -:   25:            /* Clamp to [0, TTC_MAX] seconds per SRS */
+        1:   26:            if (ttc_result > TTC_MAX)
+branch  0 taken 1 (fallthrough)
+branch  1 taken 0
+condition outcomes covered 1/2
+condition  0 not covered (false)
+        -:   27:            {
+        1:   28:                ttc_result = TTC_MAX;
+        -:   29:            }
+    #####:   30:            else if (ttc_result < 0.0f)
+branch  0 never executed (fallthrough)
+branch  1 never executed
+condition outcomes covered 0/2
+condition  0 not covered (true false)
+        -:   31:            {
+    #####:   32:                ttc_result = 0.0f;
+        -:   33:            }
+        -:   34:        }
+        -:   35:    }
+        -:   36:
+        3:   37:    return ttc_result;
+        -:   38:}
+        -:   39:
+function d_brake_calc called 0 returned 0% blocks executed 0%
+    #####:   40:float32_t d_brake_calc(float32_t v_ego)
+        -:   41:{
+        -:   42:    float32_t d_brake;
+        -:   43:
+        -:   44:    /* FR-DEC-002: d_brake = v² / (2 * a) with a = DECEL_L3 = 6.0 m/s² */
+    #####:   45:    d_brake = (v_ego * v_ego) / (2.0f * DECEL_L3);
+        -:   46:
+        -:   47:    /* Physical lower bound */
+    #####:   48:    if (d_brake < 0.0f)
+branch  0 never executed (fallthrough)
+branch  1 never executed
+condition outcomes covered 0/2
+condition  0 not covered (true false)
+        -:   49:    {
+    #####:   50:        d_brake = 0.0f;
+        -:   51:    }
+        -:   52:
+    #####:   53:    return d_brake;
+        -:   54:}
+        -:   55:
+function ttc_process called 2 returned 100% blocks executed 40%
+        2:   56:void ttc_process(const perception_output_t * const perception,
+        -:   57:                 ttc_output_t * const ttc_out)
+        -:   58:{
+        -:   59:    /* Defensive checks */
+        2:   60:    if ((perception == NULL) || (ttc_out == NULL))
+branch  0 taken 1 (fallthrough)
+branch  1 taken 1
+branch  2 taken 1 (fallthrough)
+branch  3 taken 0
+condition outcomes covered 2/4
+condition  0 not covered (false)
+condition  1 not covered (false)
+        -:   61:    {
+        2:   62:        return;
+        -:   63:    }
+        -:   64:
+        -:   65:    /* FR-DEC-003: Use v_rel directly from perception (the Perception module already computed it) */
+        -:   66:    /* Set closing flag (v_rel > V_REL_MIN means approaching) */
+    #####:   67:    ttc_out->is_closing = (perception->v_rel > V_REL_MIN) ? 1U : 0U;
+branch  0 never executed (fallthrough)
+branch  1 never executed
+condition outcomes covered 0/2
+condition  0 not covered (true false)
+        -:   68:
+        -:   69:    /* Calculate TTC and braking distance */
+    #####:   70:    ttc_out->ttc = ttc_calc(perception->distance, perception->v_rel);
+call    0 never executed
+    #####:   71:    ttc_out->d_brake = d_brake_calc(perception->v_ego);
+call    0 never executed
+        -:   72:}
