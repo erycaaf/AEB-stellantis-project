@@ -45,7 +45,7 @@ GCOVR     ?= $(if $(wildcard venv/bin/gcovr),venv/bin/gcovr,gcovr)
 
 # Per-target V&V report directory — keeps the UDS and Decision stacks
 # from overwriting each other when both are invoked in the same workflow.
-mcdc-uds fault-uds memory-uds misra-uds vv-uds: \
+mcdc-uds fault-uds memory-uds misra-uds html-uds vv-uds: \
         VV_REPORT_DIR := reports/vv_uds
 mcdc-decision fault-decision memory-decision misra-decision vv-decision: \
         VV_REPORT_DIR := reports/vv_decision
