@@ -31,6 +31,13 @@ reports/vv_decision/**/*.gcda
 reports/vv_decision/**/*.gcno
 reports/vv_decision/coverage_mcdc/report.*
 
+# V&V HTML bundles — regenerated locally by `make html-decision` and
+# published to gh-pages by the publish-pages job; never committed.
+reports/vv_decision/coverage_html/
+reports/vv_decision/misra_html/
+reports/vv_decision/memory_html/
+reports/vv_decision/fault_html/
+
 # Consolidated V&V reports live in the team docs area, not in the repo
 reports/vv_uds/*.tex
 reports/vv_uds/*.pdf
