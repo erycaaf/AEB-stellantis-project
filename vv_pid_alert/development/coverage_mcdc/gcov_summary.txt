@@ -1,5 +1,5 @@
 MC/DC Coverage Summary — PID + Alert
-Generated: 2026-04-24T14:40:28+00:00
+Generated: 2026-04-24T18:35:17+00:00
 Toolchain: gcc-14 (Ubuntu 14.2.0-4ubuntu2~24.04.1) 14.2.0
 ==============================================
 
