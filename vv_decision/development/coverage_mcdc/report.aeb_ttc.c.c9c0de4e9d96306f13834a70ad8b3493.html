@@ -80,23 +80,23 @@
     <div role="rowheader" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2 sortable">Blocks</div>
   </div>
   <div class="Box-row Box-row--focus-gray py-2 d-flex">
-    <div role="gridcell" class="color-fg-muted flex-auto min-width-0 col-md-2"><a href="#l40">d_brake_calc (src/decision/aeb_ttc.c:40)</a>    </div>
+    <div role="gridcell" class="color-fg-muted flex-auto min-width-0 col-md-2"><a href="#l43">d_brake_calc (src/decision/aeb_ttc.c:43)</a>    </div>
     <div role="gridcell" class="color-fg-muted flex-auto min-width-0 d-flex flex-justify-end flex-wrap flex-items-baseline" data-sort="5">called 5 times</div>
-    <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2">80.0%</div>
+    <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2">71.4%</div>
     <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2">50.0%</div>
     <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2" >50.0%</div>
-    <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2">75.0%</div>
+    <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2">66.7%</div>
   </div>
   <div class="Box-row Box-row--focus-gray py-2 d-flex">
-    <div role="gridcell" class="color-fg-muted flex-auto min-width-0 col-md-2"><a href="#l13">ttc_calc (src/decision/aeb_ttc.c:13)</a>    </div>
+    <div role="gridcell" class="color-fg-muted flex-auto min-width-0 col-md-2"><a href="#l14">ttc_calc (src/decision/aeb_ttc.c:14)</a>    </div>
     <div role="gridcell" class="color-fg-muted flex-auto min-width-0 d-flex flex-justify-end flex-wrap flex-items-baseline" data-sort="6">called 6 times</div>
-    <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2">90.0%</div>
-    <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2">87.5%</div>
-    <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2" >87.5%</div>
-    <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2">75.0%</div>
+    <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2">100.0%</div>
+    <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2">100.0%</div>
+    <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2" >100.0%</div>
+    <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2">100.0%</div>
   </div>
   <div class="Box-row Box-row--focus-gray py-2 d-flex">
-    <div role="gridcell" class="color-fg-muted flex-auto min-width-0 col-md-2"><a href="#l56">ttc_process (src/decision/aeb_ttc.c:56)</a>    </div>
+    <div role="gridcell" class="color-fg-muted flex-auto min-width-0 col-md-2"><a href="#l72">ttc_process (src/decision/aeb_ttc.c:72)</a>    </div>
     <div role="gridcell" class="color-fg-muted flex-auto min-width-0 d-flex flex-justify-end flex-wrap flex-items-baseline" data-sort="5">called 5 times</div>
     <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2">100.0%</div>
     <div role="gridcell" class="color-fg-muted d-flex flex-justify-end flex-wrap col-2">100.0%</div>
@@ -229,7 +229,7 @@
         <td class="linecondition">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stddef.h&gt;</span></td>
+        <td class="src "><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;math.h&gt;</span><span class="c1">    /* isfinite() — Bug #1 guard in d_brake_calc */</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l12" href="#l12">12</a></td>
@@ -238,10 +238,19 @@
         <td class="linecondition">
         </td>
         <td class="linecount"></td>
-        <td class="src "></td>
+        <td class="src "><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stddef.h&gt;</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l13" href="#l13">13</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l14" href="#l14">14</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -250,7 +259,7 @@
         <td class="src  coveredLine show_coveredLine"><span class="n">float32_t</span><span class="w"> </span><span class="nf">ttc_calc</span><span class="p">(</span><span class="n">float32_t</span><span class="w"> </span><span class="n">distance</span><span class="p">,</span><span class="w"> </span><span class="n">float32_t</span><span class="w"> </span><span class="n">v_rel</span><span class="p">)</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l14" href="#l14">14</a></td>
+        <td class="lineno"><a id="l15" href="#l15">15</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -259,7 +268,7 @@
         <td class="src "><span class="p">{</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l15" href="#l15">15</a></td>
+        <td class="lineno"><a id="l16" href="#l16">16</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -268,7 +277,7 @@
         <td class="src  coveredLine show_coveredLine"><span class="w">    </span><span class="n">float32_t</span><span class="w"> </span><span class="n">ttc_result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TTC_MAX</span><span class="p">;</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l16" href="#l16">16</a></td>
+        <td class="lineno"><a id="l17" href="#l17">17</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -277,7 +286,7 @@
         <td class="src "></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l17" href="#l17">17</a></td>
+        <td class="lineno"><a id="l18" href="#l18">18</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -286,13 +295,13 @@
         <td class="src "><span class="w">    </span><span class="cm">/* Safety check for invalid distance */</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l18" href="#l18">18</a></td>
+        <td class="lineno"><a id="l19" href="#l19">19</a></td>
         <td class="linebranch">
           <details class="linebranchDetails">
             <summary class="linebranchSummary">2/2</summary>
             <div class="linebranchContents">
               <div class="takenBranch">&check; Branch 2 &rightarrow; 3 taken 4 times.</div>
-              <div class="takenBranch">&check; Branch 2 &rightarrow; 8 taken 2 times.</div>
+              <div class="takenBranch">&check; Branch 2 &rightarrow; 6 taken 2 times.</div>
             </div>
           </details>
         </td>
@@ -308,7 +317,7 @@
         <td class="src  coveredLine show_coveredLine"><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">distance</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">)</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l19" href="#l19">19</a></td>
+        <td class="lineno"><a id="l20" href="#l20">20</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -317,7 +326,7 @@
         <td class="src "><span class="w">    </span><span class="p">{</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l20" href="#l20">20</a></td>
+        <td class="lineno"><a id="l21" href="#l21">21</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -326,13 +335,13 @@
         <td class="src "><span class="w">        </span><span class="cm">/* FR-DEC-001: Only calculate when approaching (v_rel &gt; V_REL_MIN) */</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l21" href="#l21">21</a></td>
+        <td class="lineno"><a id="l22" href="#l22">22</a></td>
         <td class="linebranch">
           <details class="linebranchDetails">
             <summary class="linebranchSummary">2/2</summary>
             <div class="linebranchContents">
               <div class="takenBranch">&check; Branch 3 &rightarrow; 4 taken 3 times.</div>
-              <div class="takenBranch">&check; Branch 3 &rightarrow; 8 taken 1 time.</div>
+              <div class="takenBranch">&check; Branch 3 &rightarrow; 6 taken 1 time.</div>
             </div>
           </details>
         </td>
@@ -348,7 +357,7 @@
         <td class="src  coveredLine show_coveredLine"><span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">v_rel</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">V_REL_MIN</span><span class="p">)</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l22" href="#l22">22</a></td>
+        <td class="lineno"><a id="l23" href="#l23">23</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -357,7 +366,7 @@
         <td class="src "><span class="w">        </span><span class="p">{</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l23" href="#l23">23</a></td>
+        <td class="lineno"><a id="l24" href="#l24">24</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -366,7 +375,7 @@
         <td class="src  coveredLine show_coveredLine"><span class="w">            </span><span class="n">ttc_result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">distance</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">v_rel</span><span class="p">;</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l24" href="#l24">24</a></td>
+        <td class="lineno"><a id="l25" href="#l25">25</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -375,16 +384,70 @@
         <td class="src "></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l25" href="#l25">25</a></td>
+        <td class="lineno"><a id="l26" href="#l26">26</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="w">            </span><span class="cm">/* Clamp to [0, TTC_MAX] seconds per SRS */</span></td>
+        <td class="src "><span class="w">            </span><span class="cm">/* Clamp to [0, TTC_MAX] seconds per SRS.</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l26" href="#l26">26</a></td>
+        <td class="lineno"><a id="l27" href="#l27">27</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="cm">             * D1: only the upper bound is reachable — the guard above</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l28" href="#l28">28</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="cm">             * ensures distance &gt; 0 AND v_rel &gt; V_REL_MIN &gt; 0, so the</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l29" href="#l29">29</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="cm">             * quotient is strictly positive. The defensive</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l30" href="#l30">30</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="cm">             * `else if (ttc_result &lt; 0.0f)` branch was unreachable</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l31" href="#l31">31</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="cm">             * (MISRA C:2012 Rule 2.1) and was removed as catalogued in</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l32" href="#l32">32</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="cm">             * the V&amp;V report Sec. 7.5 desvio D1. */</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l33" href="#l33">33</a></td>
         <td class="linebranch">
           <details class="linebranchDetails">
             <summary class="linebranchSummary">2/2</summary>
@@ -406,7 +469,7 @@
         <td class="src  coveredLine show_coveredLine"><span class="w">            </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ttc_result</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">TTC_MAX</span><span class="p">)</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l27" href="#l27">27</a></td>
+        <td class="lineno"><a id="l34" href="#l34">34</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -415,7 +478,7 @@
         <td class="src "><span class="w">            </span><span class="p">{</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l28" href="#l28">28</a></td>
+        <td class="lineno"><a id="l35" href="#l35">35</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -424,7 +487,7 @@
         <td class="src  coveredLine show_coveredLine"><span class="w">                </span><span class="n">ttc_result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TTC_MAX</span><span class="p">;</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l29" href="#l29">29</a></td>
+        <td class="lineno"><a id="l36" href="#l36">36</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -433,56 +496,7 @@
         <td class="src "><span class="w">            </span><span class="p">}</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l30" href="#l30">30</a></td>
-        <td class="linebranch">
-          <details class="linebranchDetails">
-            <summary class="linebranchSummary">1/2</summary>
-            <div class="linebranchContents">
-              <div class="notTakenBranch">&cross; Branch 6 &rightarrow; 7 not taken.</div>
-              <div class="takenBranch">&check; Branch 6 &rightarrow; 8 taken 2 times.</div>
-            </div>
-          </details>
-        </td>
-        <td class="linecondition">
-            <details class="lineconditionDetails">
-              <summary class="lineconditionSummary">1/2</summary>
-              <div class="lineconditionContents">
-                <div class="notTakenCondition">&cross; True not covered.</div>
-              </div>
-              </details>
-        </td>
-        <td class="linecount partialCoveredLine show_partialCoveredLine">2</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">            </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ttc_result</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">)</span></td>
-      </tr>
-      <tr class="source-line">
-        <td class="lineno"><a id="l31" href="#l31">31</a></td>
-        <td class="linebranch">
-        </td>
-        <td class="linecondition">
-        </td>
-        <td class="linecount"></td>
-        <td class="src "><span class="w">            </span><span class="p">{</span></td>
-      </tr>
-      <tr class="source-line">
-        <td class="lineno"><a id="l32" href="#l32">32</a></td>
-        <td class="linebranch">
-        </td>
-        <td class="linecondition">
-        </td>
-        <td class="linecount uncoveredLine show_uncoveredLine">&cross;</td>
-        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">                </span><span class="n">ttc_result</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">;</span></td>
-      </tr>
-      <tr class="source-line">
-        <td class="lineno"><a id="l33" href="#l33">33</a></td>
-        <td class="linebranch">
-        </td>
-        <td class="linecondition">
-        </td>
-        <td class="linecount"></td>
-        <td class="src "><span class="w">            </span><span class="p">}</span></td>
-      </tr>
-      <tr class="source-line">
-        <td class="lineno"><a id="l34" href="#l34">34</a></td>
+        <td class="lineno"><a id="l37" href="#l37">37</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -491,40 +505,13 @@
         <td class="src "><span class="w">        </span><span class="p">}</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l35" href="#l35">35</a></td>
-        <td class="linebranch">
-        </td>
-        <td class="linecondition">
-        </td>
-        <td class="linecount"></td>
-        <td class="src "><span class="w">    </span><span class="p">}</span></td>
-      </tr>
-      <tr class="source-line">
-        <td class="lineno"><a id="l36" href="#l36">36</a></td>
-        <td class="linebranch">
-        </td>
-        <td class="linecondition">
-        </td>
-        <td class="linecount"></td>
-        <td class="src "></td>
-      </tr>
-      <tr class="source-line">
-        <td class="lineno"><a id="l37" href="#l37">37</a></td>
-        <td class="linebranch">
-        </td>
-        <td class="linecondition">
-        </td>
-        <td class="linecount coveredLine show_coveredLine">6</td>
-        <td class="src  coveredLine show_coveredLine"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">ttc_result</span><span class="p">;</span></td>
-      </tr>
-      <tr class="source-line">
         <td class="lineno"><a id="l38" href="#l38">38</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="p">}</span></td>
+        <td class="src "><span class="w">    </span><span class="p">}</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l39" href="#l39">39</a></td>
@@ -541,8 +528,8 @@
         </td>
         <td class="linecondition">
         </td>
-        <td class="linecount coveredLine show_coveredLine">5</td>
-        <td class="src  coveredLine show_coveredLine"><span class="n">float32_t</span><span class="w"> </span><span class="nf">d_brake_calc</span><span class="p">(</span><span class="n">float32_t</span><span class="w"> </span><span class="n">v_ego</span><span class="p">)</span></td>
+        <td class="linecount coveredLine show_coveredLine">6</td>
+        <td class="src  coveredLine show_coveredLine"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">ttc_result</span><span class="p">;</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l41" href="#l41">41</a></td>
@@ -551,7 +538,7 @@
         <td class="linecondition">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="p">{</span></td>
+        <td class="src "><span class="p">}</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l42" href="#l42">42</a></td>
@@ -560,7 +547,7 @@
         <td class="linecondition">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="w">    </span><span class="n">float32_t</span><span class="w"> </span><span class="n">d_brake</span><span class="p">;</span></td>
+        <td class="src "></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l43" href="#l43">43</a></td>
@@ -568,8 +555,8 @@
         </td>
         <td class="linecondition">
         </td>
-        <td class="linecount"></td>
-        <td class="src "></td>
+        <td class="linecount coveredLine show_coveredLine">5</td>
+        <td class="src  coveredLine show_coveredLine"><span class="n">float32_t</span><span class="w"> </span><span class="nf">d_brake_calc</span><span class="p">(</span><span class="n">float32_t</span><span class="w"> </span><span class="n">v_ego</span><span class="p">)</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l44" href="#l44">44</a></td>
@@ -578,7 +565,7 @@
         <td class="linecondition">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="w">    </span><span class="cm">/* FR-DEC-002: d_brake = v² / (2 * a) with a = DECEL_L3 = 6.0 m/s² */</span></td>
+        <td class="src "><span class="p">{</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l45" href="#l45">45</a></td>
@@ -586,8 +573,8 @@
         </td>
         <td class="linecondition">
         </td>
-        <td class="linecount coveredLine show_coveredLine">5</td>
-        <td class="src  coveredLine show_coveredLine"><span class="w">    </span><span class="n">d_brake</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">v_ego</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">v_ego</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mf">2.0f</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">DECEL_L3</span><span class="p">);</span></td>
+        <td class="linecount"></td>
+        <td class="src "><span class="w">    </span><span class="n">float32_t</span><span class="w"> </span><span class="n">d_brake</span><span class="p">;</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l46" href="#l46">46</a></td>
@@ -605,10 +592,28 @@
         <td class="linecondition">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="w">    </span><span class="cm">/* Physical lower bound */</span></td>
+        <td class="src "><span class="w">    </span><span class="cm">/* Bug #1 fail-safe gate: reject non-finite input (NaN, +Inf, -Inf).</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l48" href="#l48">48</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="cm">     * IEEE 754 comparisons with NaN are false, so `d_brake &lt; 0.0f` below</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l49" href="#l49">49</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="cm">     * cannot be relied on to catch this. */</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l50" href="#l50">50</a></td>
         <td class="linebranch">
           <details class="linebranchDetails">
             <summary class="linebranchSummary">1/2</summary>
@@ -627,25 +632,7 @@
               </details>
         </td>
         <td class="linecount partialCoveredLine show_partialCoveredLine">5</td>
-        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">d_brake</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">)</span></td>
-      </tr>
-      <tr class="source-line">
-        <td class="lineno"><a id="l49" href="#l49">49</a></td>
-        <td class="linebranch">
-        </td>
-        <td class="linecondition">
-        </td>
-        <td class="linecount"></td>
-        <td class="src "><span class="w">    </span><span class="p">{</span></td>
-      </tr>
-      <tr class="source-line">
-        <td class="lineno"><a id="l50" href="#l50">50</a></td>
-        <td class="linebranch">
-        </td>
-        <td class="linecondition">
-        </td>
-        <td class="linecount uncoveredLine show_uncoveredLine">&cross;</td>
-        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">        </span><span class="n">d_brake</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">;</span></td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">isfinite</span><span class="p">(</span><span class="n">v_ego</span><span class="p">))</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l51" href="#l51">51</a></td>
@@ -654,7 +641,7 @@
         <td class="linecondition">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="w">    </span><span class="p">}</span></td>
+        <td class="src "><span class="w">    </span><span class="p">{</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l52" href="#l52">52</a></td>
@@ -662,8 +649,8 @@
         </td>
         <td class="linecondition">
         </td>
-        <td class="linecount"></td>
-        <td class="src "></td>
+        <td class="linecount uncoveredLine show_uncoveredLine">&cross;</td>
+        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">;</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l53" href="#l53">53</a></td>
@@ -671,8 +658,8 @@
         </td>
         <td class="linecondition">
         </td>
-        <td class="linecount coveredLine show_coveredLine">5</td>
-        <td class="src  coveredLine show_coveredLine"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">d_brake</span><span class="p">;</span></td>
+        <td class="linecount"></td>
+        <td class="src "><span class="w">    </span><span class="p">}</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l54" href="#l54">54</a></td>
@@ -681,7 +668,7 @@
         <td class="linecondition">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="p">}</span></td>
+        <td class="src "></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l55" href="#l55">55</a></td>
@@ -690,7 +677,7 @@
         <td class="linecondition">
         </td>
         <td class="linecount"></td>
-        <td class="src "></td>
+        <td class="src "><span class="w">    </span><span class="cm">/* FR-DEC-002: d_brake = v² / (2 * a) with a = DECEL_L3 = 6.0 m/s² */</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l56" href="#l56">56</a></td>
@@ -699,7 +686,7 @@
         <td class="linecondition">
         </td>
         <td class="linecount coveredLine show_coveredLine">5</td>
-        <td class="src  coveredLine show_coveredLine"><span class="kt">void</span><span class="w"> </span><span class="nf">ttc_process</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">perception_output_t</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">perception</span><span class="p">,</span></td>
+        <td class="src  coveredLine show_coveredLine"><span class="w">    </span><span class="n">d_brake</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">v_ego</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">v_ego</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="p">(</span><span class="mf">2.0f</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">DECEL_L3</span><span class="p">);</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l57" href="#l57">57</a></td>
@@ -708,7 +695,7 @@
         <td class="linecondition">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="w">                 </span><span class="n">ttc_output_t</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">ttc_out</span><span class="p">)</span></td>
+        <td class="src "></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l58" href="#l58">58</a></td>
@@ -717,7 +704,7 @@
         <td class="linecondition">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="p">{</span></td>
+        <td class="src "><span class="w">    </span><span class="cm">/* Overflow guard: a very large but finite v_ego (e.g. FLT_MAX)</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l59" href="#l59">59</a></td>
@@ -726,10 +713,167 @@
         <td class="linecondition">
         </td>
         <td class="linecount"></td>
-        <td class="src "><span class="w">    </span><span class="cm">/* Defensive checks */</span></td>
+        <td class="src "><span class="cm">     * squares to +Inf, which would slip past the isfinite() gate above.</span></td>
       </tr>
       <tr class="source-line">
         <td class="lineno"><a id="l60" href="#l60">60</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="cm">     * The original `d_brake &lt; 0.0f` clamp that used to be here is</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l61" href="#l61">61</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="cm">     * unreachable (IEEE 754: v*v &gt;= 0 for all finite v, including</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l62" href="#l62">62</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="cm">     * subnormals) and was removed per V&amp;V report Sec. 7.5 desvio D2</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l63" href="#l63">63</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="cm">     * (MISRA C:2012 Rule 2.1). */</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l64" href="#l64">64</a></td>
+        <td class="linebranch">
+          <details class="linebranchDetails">
+            <summary class="linebranchSummary">1/2</summary>
+            <div class="linebranchContents">
+              <div class="notTakenBranch">&cross; Branch 4 &rightarrow; 5 not taken.</div>
+              <div class="takenBranch">&check; Branch 4 &rightarrow; 6 taken 5 times.</div>
+            </div>
+          </details>
+        </td>
+        <td class="linecondition">
+            <details class="lineconditionDetails">
+              <summary class="lineconditionSummary">1/2</summary>
+              <div class="lineconditionContents">
+                <div class="notTakenCondition">&cross; True not covered.</div>
+              </div>
+              </details>
+        </td>
+        <td class="linecount partialCoveredLine show_partialCoveredLine">5</td>
+        <td class="src  partialCoveredLine show_partialCoveredLine"><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">isfinite</span><span class="p">(</span><span class="n">d_brake</span><span class="p">))</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l65" href="#l65">65</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="w">    </span><span class="p">{</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l66" href="#l66">66</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount uncoveredLine show_uncoveredLine">&cross;</td>
+        <td class="src  uncoveredLine show_uncoveredLine"><span class="w">        </span><span class="n">d_brake</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.0f</span><span class="p">;</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l67" href="#l67">67</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="w">    </span><span class="p">}</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l68" href="#l68">68</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l69" href="#l69">69</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount coveredLine show_coveredLine">5</td>
+        <td class="src  coveredLine show_coveredLine"><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">d_brake</span><span class="p">;</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l70" href="#l70">70</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="p">}</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l71" href="#l71">71</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l72" href="#l72">72</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount coveredLine show_coveredLine">5</td>
+        <td class="src  coveredLine show_coveredLine"><span class="kt">void</span><span class="w"> </span><span class="nf">ttc_process</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">perception_output_t</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">perception</span><span class="p">,</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l73" href="#l73">73</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="w">                 </span><span class="n">ttc_output_t</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">ttc_out</span><span class="p">)</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l74" href="#l74">74</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="p">{</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l75" href="#l75">75</a></td>
+        <td class="linebranch">
+        </td>
+        <td class="linecondition">
+        </td>
+        <td class="linecount"></td>
+        <td class="src "><span class="w">    </span><span class="cm">/* Defensive checks */</span></td>
+      </tr>
+      <tr class="source-line">
+        <td class="lineno"><a id="l76" href="#l76">76</a></td>
         <td class="linebranch">
           <details class="linebranchDetails">
             <summary class="linebranchSummary">4/4</summary>
@@ -754,7 +898,7 @@
         <td class="src  coveredLine show_coveredLine"><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">((</span><span class="n">perception</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="p">(</span><span class="n">ttc_out</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">))</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l61" href="#l61">61</a></td>
+        <td class="lineno"><a id="l77" href="#l77">77</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -763,7 +907,7 @@
         <td class="src "><span class="w">    </span><span class="p">{</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l62" href="#l62">62</a></td>
+        <td class="lineno"><a id="l78" href="#l78">78</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -772,7 +916,7 @@
         <td class="src  coveredLine show_coveredLine"><span class="w">        </span><span class="k">return</span><span class="p">;</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l63" href="#l63">63</a></td>
+        <td class="lineno"><a id="l79" href="#l79">79</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -781,7 +925,7 @@
         <td class="src "><span class="w">    </span><span class="p">}</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l64" href="#l64">64</a></td>
+        <td class="lineno"><a id="l80" href="#l80">80</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -790,7 +934,7 @@
         <td class="src "></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l65" href="#l65">65</a></td>
+        <td class="lineno"><a id="l81" href="#l81">81</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -799,7 +943,7 @@
         <td class="src "><span class="w">    </span><span class="cm">/* FR-DEC-003: Use v_rel directly from perception (the Perception module already computed it) */</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l66" href="#l66">66</a></td>
+        <td class="lineno"><a id="l82" href="#l82">82</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -808,7 +952,7 @@
         <td class="src "><span class="w">    </span><span class="cm">/* Set closing flag (v_rel &gt; V_REL_MIN means approaching) */</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l67" href="#l67">67</a></td>
+        <td class="lineno"><a id="l83" href="#l83">83</a></td>
         <td class="linebranch">
           <details class="linebranchDetails">
             <summary class="linebranchSummary">2/2</summary>
@@ -830,7 +974,7 @@
         <td class="src  coveredLine show_coveredLine"><span class="w">    </span><span class="n">ttc_out</span><span class="o">-&gt;</span><span class="n">is_closing</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">perception</span><span class="o">-&gt;</span><span class="n">v_rel</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">V_REL_MIN</span><span class="p">)</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="mi">1U</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">0U</span><span class="p">;</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l68" href="#l68">68</a></td>
+        <td class="lineno"><a id="l84" href="#l84">84</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -839,7 +983,7 @@
         <td class="src "></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l69" href="#l69">69</a></td>
+        <td class="lineno"><a id="l85" href="#l85">85</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -848,7 +992,7 @@
         <td class="src "><span class="w">    </span><span class="cm">/* Calculate TTC and braking distance */</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l70" href="#l70">70</a></td>
+        <td class="lineno"><a id="l86" href="#l86">86</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -857,7 +1001,7 @@
         <td class="src  coveredLine show_coveredLine"><span class="w">    </span><span class="n">ttc_out</span><span class="o">-&gt;</span><span class="n">ttc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ttc_calc</span><span class="p">(</span><span class="n">perception</span><span class="o">-&gt;</span><span class="n">distance</span><span class="p">,</span><span class="w"> </span><span class="n">perception</span><span class="o">-&gt;</span><span class="n">v_rel</span><span class="p">);</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l71" href="#l71">71</a></td>
+        <td class="lineno"><a id="l87" href="#l87">87</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -866,7 +1010,7 @@
         <td class="src  coveredLine show_coveredLine"><span class="w">    </span><span class="n">ttc_out</span><span class="o">-&gt;</span><span class="n">d_brake</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">d_brake_calc</span><span class="p">(</span><span class="n">perception</span><span class="o">-&gt;</span><span class="n">v_ego</span><span class="p">);</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l72" href="#l72">72</a></td>
+        <td class="lineno"><a id="l88" href="#l88">88</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -875,7 +1019,7 @@
         <td class="src "><span class="p">}</span></td>
       </tr>
       <tr class="source-line">
-        <td class="lineno"><a id="l73" href="#l73">73</a></td>
+        <td class="lineno"><a id="l89" href="#l89">89</a></td>
         <td class="linebranch">
         </td>
         <td class="linecondition">
@@ -890,7 +1034,7 @@
         <hr class="block-separator"/>
         <footer class="text-center">
           Created using <a href="http://gcovr.com/en/8.6">GCOVR (Version 8.6)</a>
-          at 2026-04-24 18:35:14
+          at 2026-04-24 20:39:09
         </footer>
       </div>
     </div>

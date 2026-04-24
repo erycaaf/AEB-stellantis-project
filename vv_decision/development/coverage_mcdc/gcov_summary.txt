@@ -10,11 +10,11 @@ Creating 'aeb_ttc.c.gcov'
 
 Lines executed:52.38% of 21
 File 'src/decision/aeb_fsm.c'
-Lines executed:98.72% of 156
-Branches executed:100.00% of 108
-Taken at least once:95.37% of 108
+Lines executed:98.73% of 158
+Branches executed:100.00% of 112
+Taken at least once:94.64% of 112
 Calls executed:100.00% of 3
-Condition outcomes covered:95.00% of 100
+Condition outcomes covered:94.23% of 104
 Creating 'aeb_fsm.c.gcov'
 
-Lines executed:98.72% of 156
+Lines executed:98.73% of 158

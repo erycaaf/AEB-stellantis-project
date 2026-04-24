@@ -34,7 +34,7 @@
 </div>
 
 <h1>DECISION — Fault Injection Report</h1>
-<p class="meta">Commit <code>6e82375</code> · Generated 2026-04-24 18:35:19 UTC</p>
+<p class="meta">Commit <code>300b6d8</code> · Generated 2026-04-24 20:39:16 UTC</p>
 
 <div class="summary">
   <strong>Result:</strong> no summary ·
@@ -59,29 +59,19 @@
   [fault_a2_ttc_calc_nan_vrel]
   [fault_a3_ttc_calc_inf_vrel]
   [fault_a4_dbrake_calc_nan]
-    FAIL  fault_a4_dbrake_calc_nan  A4: d_brake_calc(NaN) finite
-    FAIL  fault_a4_dbrake_calc_nan  A4: d_brake_calc(NaN) non-negative
   [fault_a5_dbrake_calc_inf]
-    FAIL  fault_a5_dbrake_calc_inf  A5: d_brake_calc(+Inf) finite
   [fault_a6_fsm_delta_t_nan]
-    FAIL  fault_a6_fsm_delta_t_nan  A6: warn_timer finite
-    FAIL  fault_a6_fsm_delta_t_nan  A6: fsm output valid
   [fault_a7_ttc_process_nan_distance]
 
 [Category B] Numeric extremes
   [fault_b1_ttc_calc_neg_distance]
   [fault_b2_dbrake_calc_fltmax]
-    FAIL  fault_b2_dbrake_calc_fltmax  B2: d_brake_calc(FLT_MAX) finite
   [fault_b3_dbrake_calc_large_neg]
   [fault_b4_fsm_delta_t_huge]
 
 [Category C] SEU / corrupted state
   [fault_c1_fsm_state_42]
-    FAIL  fault_c1_fsm_state_42  C1: fsm_state normalized
-    FAIL  fault_c1_fsm_state_42  C1: fsm output valid
   [fault_c2_fsm_state_255]
-    FAIL  fault_c2_fsm_state_255  C2: fsm_state normalized
-    FAIL  fault_c2_fsm_state_255  C2: fsm output valid
   [fault_c3_aeb_enabled_0xAA]
     FAIL  fault_c3_aeb_enabled_0xAA  C3: 0xAA treated as disabled
   [fault_c4_fault_flag_0xFF]
@@ -94,7 +84,7 @@
   [fault_d4_debounce_oscillation]
 
 ==========================================================
- Results: 32 run, 21 passed, 11 failed
+ Results: 32 run, 31 passed, 1 failed
 ==========================================================
 
 </pre>

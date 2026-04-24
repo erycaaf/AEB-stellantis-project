@@ -12,78 +12,94 @@
         -:    8:
         -:    9:#include "aeb_ttc.h"
         -:   10:#include "aeb_config.h"
-        -:   11:#include <stddef.h>
-        -:   12:
-function ttc_calc called 3 returned 100% blocks executed 75%
-        3:   13:float32_t ttc_calc(float32_t distance, float32_t v_rel)
-        -:   14:{
-        3:   15:    float32_t ttc_result = TTC_MAX;
-        -:   16:
-        -:   17:    /* Safety check for invalid distance */
-        3:   18:    if (distance > 0.0f)
+        -:   11:#include <math.h>    /* isfinite() — Bug #1 guard in d_brake_calc */
+        -:   12:#include <stddef.h>
+        -:   13:
+function ttc_calc called 3 returned 100% blocks executed 100%
+        3:   14:float32_t ttc_calc(float32_t distance, float32_t v_rel)
+        -:   15:{
+        3:   16:    float32_t ttc_result = TTC_MAX;
+        -:   17:
+        -:   18:    /* Safety check for invalid distance */
+        3:   19:    if (distance > 0.0f)
 branch  0 taken 1 (fallthrough)
 branch  1 taken 2
 condition outcomes covered 2/2
-        -:   19:    {
-        -:   20:        /* FR-DEC-001: Only calculate when approaching (v_rel > V_REL_MIN) */
-        1:   21:        if (v_rel > V_REL_MIN)
+        -:   20:    {
+        -:   21:        /* FR-DEC-001: Only calculate when approaching (v_rel > V_REL_MIN) */
+        1:   22:        if (v_rel > V_REL_MIN)
 branch  0 taken 1 (fallthrough)
 branch  1 taken 0
 condition outcomes covered 1/2
 condition  0 not covered (false)
-        -:   22:        {
-        1:   23:            ttc_result = distance / v_rel;
-        -:   24:
-        -:   25:            /* Clamp to [0, TTC_MAX] seconds per SRS */
-        1:   26:            if (ttc_result > TTC_MAX)
+        -:   23:        {
+        1:   24:            ttc_result = distance / v_rel;
+        -:   25:
+        -:   26:            /* Clamp to [0, TTC_MAX] seconds per SRS.
+        -:   27:             * D1: only the upper bound is reachable — the guard above
+        -:   28:             * ensures distance > 0 AND v_rel > V_REL_MIN > 0, so the
+        -:   29:             * quotient is strictly positive. The defensive
+        -:   30:             * `else if (ttc_result < 0.0f)` branch was unreachable
+        -:   31:             * (MISRA C:2012 Rule 2.1) and was removed as catalogued in
+        -:   32:             * the V&V report Sec. 7.5 desvio D1. */
+        1:   33:            if (ttc_result > TTC_MAX)
 branch  0 taken 1 (fallthrough)
 branch  1 taken 0
 condition outcomes covered 1/2
 condition  0 not covered (false)
-        -:   27:            {
-        1:   28:                ttc_result = TTC_MAX;
-        -:   29:            }
-    #####:   30:            else if (ttc_result < 0.0f)
-branch  0 never executed (fallthrough)
-branch  1 never executed
-condition outcomes covered 0/2
-condition  0 not covered (true false)
-        -:   31:            {
-    #####:   32:                ttc_result = 0.0f;
-        -:   33:            }
-        -:   34:        }
-        -:   35:    }
-        -:   36:
-        3:   37:    return ttc_result;
-        -:   38:}
+        -:   34:            {
+        1:   35:                ttc_result = TTC_MAX;
+        -:   36:            }
+        -:   37:        }
+        -:   38:    }
         -:   39:
+        3:   40:    return ttc_result;
+        -:   41:}
+        -:   42:
 function d_brake_calc called 0 returned 0% blocks executed 0%
-    #####:   40:float32_t d_brake_calc(float32_t v_ego)
-        -:   41:{
-        -:   42:    float32_t d_brake;
-        -:   43:
-        -:   44:    /* FR-DEC-002: d_brake = v² / (2 * a) with a = DECEL_L3 = 6.0 m/s² */
-    #####:   45:    d_brake = (v_ego * v_ego) / (2.0f * DECEL_L3);
+    #####:   43:float32_t d_brake_calc(float32_t v_ego)
+        -:   44:{
+        -:   45:    float32_t d_brake;
         -:   46:
-        -:   47:    /* Physical lower bound */
-    #####:   48:    if (d_brake < 0.0f)
+        -:   47:    /* Bug #1 fail-safe gate: reject non-finite input (NaN, +Inf, -Inf).
+        -:   48:     * IEEE 754 comparisons with NaN are false, so `d_brake < 0.0f` below
+        -:   49:     * cannot be relied on to catch this. */
+    #####:   50:    if (!isfinite(v_ego))
 branch  0 never executed (fallthrough)
 branch  1 never executed
 condition outcomes covered 0/2
 condition  0 not covered (true false)
-        -:   49:    {
-    #####:   50:        d_brake = 0.0f;
-        -:   51:    }
-        -:   52:
-    #####:   53:    return d_brake;
-        -:   54:}
-        -:   55:
+        -:   51:    {
+    #####:   52:        return 0.0f;
+        -:   53:    }
+        -:   54:
+        -:   55:    /* FR-DEC-002: d_brake = v² / (2 * a) with a = DECEL_L3 = 6.0 m/s² */
+    #####:   56:    d_brake = (v_ego * v_ego) / (2.0f * DECEL_L3);
+        -:   57:
+        -:   58:    /* Overflow guard: a very large but finite v_ego (e.g. FLT_MAX)
+        -:   59:     * squares to +Inf, which would slip past the isfinite() gate above.
+        -:   60:     * The original `d_brake < 0.0f` clamp that used to be here is
+        -:   61:     * unreachable (IEEE 754: v*v >= 0 for all finite v, including
+        -:   62:     * subnormals) and was removed per V&V report Sec. 7.5 desvio D2
+        -:   63:     * (MISRA C:2012 Rule 2.1). */
+    #####:   64:    if (!isfinite(d_brake))
+branch  0 never executed (fallthrough)
+branch  1 never executed
+condition outcomes covered 0/2
+condition  0 not covered (true false)
+        -:   65:    {
+    #####:   66:        d_brake = 0.0f;
+        -:   67:    }
+        -:   68:
+    #####:   69:    return d_brake;
+        -:   70:}
+        -:   71:
 function ttc_process called 2 returned 100% blocks executed 40%
-        2:   56:void ttc_process(const perception_output_t * const perception,
-        -:   57:                 ttc_output_t * const ttc_out)
-        -:   58:{
-        -:   59:    /* Defensive checks */
-        2:   60:    if ((perception == NULL) || (ttc_out == NULL))
+        2:   72:void ttc_process(const perception_output_t * const perception,
+        -:   73:                 ttc_output_t * const ttc_out)
+        -:   74:{
+        -:   75:    /* Defensive checks */
+        2:   76:    if ((perception == NULL) || (ttc_out == NULL))
 branch  0 taken 1 (fallthrough)
 branch  1 taken 1
 branch  2 taken 1 (fallthrough)
@@ -91,21 +107,21 @@ branch  3 taken 0
 condition outcomes covered 2/4
 condition  0 not covered (false)
 condition  1 not covered (false)
-        -:   61:    {
-        2:   62:        return;
-        -:   63:    }
-        -:   64:
-        -:   65:    /* FR-DEC-003: Use v_rel directly from perception (the Perception module already computed it) */
-        -:   66:    /* Set closing flag (v_rel > V_REL_MIN means approaching) */
-    #####:   67:    ttc_out->is_closing = (perception->v_rel > V_REL_MIN) ? 1U : 0U;
+        -:   77:    {
+        2:   78:        return;
+        -:   79:    }
+        -:   80:
+        -:   81:    /* FR-DEC-003: Use v_rel directly from perception (the Perception module already computed it) */
+        -:   82:    /* Set closing flag (v_rel > V_REL_MIN means approaching) */
+    #####:   83:    ttc_out->is_closing = (perception->v_rel > V_REL_MIN) ? 1U : 0U;
 branch  0 never executed (fallthrough)
 branch  1 never executed
 condition outcomes covered 0/2
 condition  0 not covered (true false)
-        -:   68:
-        -:   69:    /* Calculate TTC and braking distance */
-    #####:   70:    ttc_out->ttc = ttc_calc(perception->distance, perception->v_rel);
+        -:   84:
+        -:   85:    /* Calculate TTC and braking distance */
+    #####:   86:    ttc_out->ttc = ttc_calc(perception->distance, perception->v_rel);
 call    0 never executed
-    #####:   71:    ttc_out->d_brake = d_brake_calc(perception->v_ego);
+    #####:   87:    ttc_out->d_brake = d_brake_calc(perception->v_ego);
 call    0 never executed
-        -:   72:}
+        -:   88:}

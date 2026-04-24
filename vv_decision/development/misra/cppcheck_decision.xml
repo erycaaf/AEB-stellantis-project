@@ -3,34 +3,28 @@
     <cppcheck version="2.13.0"/>
     <errors>
         <error id="misra-c2012-15.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_ttc.c">
-            <location file="src/decision/aeb_ttc.c" line="62" column="9"/>
+            <location file="src/decision/aeb_ttc.c" line="52" column="9"/>
         </error>
-        <error id="misra-c2012-15.7" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_ttc.c">
-            <location file="src/decision/aeb_ttc.c" line="33" column="13"/>
+        <error id="misra-c2012-15.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_ttc.c">
+            <location file="src/decision/aeb_ttc.c" line="78" column="9"/>
         </error>
-        <error id="misra-c2012-10.3" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
-            <location file="src/decision/aeb_fsm.c" line="190" column="21"/>
+        <error id="misra-c2012-10.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
+            <location file="src/decision/aeb_fsm.c" line="223" column="23"/>
         </error>
-        <error id="misra-c2012-10.3" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
-            <location file="src/decision/aeb_fsm.c" line="208" column="24"/>
-        </error>
-        <error id="misra-c2012-15.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
-            <location file="src/decision/aeb_fsm.c" line="168" column="9"/>
+        <error id="misra-c2012-10.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
+            <location file="src/decision/aeb_fsm.c" line="242" column="26"/>
         </error>
         <error id="misra-c2012-15.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
-            <location file="src/decision/aeb_fsm.c" line="186" column="9"/>
+            <location file="src/decision/aeb_fsm.c" line="176" column="9"/>
         </error>
         <error id="misra-c2012-15.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
-            <location file="src/decision/aeb_fsm.c" line="204" column="9"/>
+            <location file="src/decision/aeb_fsm.c" line="216" column="9"/>
         </error>
         <error id="misra-c2012-15.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
-            <location file="src/decision/aeb_fsm.c" line="226" column="9"/>
+            <location file="src/decision/aeb_fsm.c" line="237" column="9"/>
         </error>
-        <error id="misra-c2012-15.7" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
-            <location file="src/decision/aeb_fsm.c" line="265" column="13"/>
-        </error>
-        <error id="misra-c2012-15.7" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
-            <location file="src/decision/aeb_fsm.c" line="313" column="13"/>
+        <error id="misra-c2012-15.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
+            <location file="src/decision/aeb_fsm.c" line="260" column="9"/>
         </error>
         <error id="misra-c2012-2.3" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
             <location file="include/aeb_types.h" line="78" column="1"/>
@@ -177,10 +171,10 @@
             <location file="include/aeb_types.h" line="115" column="0"/>
         </error>
         <error id="misra-c2012-8.7" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
-            <location file="src/decision/aeb_ttc.c" line="13" column="11"/>
+            <location file="src/decision/aeb_ttc.c" line="14" column="11"/>
         </error>
         <error id="misra-c2012-8.7" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
-            <location file="src/decision/aeb_ttc.c" line="40" column="11"/>
+            <location file="src/decision/aeb_ttc.c" line="43" column="11"/>
         </error>
         <error id="checkersReport" severity="information" msg="Active checkers: 305/792 (use --checkers-report=&lt;filename&gt; to see details)" verbose="Active checkers: 305/792 (use --checkers-report=&lt;filename&gt; to see details)"/>
     </errors>
