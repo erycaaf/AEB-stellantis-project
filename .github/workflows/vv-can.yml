@@ -163,42 +163,19 @@ jobs:
       # ─── Blocking gate 3: MISRA C:2012 (CAN scope only) ───────────────────
       # Counts only findings emitted by the MISRA addon (id prefix
       # "misra-c2012"), not cppcheck-native style/portability/unused
-      # warnings. Also filters Advisory rules that don't reflect real
-      # defects in the source (2.3 / 2.4 — unused type/tag declarations
-      # used only by downstream TUs that cppcheck cannot see). Required
-      # and Mandatory rules are never filtered.
-      #
-      # TEMPORARILY SUPPRESSED pending a follow-up refactor by the CAN
-      # module author (@renatosfagundes):
-      #   - misra-c2012-14.4 (aeb_can.c:87)  — exposed by PR #102 isfinite()
-      #   - misra-c2012-10.6 (aeb_can.c:340) — pre-existing composite-expr cast
-      #   - misra-c2012-2.5  (aeb_can.h:50)  — CAN_ERR_TIMEOUT macro reserved
-      # All three live in source authored by another team member; per
-      # ISO 26262-6 §5.4.8 the module author applies the fix, not the V&V
-      # author introducing this CI. Once the follow-up refactor lands,
-      # the three IDs below must be removed from ADVISORY so regressions
-      # of the same kind are caught.
-      - name: MISRA Required/Mandatory (0 findings in aeb_can.{c,h})
+      # warnings. Those are still generated into the XML for context but
+      # do not fail the gate. Required and Mandatory rules are never
+      # filtered — any finding in aeb_can.{c,h} scope is a gate failure.
+      - name: MISRA (0 issues in aeb_can.{c,h})
         run: |
           make misra-can
           CAN_ISSUES=$(python3 - <<'PY'
           import xml.etree.ElementTree as ET
           t = ET.parse("reports/vv_can/misra/cppcheck_can.xml")
           target = ("src/communication/aeb_can.c", "include/aeb_can.h")
-          ADVISORY = {
-              "misra-c2012-2.3",   # unused type declaration
-              "misra-c2012-2.4",   # unused tag declaration
-              # TEMPORARY — remove once @renatosfagundes lands the refactor:
-              "misra-c2012-2.5",   # unused macro (CAN_ERR_TIMEOUT, aeb_can.h:50)
-              "misra-c2012-10.6",  # essential-type widening (aeb_can.c:340)
-              "misra-c2012-14.4",  # controlling expr not essentially Boolean (aeb_can.c:87)
-          }
           n = 0
           for e in t.findall(".//error"):
-              rid = e.get("id", "")
-              if not rid.startswith("misra-c2012"):
-                  continue
-              if rid in ADVISORY:
+              if not e.get("id", "").startswith("misra-c2012"):
                   continue
               loc = e.find("location")
               if loc is not None and loc.get("file", "") in target:
@@ -206,7 +183,7 @@ jobs:
           print(n)
           PY
           )
-          echo "MISRA Required/Mandatory issues in aeb_can scope: $CAN_ISSUES"
+          echo "MISRA issues in aeb_can scope: $CAN_ISSUES"
           if [ "$CAN_ISSUES" != "0" ]; then
             echo "::error title=MISRA regression::$CAN_ISSUES issue(s) in aeb_can.{c,h}"
             exit 1
