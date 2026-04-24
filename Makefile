@@ -449,7 +449,7 @@ mcdc-pid-alert:
 	@cat $(VV_REPORT_DIR)/coverage_mcdc/gcov_summary.txt
 	@echo ""
 	@echo "=== Generating HTML report (gcovr) ==="
-	cd $(VV_REPORT_DIR)/coverage_mcdc && gcovr --gcov-executable='gcov-14 --conditions' \
+	cd $(VV_REPORT_DIR)/coverage_mcdc && $(GCOVR) --gcov-executable='gcov-14 --conditions' \
 	                                             --root=../../.. \
 	                                             --filter='.*/src/execution/.*' \
 	                                             --html-details report.html \
