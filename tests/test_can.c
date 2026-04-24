@@ -389,6 +389,32 @@ TEST(test_tx_uds_response)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: RX decode — UDS Request with short DLC is rejected (FR-UDS-005)
+ *
+ *  Contract: can_rx_process() only accepts 0x7DF frames with
+ *  DLC == CAN_DLC_UDS_REQUEST (4). Shorter frames must leave
+ *  uds_request_pending at 0 so aeb_core_step() observes a no-op.
+ *  This locks the malformed-frame behaviour that was previously
+ *  implicit.
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_rx_uds_request_short_dlc)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    /* Only 3 bytes — missing the value field. */
+    uint8_t frame[3] = { 0x22U, 0xF1U, 0x01U };
+
+    can_rx_process(&state, CAN_ID_UDS_REQUEST, frame, 3U);
+
+    can_rx_data_t rx;
+    can_get_rx_data(&state, &rx);
+
+    ASSERT_EQ(rx.uds_request_pending, 0U);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
  *  TEST: UDS request ack clears the pending flag
  * ═══════════════════════════════════════════════════════════════════════ */
 TEST(test_uds_request_ack)
@@ -431,6 +457,7 @@ int main(void)
     RUN(test_tx_fsm_period);
     RUN(test_tx_send_failure);
     RUN(test_rx_uds_request);
+    RUN(test_rx_uds_request_short_dlc);
     RUN(test_tx_uds_response);
     RUN(test_uds_request_ack);
 

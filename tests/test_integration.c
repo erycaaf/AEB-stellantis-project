@@ -272,6 +272,83 @@ static void test_uds_request_response_roundtrip(void)
         "pending flag cleared after one cycle");
 }
 
+/* ISO 14229 negative-response flow through the full pipeline:
+ * an unknown SID produces SID 0x7F + NRC 0x11 (Service Not Supported);
+ * a supported SID with an unknown DID produces SID 0x7F + NRC 0x31
+ * (Request Out Of Range). In both cases the response MUST still go out
+ * on 0x7E8 — silence would force the client into a P2 timeout. */
+static void test_uds_negative_response_unknown_sid(void)
+{
+    aeb_core_state_t state;
+    raw_sensor_input_t raw;
+
+    printf("\n[TEST] UDS negative response — unknown SID\n");
+    (void)aeb_core_init(&state);
+    can_hal_test_reset();
+
+    {
+        uint8_t enable_frame[8] = {0};
+        can_pack_signal(enable_frame, 16, 1, 1U);
+        can_rx_process(&state.can, 0x101U, enable_frame, 8U);
+    }
+    inject_can_frames(&state, 100.0F, 0.0F);
+
+    /* SID 0xAA is not in the supported set (0x22, 0x14, 0x31).
+     * SID 0x00 is reserved as "empty request" by uds_process_request
+     * and produces no response at all — we need a real unknown SID. */
+    uint8_t req[4] = { 0xAAU, 0x00U, 0x00U, 0x00U };
+    can_rx_process(&state.can, CAN_ID_UDS_REQUEST, req, CAN_DLC_UDS_REQUEST);
+
+    raw = make_raw(100.0F, 0.0F, 0.0F);
+    aeb_core_step(&state, &raw);
+
+    const tx_record_t *resp = find_tx(CAN_ID_UDS_RESPONSE);
+    TEST_ASSERT(resp != NULL,
+        "negative response frame 0x7E8 transmitted on unknown SID");
+    if (resp != NULL)
+    {
+        TEST_ASSERT(resp->data[0] == 0x7FU,
+            "negative response SID byte is 0x7F");
+        TEST_ASSERT(resp->data[2] == 0x11U,
+            "NRC 0x11 (Service Not Supported) on unknown SID");
+    }
+}
+
+static void test_uds_negative_response_unknown_did(void)
+{
+    aeb_core_state_t state;
+    raw_sensor_input_t raw;
+
+    printf("\n[TEST] UDS negative response — unknown DID\n");
+    (void)aeb_core_init(&state);
+    can_hal_test_reset();
+
+    {
+        uint8_t enable_frame[8] = {0};
+        can_pack_signal(enable_frame, 16, 1, 1U);
+        can_rx_process(&state.can, 0x101U, enable_frame, 8U);
+    }
+    inject_can_frames(&state, 100.0F, 0.0F);
+
+    /* ReadDID with a DID outside the supported set (0xF100, 0xF101, 0xF102). */
+    uint8_t req[4] = { 0x22U, 0xFFU, 0xFFU, 0x00U };
+    can_rx_process(&state.can, CAN_ID_UDS_REQUEST, req, CAN_DLC_UDS_REQUEST);
+
+    raw = make_raw(100.0F, 0.0F, 0.0F);
+    aeb_core_step(&state, &raw);
+
+    const tx_record_t *resp = find_tx(CAN_ID_UDS_RESPONSE);
+    TEST_ASSERT(resp != NULL,
+        "negative response frame 0x7E8 transmitted on unknown DID");
+    if (resp != NULL)
+    {
+        TEST_ASSERT(resp->data[0] == 0x7FU,
+            "negative response SID byte is 0x7F");
+        TEST_ASSERT(resp->data[2] == 0x31U,
+            "NRC 0x31 (Request Out Of Range) on unknown DID");
+    }
+}
+
 static void test_speed_out_of_range(void)
 {
     aeb_core_state_t state;
@@ -309,6 +386,8 @@ int main(void)
     test_sensor_fault_to_off();
     test_speed_out_of_range();
     test_uds_request_response_roundtrip();
+    test_uds_negative_response_unknown_sid();
+    test_uds_negative_response_unknown_did();
 
     printf("\n========================================\n");
     printf("  Results: %d/%d passed, %d failed\n",
