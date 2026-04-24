@@ -2,10 +2,10 @@
  * @file  test_can_struct.c
  * @brief Structural (coverage-driven) complementary tests for aeb_can.c.
  *
- * Independent V&V author: Lourenço  (cross-validation of Renato's module).
+ * Independent V&V author: @mphumapo2014  (cross-validation).
  *
  * Purpose:
- *   The nominal suite test_can.c (Renato) already passes 100% of its
+ *   The nominal suite test_can.c (module author) already passes 100% of its
  *   requirements-based cases, but does not exercise every branch of
  *   three defensive switch statements:
  *

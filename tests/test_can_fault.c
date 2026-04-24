@@ -2,13 +2,13 @@
  * @file  test_can_fault.c
  * @brief Systematic fault injection for the AEB CAN module.
  *
- * Independent V&V author: Lourenço  (cross-validation of Renato's module).
- * Original author:        Renato Fagundes  (aeb_can.{c,h}, test_can.c)
+ * Independent V&V author: @mphumapo2014  (cross-validation).
+ * Original module author: @renatosfagundes  (aeb_can.{c,h}, test_can.c)
  *
  * Methodology:  ISO 26262-6:2018 Table 11 item 1e ("highly recommended"
  *               for ASIL-D) — fault injection / error guessing.
  *
- * Structure mirrors test_uds_fault.c by Renato Fagundes:
+ * Structure mirrors the UDS V&V fault-injection template (see tests/test_uds_fault.c):
  *   Category A — invalid values (NULL pointers, bad DLC, unknown ID, HAL fault)
  *   Category B — numeric extremes (NaN/Inf/negative in physical-to-raw,
  *                raw values exceeding the signal bit-width)

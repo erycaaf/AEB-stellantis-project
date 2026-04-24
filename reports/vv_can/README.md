@@ -3,8 +3,8 @@
 Cross-validation of `src/communication/aeb_can.{c,h}` against ISO 26262-6:2018
 ASIL-D requirements.
 
-- **Original author:** Renato
-- **Cross-validator:** Lourenço
+- **Original author:** @renatosfagundes
+- **Cross-validator:** @mphumapo2014
 - **Report:** `Relatorio_Consolidado_VV_CAN.pdf` (built from the `.tex` source)
 
 ## How to reproduce everything
@@ -52,9 +52,9 @@ pdflatex Relatorio_Consolidado_VV_CAN.tex   # second pass for cross-refs
 
 | Activity | Result |
 |---|---|
-| Nominal tests (Renato) | 13 tests · 36 assertions · 100% PASS |
-| Structural complementary tests (Lourenço) | 13 tests · 13 assertions · 100% PASS |
-| Fault injection (Lourenço) | 16 tests · 31 assertions · 100% PASS |
+| Nominal tests (module author) | 13 tests · 36 assertions · 100% PASS |
+| Structural complementary tests (cross-validator) | 13 tests · 13 assertions · 100% PASS |
+| Fault injection (cross-validator) | 16 tests · 31 assertions · 100% PASS |
 | Statement coverage | **100.00%** (167/167) |
 | Branch coverage | **100.00%** (81/81) |
 | MC/DC coverage | **100.00%** (68/68) |
@@ -63,6 +63,12 @@ pdflatex Relatorio_Consolidado_VV_CAN.tex   # second pass for cross-refs
 | UBSan errors | **1 UB** — cast float→uint in `encode_unsigned` (see Bug #1 in the report) |
 | MISRA in-scope | 2 style advisories (documented) |
 | MISRA out-of-scope (shared headers) | 60 — deferred to the systemic MISRA report |
+
+> **Note on the fault-injection row vs the UBSan row:** Bug #1 is surfaced by the
+> UBSan sanitiser lane, not by the functional fail-safe predicates. The 31/31 PASS
+> figure reflects that the module's fail-safe behaviour holds under fault injection;
+> the UB is a separate latent defect in the float→uint cast of `encode_unsigned`,
+> tracked under issue #101 and fixed on `fix/can-encode-robustness` (PR #102).
 
 See the report (`Relatorio_Consolidado_VV_CAN.pdf`) for full narrative, patch
 proposed for Bug #1, and the action plan.
