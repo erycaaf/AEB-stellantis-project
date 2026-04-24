@@ -1,0 +1,29 @@
+======================================================
+  Perception complementary MC/DC suite
+  Targets gap groups G1..G5 (report section 3.3)
+======================================================
+
+--- G1: counter saturation (uint8_t ceiling) ---
+[PASS] G1 lidar: fault stays latched past 255-cycle counter ceiling
+[PASS] G1 lidar: counter saturates at 255U, no wrap-around to 0
+[PASS] G1 radar: fault stays latched past 255-cycle counter ceiling
+[PASS] G1 radar: counter saturates at 255U, no wrap-around to 0
+
+--- G2: radar velocity out-of-range clause ---
+[PASS] G2 radar velocity: |vr_r| > MAX_REL_VEL alone latches radar fault
+
+--- G3: radar ROC composite, clause independence ---
+[PASS] G3a radar: distance-ROC violation alone latches radar fault
+[PASS] G3b radar: velocity-ROC violation alone latches radar fault
+
+--- G4: Kalman radar update skip path ---
+[PASS] G4 kalman: distance is finite when radar update skipped
+[PASS] G4 kalman: radar fault remains latched during radar-off path
+
+--- G5: confidence quality clamp ---
+[PASS] G5 confidence: quality clamp keeps confidence >= 0.0
+[PASS] G5 confidence: confidence never exceeds 1.0
+
+======================================================
+  Results: 11 passed, 0 failed
+======================================================
