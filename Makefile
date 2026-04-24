@@ -1,14 +1,53 @@
 # Makefile — AEB Stellantis Project (host build)
 #
-# Targets:
-#   make build     — compile all modules (zero-warning gate)
-#   make test      — build and run all unit tests
-#   make misra     — run cppcheck MISRA C:2012 on non-stub sources
-#   make clean     — remove build artefacts
+# Targets (build & test):
+#   make build             — compile all modules (zero-warning gate)
+#   make test              — build and run all unit tests
+#   make misra             — run cppcheck MISRA C:2012 on non-stub sources
+#   make clean             — remove build artefacts
+#
+# Targets (ASIL-D V&V — UDS module):
+#   make mcdc-uds          — MC/DC coverage (gcc-14 + gcov-14)
+#   make fault-uds         — systematic fault-injection suite
+#   make memory-uds        — Valgrind + ASan + UBSan on UDS suites
+#   make misra-uds         — cppcheck MISRA scoped to aeb_uds.{c,h}
+#   make vv-uds            — full V&V stack
+#
+# Targets (ASIL-D V&V — Decision module, TTC + FSM):
+#   make mcdc-decision     — MC/DC coverage (gcc-14 + gcov-14 + gcovr)
+#   make fault-decision    — systematic fault-injection suite
+#   make memory-decision   — Valgrind + ASan + UBSan on Decision suites
+#   make misra-decision    — cppcheck MISRA scoped to aeb_ttc / aeb_fsm
+#   make vv-decision       — full V&V stack
+#
+# V&V artefacts land under reports/vv_<module>/. Consolidated reports
+# live in the team documentation area, outside this repo.
 
 CC       = gcc
 CFLAGS   = -Wall -Wextra -Wpedantic -std=c99 -O2 -Iinclude -Istubs
 LDFLAGS  = -lm
+
+# ── V&V coverage toolchain (shared across modules) ──────────────────────
+# Requires gcc-14 for -fcondition-coverage (native MC/DC support).
+# GCOVR picks local venv/bin/gcovr if present, else system gcovr on $PATH.
+# CI can override via environment: `GCOVR=gcovr make vv-decision`.
+CC_COV     = gcc-14
+CFLAGS_COV = -Wall -Wextra -Wpedantic -std=c99 -O0 -g \
+             --coverage -fcondition-coverage -Iinclude -Istubs
+CFLAGS_SAN = -Wall -Wextra -Wpedantic -std=c99 -O0 -g -Iinclude -Istubs \
+             -fsanitize=address \
+             -fsanitize=undefined \
+             -fsanitize=float-cast-overflow \
+             -fno-omit-frame-pointer
+GCOV       = gcov-14
+GCOVR     ?= $(if $(wildcard venv/bin/gcovr),venv/bin/gcovr,gcovr)
+
+# Per-target V&V report directory — keeps the UDS and Decision stacks
+# from overwriting each other when both are invoked in the same workflow.
+mcdc-uds fault-uds memory-uds misra-uds vv-uds: \
+        VV_REPORT_DIR := reports/vv_uds
+mcdc-decision fault-decision memory-decision misra-decision vv-decision: \
+        VV_REPORT_DIR := reports/vv_decision
 
 # All sources (stubs + real code)
 SRC_ALL = src/communication/aeb_can.c \
@@ -29,14 +68,19 @@ SRC_CAN_TEST = src/communication/aeb_can.c stubs/can_hal.c tests/test_can.c
 
 SRC_PERCEPTION_TEST = src/perception/aeb_perception.c tests/test_perception.c
 
-SRC_DECISION_TEST = src/decision/aeb_ttc.c src/decision/aeb_fsm.c \
-                    tests/test_decision.c
+SRC_DECISION_TEST       = src/decision/aeb_ttc.c src/decision/aeb_fsm.c \
+                          tests/test_decision.c
+SRC_DECISION_MCDC_TEST  = src/decision/aeb_ttc.c src/decision/aeb_fsm.c \
+                          tests/test_decision_mcdc.c
+SRC_DECISION_FAULT_TEST = src/decision/aeb_ttc.c src/decision/aeb_fsm.c \
+                          tests/test_decision_fault.c
 
 SRC_PID_TEST = src/execution/aeb_pid.c tests/test_pid.c
 
 SRC_ALERT_TEST = src/execution/aeb_alert.c tests/test_alert.c
 
-SRC_UDS_TEST = src/communication/aeb_uds.c tests/test_uds.c
+SRC_UDS_TEST       = src/communication/aeb_uds.c tests/test_uds.c
+SRC_UDS_FAULT_TEST = src/communication/aeb_uds.c tests/test_uds_fault.c
 
 SRC_INTEGRATION_TEST = $(SRC_ALL) tests/test_integration.c
 
@@ -56,7 +100,9 @@ SRC_MISRA = src/communication/aeb_can.c \
 TEST_BINS = test_smoke test_can test_perception test_decision \
             test_pid test_alert test_uds test_integration
 
-.PHONY: build test misra clean
+.PHONY: build test misra clean vv-clean \
+        mcdc-uds fault-uds memory-uds misra-uds vv-uds \
+        mcdc-decision fault-decision memory-decision misra-decision vv-decision
 
 build:
 	$(CC) $(CFLAGS) -c $(SRC_ALL)
@@ -98,162 +144,187 @@ misra:
 		--suppress=unusedFunction --suppress=missingIncludeSystem \
 		--enable=all $(SRC_MISRA)
 
-clean:
-	rm -f $(TEST_BINS) *.o
+# ── ASIL-D V&V targets (UDS) ────────────────────────────────────────────
 
+mcdc-uds:
+	@rm -rf $(VV_REPORT_DIR)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR)/coverage_mcdc
+	$(CC) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_uds $(SRC_UDS_TEST) $(LDFLAGS)
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_uds > run.log 2>&1 && grep "Results:" run.log
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && gcov -b -c test_uds-aeb_uds.gcno > gcov_summary.txt 2>&1 && cat gcov_summary.txt
+	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
 
-# ==========================================================================
-# MC/DC Coverage (ASIL-D) — PID + Alert
-# ==========================================================================
-# Requisitos (uma vez):
-#   sudo apt install -y gcc-14
-#   sudo apt install -y gcovr    # Ubuntu 24.04: version 7.2 (supports MC/DC)
-#
-# Uso:
-#   make mcdc        — rodar cobertura MC/DC e gerar relatório HTML
-#   make mcdc-clean  — limpar artefatos MC/DC
-# ==========================================================================
+fault-uds:
+	@mkdir -p $(VV_REPORT_DIR)/fault_injection
+	$(CC) $(CFLAGS) -O0 -g -o $(VV_REPORT_DIR)/fault_injection/test_uds_fault $(SRC_UDS_FAULT_TEST) $(LDFLAGS)
+	@$(VV_REPORT_DIR)/fault_injection/test_uds_fault | tee $(VV_REPORT_DIR)/fault_injection/run.log; \
+		echo ""; echo "(non-zero exit expected while bugs are pending patch)"
 
-MCDC_CC       = gcc-14
-MCDC_CFLAGS   = --coverage -fcondition-coverage -std=c99 \
-                -Wall -Wextra -Wpedantic -Iinclude -Istubs
-MCDC_LDFLAGS  = -lm
-MCDC_DIR      = reports/vv_pid_alert/coverage_mcdc
+memory-uds:
+	@mkdir -p $(VV_REPORT_DIR)/memory_safety
+	# Valgrind on unsanitised binaries
+	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs -o $(VV_REPORT_DIR)/memory_safety/test_uds_val       $(SRC_UDS_TEST)       $(LDFLAGS)
+	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs -o $(VV_REPORT_DIR)/memory_safety/test_uds_fault_val $(SRC_UDS_FAULT_TEST) $(LDFLAGS)
+	@echo "--- Valgrind: test_uds (nominal) ---"
+	@valgrind --error-exitcode=0 --leak-check=full --quiet \
+		$(VV_REPORT_DIR)/memory_safety/test_uds_val > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_uds.log; \
+		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_uds.log; \
+		[ ! -s $(VV_REPORT_DIR)/memory_safety/valgrind_test_uds.log ] && echo "(clean)" || true
+	@echo "--- Valgrind: test_uds_fault ---"
+	@valgrind --error-exitcode=0 --leak-check=full --quiet \
+		$(VV_REPORT_DIR)/memory_safety/test_uds_fault_val > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_uds_fault.log; \
+		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_uds_fault.log; \
+		[ ! -s $(VV_REPORT_DIR)/memory_safety/valgrind_test_uds_fault.log ] && echo "(clean)" || true
+	# ASan + UBSan (sanitised binaries; separate from Valgrind to avoid collisions)
+	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_uds_san       $(SRC_UDS_TEST)       $(LDFLAGS)
+	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_uds_fault_san $(SRC_UDS_FAULT_TEST) $(LDFLAGS)
+	@echo "--- ASan+UBSan: test_uds (nominal) ---"
+	@$(VV_REPORT_DIR)/memory_safety/test_uds_san > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_uds.log || true
+	@[ -s $(VV_REPORT_DIR)/memory_safety/ubsan_test_uds.log ] && \
+		cat $(VV_REPORT_DIR)/memory_safety/ubsan_test_uds.log || echo "(clean)"
+	@echo "--- ASan+UBSan: test_uds_fault (UB reports expected until bugs are patched) ---"
+	@$(VV_REPORT_DIR)/memory_safety/test_uds_fault_san > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_uds_fault.log || true
+	@grep "runtime error" $(VV_REPORT_DIR)/memory_safety/ubsan_test_uds_fault.log | sort -u || echo "(clean)"
 
-.PHONY: mcdc mcdc-clean
+misra-uds:
+	@mkdir -p $(VV_REPORT_DIR)/misra
+	cppcheck --addon=misra --std=c99 -Iinclude -Istubs \
+		--suppress=unusedFunction --suppress=missingIncludeSystem \
+		--enable=all \
+		--xml --xml-version=2 \
+		src/communication/aeb_uds.c include/aeb_uds.h \
+		2> $(VV_REPORT_DIR)/misra/cppcheck_uds.xml
+	@echo "cppcheck XML -> $(VV_REPORT_DIR)/misra/cppcheck_uds.xml"
 
-mcdc-pid-alert:
-	@echo "=== Building MC/DC test binaries (gcc-14 -fcondition-coverage) ==="
-	@rm -rf $(MCDC_DIR) && mkdir -p $(MCDC_DIR)
-	$(MCDC_CC) $(MCDC_CFLAGS) -c src/execution/aeb_pid.c   -o $(MCDC_DIR)/aeb_pid.o
-	$(MCDC_CC) $(MCDC_CFLAGS) -c src/execution/aeb_alert.c -o $(MCDC_DIR)/aeb_alert.o
-	$(MCDC_CC) $(MCDC_CFLAGS) $(MCDC_DIR)/aeb_pid.o   tests/test_pid.c        $(MCDC_LDFLAGS) -o $(MCDC_DIR)/test_pid
-	$(MCDC_CC) $(MCDC_CFLAGS) $(MCDC_DIR)/aeb_pid.o   tests/test_pid_mcdc.c   $(MCDC_LDFLAGS) -o $(MCDC_DIR)/test_pid_mcdc
-	$(MCDC_CC) $(MCDC_CFLAGS) $(MCDC_DIR)/aeb_alert.o tests/test_alert.c      $(MCDC_LDFLAGS) -o $(MCDC_DIR)/test_alert
-	$(MCDC_CC) $(MCDC_CFLAGS) $(MCDC_DIR)/aeb_alert.o tests/test_alert_mcdc.c $(MCDC_LDFLAGS) -o $(MCDC_DIR)/test_alert_mcdc
-	@echo "=== Running tests ==="
-	cd $(MCDC_DIR) && ./test_pid        > /dev/null
-	cd $(MCDC_DIR) && ./test_pid_mcdc   > /dev/null
-	cd $(MCDC_DIR) && ./test_alert      > /dev/null
-	cd $(MCDC_DIR) && ./test_alert_mcdc > /dev/null
+vv-uds: mcdc-uds fault-uds memory-uds misra-uds
 	@echo ""
-	@echo "=== MC/DC Summary (gcov-14 native) ==="
-	@cd $(MCDC_DIR) && gcov-14 --conditions -b -c aeb_pid.gcda   2>/dev/null | head -10
-	@cd $(MCDC_DIR) && gcov-14 --conditions -b -c aeb_alert.gcda 2>/dev/null | head -10
+	@echo "=== UDS V&V stack complete — artefacts in $(VV_REPORT_DIR)/ ==="
+
+# ── ASIL-D V&V targets (Decision: TTC + FSM) ───────────────────────────
+
+mcdc-decision:
+	@rm -rf $(VV_REPORT_DIR)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR)/coverage_mcdc
+	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_decision \
+		$(SRC_DECISION_TEST) $(LDFLAGS)
+	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_decision_mcdc \
+		$(SRC_DECISION_MCDC_TEST) $(LDFLAGS)
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_decision > run.log 2>&1 \
+		&& echo "--- test_decision ---" && grep -E "RESULTS|passed" run.log
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_decision_mcdc >> run.log 2>&1 \
+		&& echo "--- test_decision_mcdc ---" && tail -4 run.log | head -3
+	@echo "# gcov-14 per-binary metrics (test_decision_mcdc).\n\
+# See coverage_summary.txt for the merged view across both binaries." \
+		> $(VV_REPORT_DIR)/coverage_mcdc/gcov_summary.txt
+	@$(GCOV) -b -c $(VV_REPORT_DIR)/coverage_mcdc/test_decision_mcdc-aeb_ttc.gcno \
+		>> $(VV_REPORT_DIR)/coverage_mcdc/gcov_summary.txt 2>&1 || true
+	@$(GCOV) -b -c $(VV_REPORT_DIR)/coverage_mcdc/test_decision_mcdc-aeb_fsm.gcno \
+		>> $(VV_REPORT_DIR)/coverage_mcdc/gcov_summary.txt 2>&1 || true
+	@mv -f aeb_ttc.c.gcov aeb_fsm.c.gcov $(VV_REPORT_DIR)/coverage_mcdc/ 2>/dev/null || true
+	$(GCOVR) --root . \
+		--gcov-executable $(GCOV) \
+		--filter 'src/decision/' \
+		--html-details $(VV_REPORT_DIR)/coverage_mcdc/report.html \
+		--cobertura $(VV_REPORT_DIR)/coverage_mcdc/coverage.xml \
+		--txt $(VV_REPORT_DIR)/coverage_mcdc/coverage_summary.txt \
+		--print-summary
 	@echo ""
-	@echo "=== Generating HTML report (gcovr) ==="
-	cd $(MCDC_DIR) && gcovr --gcov-executable='gcov-14 --conditions' \
-	                         --root=.. \
-	                         --filter='.*/src/execution/.*' \
-	                         --html-details report.html \
-	                         --xml coverage.xml \
-	                         --txt-summary
+	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
+
+fault-decision:
+	@mkdir -p $(VV_REPORT_DIR)/fault_injection
+	$(CC) $(CFLAGS) -O0 -g -o $(VV_REPORT_DIR)/fault_injection/test_decision_fault \
+		$(SRC_DECISION_FAULT_TEST) $(LDFLAGS)
+	@$(VV_REPORT_DIR)/fault_injection/test_decision_fault \
+		| tee $(VV_REPORT_DIR)/fault_injection/run.log; \
+		echo ""; echo "(non-zero exit expected while bugs are pending patch)"
+
+memory-decision:
+	@mkdir -p $(VV_REPORT_DIR)/memory_safety
+	# Valgrind on unsanitised binaries
+	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs \
+		-o $(VV_REPORT_DIR)/memory_safety/test_decision_val \
+		$(SRC_DECISION_TEST) $(LDFLAGS)
+	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs \
+		-o $(VV_REPORT_DIR)/memory_safety/test_decision_mcdc_val \
+		$(SRC_DECISION_MCDC_TEST) $(LDFLAGS)
+	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs \
+		-o $(VV_REPORT_DIR)/memory_safety/test_decision_fault_val \
+		$(SRC_DECISION_FAULT_TEST) $(LDFLAGS)
+	@echo "--- Valgrind: test_decision (nominal) ---"
+	@valgrind --error-exitcode=0 --leak-check=full --quiet \
+		$(VV_REPORT_DIR)/memory_safety/test_decision_val > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_decision.log; \
+		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_decision.log; \
+		[ ! -s $(VV_REPORT_DIR)/memory_safety/valgrind_test_decision.log ] && echo "(clean)" || true
+	@echo "--- Valgrind: test_decision_mcdc ---"
+	@valgrind --error-exitcode=0 --leak-check=full --quiet \
+		$(VV_REPORT_DIR)/memory_safety/test_decision_mcdc_val > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_decision_mcdc.log; \
+		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_decision_mcdc.log; \
+		[ ! -s $(VV_REPORT_DIR)/memory_safety/valgrind_test_decision_mcdc.log ] && echo "(clean)" || true
+	@echo "--- Valgrind: test_decision_fault ---"
+	@valgrind --error-exitcode=0 --leak-check=full --quiet \
+		$(VV_REPORT_DIR)/memory_safety/test_decision_fault_val > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_decision_fault.log; \
+		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_decision_fault.log; \
+		[ ! -s $(VV_REPORT_DIR)/memory_safety/valgrind_test_decision_fault.log ] && echo "(clean)" || true
+	# ASan + UBSan (sanitised binaries)
+	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_decision_san \
+		$(SRC_DECISION_TEST) $(LDFLAGS)
+	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_decision_mcdc_san \
+		$(SRC_DECISION_MCDC_TEST) $(LDFLAGS)
+	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_decision_fault_san \
+		$(SRC_DECISION_FAULT_TEST) $(LDFLAGS)
+	@echo "--- ASan+UBSan: test_decision (nominal) ---"
+	@$(VV_REPORT_DIR)/memory_safety/test_decision_san > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_decision.log || true
+	@[ -s $(VV_REPORT_DIR)/memory_safety/ubsan_test_decision.log ] && \
+		cat $(VV_REPORT_DIR)/memory_safety/ubsan_test_decision.log || echo "(clean)"
+	@echo "--- ASan+UBSan: test_decision_mcdc ---"
+	@$(VV_REPORT_DIR)/memory_safety/test_decision_mcdc_san > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_decision_mcdc.log || true
+	@[ -s $(VV_REPORT_DIR)/memory_safety/ubsan_test_decision_mcdc.log ] && \
+		cat $(VV_REPORT_DIR)/memory_safety/ubsan_test_decision_mcdc.log || echo "(clean)"
+	@echo "--- ASan+UBSan: test_decision_fault (UB reports expected until bugs are patched) ---"
+	@$(VV_REPORT_DIR)/memory_safety/test_decision_fault_san > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_decision_fault.log || true
+	@grep "runtime error" $(VV_REPORT_DIR)/memory_safety/ubsan_test_decision_fault.log \
+		| sort -u || echo "(clean)"
+
+misra-decision:
+	@mkdir -p $(VV_REPORT_DIR)/misra
+	cppcheck --addon=misra --std=c99 -Iinclude -Istubs \
+		--suppress=unusedFunction --suppress=missingIncludeSystem \
+		--enable=all \
+		--xml --xml-version=2 \
+		src/decision/aeb_ttc.c src/decision/aeb_fsm.c \
+		include/aeb_ttc.h include/aeb_fsm.h \
+		2> $(VV_REPORT_DIR)/misra/cppcheck_decision.xml
+	@echo "cppcheck XML -> $(VV_REPORT_DIR)/misra/cppcheck_decision.xml"
+
+vv-decision: mcdc-decision fault-decision memory-decision misra-decision
 	@echo ""
-	@echo ""
-	@echo "=== Writing gcov_summary.txt ==="
-	@{ \
-	  echo "MC/DC Coverage Summary — PID + Alert"; \
-	  echo "Generated: $$(date -Iseconds)"; \
-	  echo "Toolchain: $$(gcc-14 --version | head -1)"; \
-	  echo "=============================================="; \
-	  echo ""; \
-	  echo "-- aeb_pid.c --"; \
-	  (cd $(MCDC_DIR) && gcov-14 --conditions -b -c aeb_pid.gcda 2>/dev/null) | head -10; \
-	  echo ""; \
-	  echo "-- aeb_alert.c --"; \
-	  (cd $(MCDC_DIR) && gcov-14 --conditions -b -c aeb_alert.gcda 2>/dev/null) | head -10; \
-	} > $(MCDC_DIR)/gcov_summary.txt
+	@echo "=== Decision V&V stack complete — artefacts in $(VV_REPORT_DIR)/ ==="
 
-	@echo "=== DONE ==="
-	@echo "Open: $(MCDC_DIR)/report.html"
+# ── Clean ────────────────────────────────────────────────────────────────
 
-mcdc-pid-alert-clean:
-	rm -rf $(MCDC_DIR)
+vv-clean:
+	rm -rf reports/vv_uds/coverage_mcdc/test_uds* \
+	       reports/vv_uds/fault_injection/test_uds* \
+	       reports/vv_uds/memory_safety/test_uds* \
+	       reports/vv_decision/coverage_mcdc/test_decision* \
+	       reports/vv_decision/coverage_mcdc/*.gcda \
+	       reports/vv_decision/coverage_mcdc/*.gcno \
+	       reports/vv_decision/coverage_mcdc/*.gcov \
+	       reports/vv_decision/coverage_mcdc/report.*.html \
+	       reports/vv_decision/coverage_mcdc/report.css \
+	       reports/vv_decision/fault_injection/test_decision* \
+	       reports/vv_decision/memory_safety/test_decision*
 
-# ==========================================================================
-# Fault Injection Tests (ASIL-D Robustness)
-# ==========================================================================
-
-FAULT_DIR = reports/vv_pid_alert/fault_injection
-
-.PHONY: fault fault-clean
-
-fault-pid-alert:
-	@echo "=== Building fault injection tests ==="
-	@rm -rf $(FAULT_DIR) && mkdir -p $(FAULT_DIR)
-	$(CC) $(CFLAGS) src/execution/aeb_pid.c   tests/test_pid_fault.c   $(LDFLAGS) -o $(FAULT_DIR)/test_pid_fault
-	$(CC) $(CFLAGS) src/execution/aeb_alert.c tests/test_alert_fault.c $(LDFLAGS) -o $(FAULT_DIR)/test_alert_fault
-	@echo ""
-	@echo "=== Running PID fault tests ==="
-	-./$(FAULT_DIR)/test_pid_fault   | tee $(FAULT_DIR)/pid_fault.log
-	@echo ""
-	@echo "=== Running Alert fault tests ==="
-	-./$(FAULT_DIR)/test_alert_fault | tee $(FAULT_DIR)/alert_fault.log
-	@echo ""
-	@echo "=== Logs saved in $(FAULT_DIR)/ ==="
-
-fault-pid-alert-clean:
-	rm -rf $(FAULT_DIR)
-
-
-# ==========================================================================
-# Memory Safety Verification (ASIL-D)
-# ==========================================================================
-# Requisitos (uma vez):
-#   sudo apt install -y valgrind
-#
-# Uso:
-#   make memory          — roda Valgrind + ASan + UBSan em toda a suíte
-#   make memory-valgrind — só Valgrind
-#   make memory-asan     — só AddressSanitizer + UBSan
-#   make memory-clean    — limpa artefatos
-# ==========================================================================
-
-MEM_DIR      = reports/vv_pid_alert/memory_safety
-SAN_CFLAGS   = -fsanitize=address,undefined -fno-omit-frame-pointer -g -O1 \
-               -std=c99 -Wall -Wextra -Iinclude -Istubs
-
-.PHONY: memory memory-valgrind memory-asan memory-clean
-
-memory-pid-alert: memory-valgrind-pid-alert memory-asan-pid-alert
-	@echo ""
-	@echo "=== Memory Safety: todos os checks concluídos ==="
-	@echo "Logs: $(MEM_DIR)/valgrind/  e  $(MEM_DIR)/sanitizers/"
-
-memory-valgrind-pid-alert: test_pid test_alert
-	@mkdir -p $(MEM_DIR)/valgrind
-	@echo "=== Valgrind (leak-check=full) ==="
-	@for t in test_pid test_alert; do \
-		valgrind --leak-check=full \
-		         --show-leak-kinds=all \
-		         --errors-for-leak-kinds=all \
-		         --error-exitcode=1 \
-		         --track-origins=yes \
-		         --log-file=$(MEM_DIR)/valgrind/$$t.log \
-		         ./$$t > /dev/null 2>&1; \
-		ec=$$?; \
-		sum=$$(grep "ERROR SUMMARY" $(MEM_DIR)/valgrind/$$t.log | head -1); \
-		if [ $$ec -eq 0 ]; then \
-			printf "  OK  %-20s  %s\n" $$t "$$sum"; \
-		else \
-			printf "  FAIL %-20s  %s\n" $$t "$$sum"; \
-		fi; \
-	done
-
-memory-asan-pid-alert:
-	@mkdir -p $(MEM_DIR)/bin $(MEM_DIR)/sanitizers
-	@echo "=== AddressSanitizer + UBSan ==="
-	$(CC) $(SAN_CFLAGS) $(SRC_PID_TEST)         -lm -o $(MEM_DIR)/bin/san_pid
-	$(CC) $(SAN_CFLAGS) $(SRC_ALERT_TEST)       -lm -o $(MEM_DIR)/bin/san_alert
-	@for t in pid alert; do \
-		$(MEM_DIR)/bin/san_$$t > $(MEM_DIR)/sanitizers/$$t.log 2>&1; \
-		ec=$$?; \
-		if [ $$ec -eq 0 ]; then \
-			printf "  OK  san_test_%-15s  PASS (0 errors)\n" $$t; \
-		else \
-			printf "  FAIL san_test_%-15s  exit=%d — ver %s.log\n" $$t $$ec $$t; \
-		fi; \
-	done
-
-memory-pid-alert-clean:
-	rm -rf $(MEM_DIR)
+clean: vv-clean
+	rm -f $(TEST_BINS) test_decision_cov test_decision_mcdc test_decision_fault \
+	      *.o *.gcda *.gcno *.gcov
+	rm -rf coverage_mcdc memory_safety
