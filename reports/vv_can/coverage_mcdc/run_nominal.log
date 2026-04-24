@@ -1,0 +1,25 @@
+=== AEB CAN Module — Unit Tests ===
+
+  [TEST] test_signal_roundtrip
+  [TEST] test_init_success
+  [TEST] test_init_failure
+  [TEST] test_rx_ego_vehicle
+  [TEST] test_rx_yaw_rate
+  [TEST] test_rx_radar_target
+  [TEST] test_rx_driver_input
+  [TEST] test_tx_alert
+  [TEST] test_rx_timeout
+  [TEST] test_rx_timeout_reset_on_valid_frame
+  [TEST] test_tx_brake_cmd
+  [TEST] test_tx_brake_cmd_nan_brake_bar
+  [TEST] test_tx_brake_cmd_pos_inf_brake_bar
+  [TEST] test_tx_brake_cmd_neg_inf_brake_bar
+  [TEST] test_tx_brake_cmd_overflow_brake_bar
+  [TEST] test_tx_fsm_period
+  [TEST] test_tx_send_failure
+  [TEST] test_rx_uds_request
+  [TEST] test_rx_uds_request_short_dlc
+  [TEST] test_tx_uds_response
+  [TEST] test_uds_request_ack
+
+=== Results: 61 run, 61 passed, 0 failed ===
