@@ -93,18 +93,12 @@ jobs:
       # A single gcov call produces gcov_summary_combined.txt — the real
       # measured union, not the per-suite numbers.
       #
-      # Threshold rationale (post-PR #93, fix/perception-robustness):
-      # the defensive `if (!isfinite(...))` guards added to aeb_perception.c
-      # grew the function from 162 lines / 92 branches to 168 lines / 110
-      # branches. The 18 new branch outcomes are exercised end-to-end by the
-      # fault-injection suite (gate 4) but not yet by the structural MC/DC
-      # suite, so statement coverage stays high (98.81% — only the
-      # unreachable `else` of the new isfinite guards remains uncovered)
-      # while MC/DC dropped mechanically to 81.82% as the divisor grew.
-      # The gate is set at ≥80% to reflect the post-fix baseline.
-      # Complementary MC/DC tests (G6/G7/G8) for the new isfinite/v_ego
-      # guards are tracked as a follow-up to bring the figure back above 93%.
-      - name: MC/DC coverage (gate ≥ 80%, post-fix baseline)
+      # Threshold ≥95% matches the UDS, Decision and PID-Alert modules.
+      # The complementary MC/DC suite (test_perception_mcdc.c) covers the
+      # G6/G7/G8 robustness branches added by PR #93/#115 (NaN/inf guards
+      # on lidar_d, radar_d/vr, and v_ego) plus FABSF sign-branch and
+      # ROC-direction extensions of G2/G3.
+      - name: MC/DC coverage (gate ≥ 95%)
         run: |
           make mcdc-perception
           SUM="reports/vv_perception/coverage_mcdc/gcov_summary_combined.txt"
@@ -114,8 +108,8 @@ jobs:
           echo "Perception coverage — stmt=${STMT}% branch=${BRCH}% mcdc=${MCDC}%"
           for metric in "Statement:$STMT" "Branch:$BRCH" "MC/DC:$MCDC"; do
             name="${metric%%:*}"; value="${metric##*:}"
-            if [ "$(echo "$value < 80.0" | bc -l)" = "1" ]; then
-              echo "::error title=Perception coverage regression::${name} dropped to ${value}% (required ≥80%)"
+            if [ "$(echo "$value < 95.0" | bc -l)" = "1" ]; then
+              echo "::error title=Perception coverage regression::${name} dropped to ${value}% (required ≥95%)"
               exit 1
             fi
           done
@@ -143,38 +137,29 @@ jobs:
       # ─── Blocking gate 3: MISRA C:2012 (Perception scope only) ────────────
       # Counts only findings emitted by the MISRA addon (id prefix
       # "misra-c2012"), not cppcheck-native style/portability/unused
-      # warnings. After that, documented deviations (see the
-      # `accepted_deviations` set in the Python block below) are filtered
-      # out, so the gate enforces the `required` + `mandatory` rule set
-      # minus the rules with a formally accepted deviation.
-      - name: MISRA (0 required/mandatory issues in aeb_perception scope, documented deviations filtered)
+      # warnings. After that, the single advisory deviation (Rule 15.5)
+      # is filtered out, so the gate enforces the `required` + `mandatory`
+      # rule set in full.
+      - name: MISRA (0 required/mandatory issues in aeb_perception.{c,h})
         run: |
           make misra-perception
           PER_ISSUES=$(python3 - <<'PY'
           import xml.etree.ElementTree as ET
           t = ET.parse("reports/vv_perception/misra/cppcheck_perception.xml")
           target = ("src/perception/aeb_perception.c", "include/aeb_perception.h")
-          # Documented deviations — filtered out of the gate count:
+          # Documented advisory deviation — filtered out of the gate count:
           #   15.5 (advisory, Rule 15.5): multiple return statements in
           #       clampf() and perception_step(). Accepted as deviation per
           #       consolidated V&V report §5.3.
-          #   14.4 (required, Rule 14.4): controlling expression of an `if`
-          #       shall have essentially Boolean type. Flagged on the
-          #       `if (!isfinite(...))` guards introduced by PR #93
-          #       (fix/perception-robustness). `isfinite()` is a standard
-          #       library macro returning `int` per ISO C99 §7.12.3.2; the
-          #       idiomatic form is accepted both by GCC and by the MISRA
-          #       rationale for Rule 14.4 (e.g. `if (isdigit(c))` is an
-          #       accepted deviation pattern). Tracked as a follow-up to
-          #       wrap the guards in explicit `!= 0` comparisons in a
-          #       separate refactor PR.
-          accepted_deviations = {"misra-c2012-15.5", "misra-c2012-14.4"}
+          # 14.4 deviation removed in PR #115 (fix/perception-misra-14-4) —
+          # aeb_perception.c:295 now uses explicit != 0 on the isfinite guard.
+          accepted_advisory = {"misra-c2012-15.5"}
           n = 0
           for e in t.findall(".//error"):
               eid = e.get("id", "")
               if not eid.startswith("misra-c2012"):
                   continue
-              if eid in accepted_deviations:
+              if eid in accepted_advisory:
                   continue
               loc = e.find("location")
               if loc is not None and loc.get("file", "") in target:

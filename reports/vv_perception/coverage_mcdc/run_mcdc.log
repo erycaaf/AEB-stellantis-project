@@ -1,6 +1,7 @@
 ======================================================
   Perception complementary MC/DC suite
-  Targets gap groups G1..G5 (report section 3.3)
+  Targets gap groups G1..G8 (G1..G5: report §3.3,
+                            G6..G8: PR #93/#115 robustness)
 ======================================================
 
 --- G1: counter saturation (uint8_t ceiling) ---
@@ -11,10 +12,15 @@
 
 --- G2: radar velocity out-of-range clause ---
 [PASS] G2 radar velocity: |vr_r| > MAX_REL_VEL alone latches radar fault
+[PASS] G2b radar velocity: vr_r below -MAX_REL_VEL alone latches radar fault
 
---- G3: radar ROC composite, clause independence ---
+--- G3: radar/lidar ROC composite, clause independence ---
 [PASS] G3a radar: distance-ROC violation alone latches radar fault
 [PASS] G3b radar: velocity-ROC violation alone latches radar fault
+[PASS] G3c radar: distance-ROC violation (negative direction) latches fault
+[PASS] G3d radar: velocity-ROC violation (negative direction) latches fault
+[PASS] G3e lidar: distance-ROC violation latches lidar fault
+[PASS] G3f lidar: distance-ROC violation (negative direction) latches fault
 
 --- G4: Kalman radar update skip path ---
 [PASS] G4 kalman: distance is finite when radar update skipped
@@ -24,6 +30,32 @@
 [PASS] G5 confidence: quality clamp keeps confidence >= 0.0
 [PASS] G5 confidence: confidence never exceeds 1.0
 
+--- G6: lidar !isfinite guard (PR #93 robustness) ---
+[PASS] G6 lidar NaN: fused distance remains finite (no NaN propagation)
+[PASS] G6 lidar NaN: fused v_rel remains finite
+[PASS] G6 lidar NaN: AEB_FAULT_LIDAR latches after SENSOR_FAULT_CYCLES
+[PASS] G6 lidar +inf: fused distance remains finite
+[PASS] G6 lidar -inf: fused distance remains finite
+
+--- G7: radar !isfinite guards (PR #93 robustness) ---
+[PASS] G7 radar_d NaN: fused distance remains finite
+[PASS] G7 radar_d NaN: fused v_rel remains finite
+[PASS] G7 radar_d NaN: AEB_FAULT_RADAR latches after SENSOR_FAULT_CYCLES
+[PASS] G7 radar_vr NaN: fused distance remains finite
+[PASS] G7 radar_vr NaN: fused v_rel remains finite
+[PASS] G7 radar_vr NaN: AEB_FAULT_RADAR latches after SENSOR_FAULT_CYCLES
+[PASS] G7 radar_d +inf: fused distance remains finite
+[PASS] G7 radar_vr -inf: fused distance remains finite
+
+--- G8: v_ego isfinite passthrough (PR #115 form) ---
+[PASS] G8 v_ego NaN: passthrough sanitised to 0.0f (fail-safe)
+[PASS] G8 v_ego NaN: AEB_FAULT_CAN_TO raised
+[PASS] G8 v_ego NaN: fused distance remains finite
+[PASS] G8 v_ego +inf: passthrough sanitised to 0.0f
+[PASS] G8 v_ego +inf: AEB_FAULT_CAN_TO raised
+[PASS] G8 v_ego -inf: passthrough sanitised to 0.0f
+[PASS] G8 v_ego -inf: AEB_FAULT_CAN_TO raised
+
 ======================================================
-  Results: 11 passed, 0 failed
+  Results: 36 passed, 0 failed
 ======================================================
