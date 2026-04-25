@@ -283,7 +283,7 @@ static void cat_B_alternating_extreme(void)
 {
     raw_sensor_input_t in;
     perception_output_t out;
-    printf("\n[B5] Alternating ROC > DIST_ROC_LIMIT (radar)\n");
+    printf("\n[B5] Alternating ROC > DIST_ROC_LIMIT (radar) — regression guard\n");
 
     perception_init();
     in = make_good_input();
@@ -298,8 +298,15 @@ static void cat_B_alternating_extreme(void)
     perception_step(&in, &out);
     printf("       distance=%f  fault=0x%02x\n",
            (double)out.distance, (unsigned)out.fault_flag);
-    ASSERT(out.fault_flag & AEB_FAULT_RADAR,
-           "B5: alternating ROC violation must latch RADAR fault");
+    /* Regression guard: post-fix behaviour (commit 9d7d965, PR #93
+     * fix/perception-robustness). Alternating bad/good/bad frames must
+     * reset the persistence counter, mirroring D2 oscillation semantics,
+     * so radar fault MUST NOT latch on transient ROC violations. The
+     * previous version of this test asserted the opposite (the buggy
+     * behaviour documented as Bug #3 by the V&V cross-validation) — it
+     * is kept under the same B5 category as an anti-regression check. */
+    ASSERT((out.fault_flag & AEB_FAULT_RADAR) == 0U,
+           "B5: alternating ROC (bad/good/bad) must NOT latch RADAR fault");
 }
 
 /* ============================================================

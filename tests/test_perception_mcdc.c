@@ -5,10 +5,12 @@
  * Scope
  * -----
  * The nominal suite (test_perception.c) achieves 100% statement coverage
- * but only 88.04% branch / MC/DC (81 of 92 condition outcomes), leaving
- * 11 outcomes uncovered. This suite targets the 5 gap groups (G1..G5)
- * identified in Relatorio_Consolidado_VV_Perception.pdf §3.3 and raises
- * MC/DC to its structural maximum.
+ * but only 88.04% branch / MC/DC (81 of 92 condition outcomes) on the
+ * pre-PR-#93 module. PR #93 added defensive `if (!isfinite(...))` guards
+ * that grew the branch count from 92 to 110 and dropped MC/DC mechanically
+ * to ~82%. This suite targets the original 5 gap groups (G1..G5) plus the
+ * three groups (G6..G8) covering the new robustness guards introduced by
+ * PR #93 and refined by PR #115 (fix/perception-misra-14-4):
  *
  *   G1 — counter saturation in lidar_fault_detect / radar_fault_detect
  *        (branches at aeb_perception.c:50 and :97)
@@ -21,6 +23,15 @@
  *        (aeb_perception.c:211)
  *   G5 — confidence quality clamp: (quality < 0.0f) true branch
  *        (aeb_perception.c:261)
+ *   G6 — !isfinite(d_l) guard in lidar_fault_detect  (aeb_perception.c:42)
+ *        plus the propagated isfinite(d_l) clause in kalman_fusion l_ok
+ *        (aeb_perception.c:151).
+ *   G7 — !isfinite(d_r)/!isfinite(vr_r) guards in radar_fault_detect
+ *        (aeb_perception.c:89) plus the propagated isfinite() clauses in
+ *        kalman_fusion r_ok and the seed-deferred init guard
+ *        (aeb_perception.c:152-153 and :157).
+ *   G8 — isfinite(in->v_ego) passthrough guard in perception_step
+ *        (aeb_perception.c:295, post-PR-#115 explicit `!= 0` form).
  *
  * Rationale
  * ---------
@@ -345,13 +356,404 @@ static void test_G5_confidence_quality_clamp(void)
 }
 
 /* =========================================================================
+ * G3 sign-flip extensions — FABSF macro ternary branches
+ * -------------------------------------------------------------------------
+ * The FABSF(x) helper expands to `((x) < 0 ? -(x) : (x))`, which is itself
+ * an atomic condition. The original G3a/G3b cover the OR's clause
+ * independence with positive deltas, but MC/DC also requires each FABSF
+ * ternary to flip independently — i.e. exercise the negation branch where
+ * the argument is negative. The same applies to FABSF(vr_r) inside the
+ * out-of-range OR at line 91 (G2 was authored only for positive vr_r).
+ *
+ * The tests below mirror G3a/G3b and G2 with sign-flipped inputs so each
+ * FABSF takes its `< 0` branch. They are the complement Rian called for
+ * when raising the gate to ≥95% — without them, the FABSF condition
+ * outcomes stay uncovered even though every functional path is exercised.
+ * ====================================================================== */
+static void test_G3c_radar_distance_roc_negative(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    /* Cycle 0: seed prev_d=30 */
+    perception_step(&in, &out);
+
+    /* Cycle 1: distance JUMPS DOWN by 20 (Δ=-20) — flips FABSF sign branch.
+     * Velocity stays close, so the velocity ROC clause stays false. */
+    in.radar_d  = 10.0f;   /* |10 - 30| = 20 > DIST_ROC_LIMIT, sign negative */
+    in.radar_vr = 5.5f;
+    perception_step(&in, &out);
+
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES; ++i) {
+        in.radar_d  -= 12.0f;   /* keep distance ROC large and negative */
+        if (in.radar_d < RADAR_DIST_MIN + 1.0f) { in.radar_d = 80.0f; }
+        in.radar_vr += 0.3f;
+        perception_step(&in, &out);
+    }
+
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) != 0U,
+          "G3c radar: distance-ROC violation (negative direction) latches fault");
+}
+
+static void test_G3d_radar_velocity_roc_negative(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    /* Cycle 0: seed prev_vr=5 */
+    perception_step(&in, &out);
+
+    /* Cycle 1: velocity JUMPS DOWN (Δ=-10) — flips FABSF sign branch. */
+    in.radar_d  = 32.0f;   /* distance ROC stays small */
+    in.radar_vr = -5.0f;   /* |-5 - 5| = 10 > VEL_ROC_LIMIT, sign negative */
+    perception_step(&in, &out);
+
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES; ++i) {
+        in.radar_d  += 1.0f;
+        in.radar_vr -= 5.0f;
+        if (in.radar_vr < -MAX_REL_VEL + 1.0f) { in.radar_vr = MAX_REL_VEL - 1.0f; }
+        perception_step(&in, &out);
+    }
+
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) != 0U,
+          "G3d radar: velocity-ROC violation (negative direction) latches fault");
+}
+
+static void test_G3e_lidar_distance_roc(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    /* Cycle 0: seed prev_d=30.2 */
+    perception_step(&in, &out);
+
+    /* Cycle 1: lidar_d jumps up by 20 (Δ=+20) — exercises both the
+     * `FABSF(d_l - prev_d) > DIST_ROC_LIMIT` true branch at line 46
+     * and the FABSF positive sign. */
+    in.lidar_d = 50.2f;
+    perception_step(&in, &out);
+
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES; ++i) {
+        in.lidar_d += 15.0f;
+        if (in.lidar_d > LIDAR_DIST_MAX - 1.0f) { in.lidar_d = 20.0f; }
+        perception_step(&in, &out);
+    }
+
+    CHECK((out.fault_flag & AEB_FAULT_LIDAR) != 0U,
+          "G3e lidar: distance-ROC violation latches lidar fault");
+}
+
+static void test_G3f_lidar_distance_roc_negative(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    /* Seed prev_d=30.2 */
+    perception_step(&in, &out);
+
+    /* lidar_d drops by 20 (Δ=-20) — flips the FABSF sign branch. */
+    in.lidar_d = 10.2f;
+    perception_step(&in, &out);
+
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES; ++i) {
+        in.lidar_d -= 12.0f;
+        if (in.lidar_d < LIDAR_DIST_MIN + 1.0f) { in.lidar_d = 80.0f; }
+        perception_step(&in, &out);
+    }
+
+    CHECK((out.fault_flag & AEB_FAULT_LIDAR) != 0U,
+          "G3f lidar: distance-ROC violation (negative direction) latches fault");
+}
+
+static void test_G2b_radar_velocity_negative_oor(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    /* vr_r = -60 m/s — flips FABSF negation branch in line 91. */
+    in.radar_d  = 30.0f;
+    in.radar_vr = (float)(-(MAX_REL_VEL + 10.0f));
+
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES + 1U; ++i) {
+        perception_step(&in, &out);
+    }
+
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) != 0U,
+          "G2b radar velocity: vr_r below -MAX_REL_VEL alone latches radar fault");
+}
+
+/* =========================================================================
+ * G6 — Non-finite lidar_d (NaN / +inf / -inf)
+ * -------------------------------------------------------------------------
+ * Target branches:
+ *   lidar_fault_detect : aeb_perception.c:42
+ *     bad = (!isfinite(d_l) || ...) ? 1U : 0U;
+ *     -> the `!isfinite(d_l)` true outcome must be exercised.
+ *   kalman_fusion      : aeb_perception.c:151
+ *     uint8_t l_ok = ((l_fault == 0U) && (fi == 0U) && isfinite(d_l)) ...
+ *     -> the `isfinite(d_l)` false outcome must be exercised while
+ *        l_fault is still 0 (i.e. within the first SENSOR_FAULT_CYCLES
+ *        cycles, before the counter latches).
+ *
+ * Strategy: feed a single non-finite lidar_d frame on a fresh module.
+ * On the first cycle, the lidar bad-counter ticks to 1 (< SENSOR_FAULT_CYCLES)
+ * so l_fault returns 0, yet isfinite(d_l) is false — exercising both the
+ * `!isfinite` true-branch in the detector and the `isfinite` false-branch
+ * in the kalman l_ok expression in the same step. Then we hold the bad
+ * input long enough to latch the fault, mirroring the pattern used by
+ * test_mcdc_decel_target_nan/test_mcdc_a_ego_nan in test_pid_mcdc.c.
+ *
+ * Acceptance: outputs remain finite (no NaN propagation), and the
+ * AEB_FAULT_LIDAR flag latches once the counter hits SENSOR_FAULT_CYCLES.
+ * ====================================================================== */
+static void test_G6_lidar_nan(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    /* First cycle with NaN lidar_d — drives !isfinite(d_l)=true on line 42
+     * and isfinite(d_l)=false on line 151 simultaneously. */
+    in.lidar_d = NAN;
+    perception_step(&in, &out);
+
+    CHECK(isfinite(out.distance),
+          "G6 lidar NaN: fused distance remains finite (no NaN propagation)");
+    CHECK(isfinite(out.v_rel),
+          "G6 lidar NaN: fused v_rel remains finite");
+
+    /* Hold non-finite input until the counter latches the lidar fault. */
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES + 2U; ++i) {
+        perception_step(&in, &out);
+    }
+    CHECK((out.fault_flag & AEB_FAULT_LIDAR) != 0U,
+          "G6 lidar NaN: AEB_FAULT_LIDAR latches after SENSOR_FAULT_CYCLES");
+}
+
+static void test_G6_lidar_posinf(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.lidar_d = INFINITY;
+    perception_step(&in, &out);
+
+    CHECK(isfinite(out.distance),
+          "G6 lidar +inf: fused distance remains finite");
+}
+
+static void test_G6_lidar_neginf(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.lidar_d = -INFINITY;
+    perception_step(&in, &out);
+
+    CHECK(isfinite(out.distance),
+          "G6 lidar -inf: fused distance remains finite");
+}
+
+/* =========================================================================
+ * G7 — Non-finite radar_d / radar_vr (NaN / +inf / -inf)
+ * -------------------------------------------------------------------------
+ * Target branches:
+ *   radar_fault_detect : aeb_perception.c:89
+ *     bad = (!isfinite(d_r) || !isfinite(vr_r) || ...) ? 1U : 0U;
+ *     -> the `!isfinite(d_r)` and `!isfinite(vr_r)` true outcomes must
+ *        each be exercised (independent effect on the OR).
+ *   kalman_fusion      : aeb_perception.c:152-153
+ *     uint8_t r_ok = ((r_fault == 0U) && (fi == 0U) &&
+ *                     isfinite(d_r) && isfinite(vr_r)) ? 1U : 0U;
+ *     -> false outcomes of isfinite(d_r) and isfinite(vr_r) needed
+ *        within the first SENSOR_FAULT_CYCLES cycles (r_fault still 0).
+ *   kalman_fusion seed : aeb_perception.c:157
+ *     if ((s_kalman.initialized == 0U) && isfinite(d_r) && isfinite(vr_r))
+ *     -> false outcomes of the seed-guard isfinite() clauses are reached
+ *        when the very first frame after init carries non-finite radar.
+ *
+ * Strategy: separate tests for d_r and vr_r so each clause flips the
+ * outcome independently, on a freshly-initialised module so the seed
+ * guard at line 157 also gets exercised. This mirrors Rian's
+ * test_mcdc_decel_target_nan / test_mcdc_a_ego_nan pattern in
+ * test_pid_mcdc.c, which proves independent effect of NaN-driven
+ * isfinite() clauses in a multi-clause AND.
+ * ====================================================================== */
+static void test_G7_radar_d_nan(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    /* First cycle: NaN radar_d, finite radar_vr.
+     * Hits !isfinite(d_r)=true on line 89, isfinite(d_r)=false on line 152,
+     * and isfinite(d_r)=false on the seed guard at line 157. */
+    in.radar_d = NAN;
+    perception_step(&in, &out);
+
+    CHECK(isfinite(out.distance),
+          "G7 radar_d NaN: fused distance remains finite");
+    CHECK(isfinite(out.v_rel),
+          "G7 radar_d NaN: fused v_rel remains finite");
+
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES + 2U; ++i) {
+        perception_step(&in, &out);
+    }
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) != 0U,
+          "G7 radar_d NaN: AEB_FAULT_RADAR latches after SENSOR_FAULT_CYCLES");
+}
+
+static void test_G7_radar_vr_nan(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    /* First cycle: finite radar_d, NaN radar_vr.
+     * Independent flip of !isfinite(vr_r) clause at line 89 / line 153 /
+     * line 157, with !isfinite(d_r) staying false. */
+    in.radar_vr = NAN;
+    perception_step(&in, &out);
+
+    CHECK(isfinite(out.distance),
+          "G7 radar_vr NaN: fused distance remains finite");
+    CHECK(isfinite(out.v_rel),
+          "G7 radar_vr NaN: fused v_rel remains finite");
+
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES + 2U; ++i) {
+        perception_step(&in, &out);
+    }
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) != 0U,
+          "G7 radar_vr NaN: AEB_FAULT_RADAR latches after SENSOR_FAULT_CYCLES");
+}
+
+static void test_G7_radar_d_posinf(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.radar_d = INFINITY;
+    perception_step(&in, &out);
+
+    CHECK(isfinite(out.distance),
+          "G7 radar_d +inf: fused distance remains finite");
+}
+
+static void test_G7_radar_vr_neginf(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.radar_vr = -INFINITY;
+    perception_step(&in, &out);
+
+    CHECK(isfinite(out.distance),
+          "G7 radar_vr -inf: fused distance remains finite");
+}
+
+/* =========================================================================
+ * G8 — Non-finite v_ego passthrough (post-PR-#115 explicit `!= 0` form)
+ * -------------------------------------------------------------------------
+ * Target branch:
+ *   perception_step : aeb_perception.c:295
+ *     if (isfinite(in->v_ego) != 0) {
+ *         out->v_ego = in->v_ego;
+ *     } else {
+ *         out->v_ego       = 0.0f;
+ *         out->fault_flag |= AEB_FAULT_CAN_TO;
+ *     }
+ *     -> the `isfinite(in->v_ego) != 0` false outcome must be exercised.
+ *
+ * Note: the `!= 0` form was introduced by PR #115 (fix/perception-misra-14-4)
+ * to lift the MISRA Rule 14.4 deviation that was previously documented in
+ * the workflow's `accepted_deviations` set. The semantics are identical to
+ * the prior `if (isfinite(in->v_ego))` form; only the controlling-expression
+ * type is now explicitly Boolean.
+ *
+ * Strategy: feed a single frame with non-finite v_ego on a fresh module.
+ * The guard must sanitise the passthrough (out->v_ego == 0.0f) and raise
+ * AEB_FAULT_CAN_TO. Mirrors the test_mcdc_decel_target_nan pattern.
+ * ====================================================================== */
+static void test_G8_v_ego_nan(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.v_ego = NAN;
+    perception_step(&in, &out);
+
+    CHECK(out.v_ego == 0.0f,
+          "G8 v_ego NaN: passthrough sanitised to 0.0f (fail-safe)");
+    CHECK((out.fault_flag & AEB_FAULT_CAN_TO) != 0U,
+          "G8 v_ego NaN: AEB_FAULT_CAN_TO raised");
+    CHECK(isfinite(out.distance),
+          "G8 v_ego NaN: fused distance remains finite");
+}
+
+static void test_G8_v_ego_posinf(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.v_ego = INFINITY;
+    perception_step(&in, &out);
+
+    CHECK(out.v_ego == 0.0f,
+          "G8 v_ego +inf: passthrough sanitised to 0.0f");
+    CHECK((out.fault_flag & AEB_FAULT_CAN_TO) != 0U,
+          "G8 v_ego +inf: AEB_FAULT_CAN_TO raised");
+}
+
+static void test_G8_v_ego_neginf(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.v_ego = -INFINITY;
+    perception_step(&in, &out);
+
+    CHECK(out.v_ego == 0.0f,
+          "G8 v_ego -inf: passthrough sanitised to 0.0f");
+    CHECK((out.fault_flag & AEB_FAULT_CAN_TO) != 0U,
+          "G8 v_ego -inf: AEB_FAULT_CAN_TO raised");
+}
+
+/* =========================================================================
  * Main
  * ====================================================================== */
 int main(void)
 {
     printf("======================================================\n");
     printf("  Perception complementary MC/DC suite\n");
-    printf("  Targets gap groups G1..G5 (report section 3.3)\n");
+    printf("  Targets gap groups G1..G8 (G1..G5: report §3.3,\n");
+    printf("                            G6..G8: PR #93/#115 robustness)\n");
     printf("======================================================\n\n");
 
     printf("--- G1: counter saturation (uint8_t ceiling) ---\n");
@@ -361,11 +763,16 @@ int main(void)
 
     printf("--- G2: radar velocity out-of-range clause ---\n");
     test_G2_radar_velocity_out_of_range();
+    test_G2b_radar_velocity_negative_oor();
     printf("\n");
 
-    printf("--- G3: radar ROC composite, clause independence ---\n");
+    printf("--- G3: radar/lidar ROC composite, clause independence ---\n");
     test_G3a_radar_distance_roc_only();
     test_G3b_radar_velocity_roc_only();
+    test_G3c_radar_distance_roc_negative();
+    test_G3d_radar_velocity_roc_negative();
+    test_G3e_lidar_distance_roc();
+    test_G3f_lidar_distance_roc_negative();
     printf("\n");
 
     printf("--- G4: Kalman radar update skip path ---\n");
@@ -374,6 +781,25 @@ int main(void)
 
     printf("--- G5: confidence quality clamp ---\n");
     test_G5_confidence_quality_clamp();
+    printf("\n");
+
+    printf("--- G6: lidar !isfinite guard (PR #93 robustness) ---\n");
+    test_G6_lidar_nan();
+    test_G6_lidar_posinf();
+    test_G6_lidar_neginf();
+    printf("\n");
+
+    printf("--- G7: radar !isfinite guards (PR #93 robustness) ---\n");
+    test_G7_radar_d_nan();
+    test_G7_radar_vr_nan();
+    test_G7_radar_d_posinf();
+    test_G7_radar_vr_neginf();
+    printf("\n");
+
+    printf("--- G8: v_ego isfinite passthrough (PR #115 form) ---\n");
+    test_G8_v_ego_nan();
+    test_G8_v_ego_posinf();
+    test_G8_v_ego_neginf();
     printf("\n");
 
     printf("======================================================\n");

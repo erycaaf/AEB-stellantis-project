@@ -87,6 +87,10 @@ reports/vv_*/coverage_mcdc/test_*
 reports/vv_*/fault_injection/test_*
 reports/vv_*/memory_safety/bin/
 
+# Fault-injection driver log — regenerated locally by `make fault-<module>`,
+# never committed (other modules already follow this convention).
+reports/vv_*/fault_injection/run.log
+
 # Memory safety instrumented binaries (not evidence, regenerated each run)
 reports/vv_*/memory_safety/test_*_san
 reports/vv_*/memory_safety/test_*_val
