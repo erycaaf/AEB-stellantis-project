@@ -18,18 +18,10 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   DEPENDENCIES std_msgs
 )
 
-# NOTE: C++ controller node disabled for Docker build.
-# The Python aeb_node.py provides equivalent functionality.
-# To re-enable, set AEB_C_ROOT to the embedded C source tree
-# and uncomment the add_executable section below.
-#
-# set(AEB_C_ROOT "/path/to/c_embedded" CACHE PATH "AEB C sources")
-# add_executable(aeb_controller_node src/aeb_controller_node.cpp ...)
-# ...
-
 # ── Python nodes ─────────────────────────────────────────────────────────────
+# AEB control logic runs on the Zephyr ECU (aeb-ecu container, native_sim);
+# no Python or C++ controller node is launched from this package.
 install(PROGRAMS
-  src/aeb_node.py
   src/scenario_controller.py
   src/target_vehicle_controller.py
   src/dashboard_node.py

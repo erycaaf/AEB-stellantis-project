@@ -87,19 +87,9 @@ def _launch_nodes(context):
 
     nodes = [gazebo, scenario_controller, perception_node]
 
-    # NOTE: aeb_node.py (Python AEB controller) is NOT launched here.
-    # The AEB control logic runs on the Zephyr ECU (native_sim on vcan0),
-    # which receives sensor data via CAN from perception_node and sends
+    # AEB control logic runs on the Zephyr ECU (native_sim, aeb-ecu container),
+    # which receives sensor data via CAN from perception_node and emits
     # brake commands back via CAN to scenario_controller.
-    #
-    # To run without the Zephyr ECU (Python-only mode), uncomment:
-    # if params.get('aeb_enabled', True):
-    #     nodes.append(Node(
-    #         package='aeb_gazebo',
-    #         executable='aeb_node.py',
-    #         name='aeb_controller',
-    #         output='screen',
-    #     ))
 
     return nodes
 
