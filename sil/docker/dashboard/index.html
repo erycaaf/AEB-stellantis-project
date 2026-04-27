@@ -265,7 +265,130 @@
         }
         .result-pass { background: rgba(25,135,84,0.9); color: white; display: block; }
         .result-fail { background: rgba(220,53,69,0.9); color: white; display: block; }
-    </style>
+
+        /* ── UDS Diagnostic Panel (toggle from scenario bar) ─── */
+        .btn-uds {
+            background: #4d3d8a;
+            color: white;
+            border: 1px solid #6b5bb3;
+        }
+        .btn-uds:hover { background: #5e4ca0; }
+        .btn-uds.active { background: #7259d4; }
+
+        .uds-panel {
+            position: absolute;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 340px;
+            background: rgba(13,17,23,0.96);
+            border-left: 1px solid #2d2748;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            box-shadow: -4px 0 12px rgba(0,0,0,0.4);
+            z-index: 30;
+            overflow-y: auto;
+            padding: 12px 14px;
+            transform: translateX(100%);
+            transition: transform 0.25s ease;
+        }
+        .uds-panel.open { transform: translateX(0); }
+        .uds-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #2d2748;
+        }
+        .uds-header .title {
+            font-size: 13px;
+            font-weight: bold;
+            color: #b0a8e8;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .uds-conn {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 10px;
+            color: #888;
+        }
+        .uds-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #555;
+        }
+        .uds-dot.ok   { background: #28a745; box-shadow: 0 0 6px #28a745; }
+        .uds-dot.err  { background: #dc3545; }
+        .uds-dot.idle { background: #888; }
+
+        .uds-cards {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .uds-card {
+            background: #141826;
+            border: 1px solid #232a3d;
+            border-radius: 6px;
+            padding: 8px 10px;
+        }
+        .uds-card .lbl {
+            font-size: 9px;
+            color: #6c7290;
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+        }
+        .uds-card .val {
+            font-size: 22px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            color: #e0e0e0;
+            margin-top: 2px;
+        }
+        .uds-card .sub {
+            font-size: 10px;
+            color: #6c7290;
+            margin-top: 2px;
+        }
+        .uds-card.error .val { color: #dc3545; font-size: 13px; }
+
+        .uds-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+        }
+        .uds-btn {
+            padding: 8px 10px;
+            border-radius: 4px;
+            border: 1px solid #3a3658;
+            background: #1c1d2e;
+            color: #cfd0e0;
+            cursor: pointer;
+            font-size: 11px;
+            text-align: left;
+            transition: background 0.2s;
+        }
+        .uds-btn:hover { background: #262842; }
+        .uds-btn.toggle-on  { background: #1d3a26; border-color: #2d6a3a; color: #b8e8c4; }
+        .uds-btn.toggle-off { background: #3a1d1d; border-color: #6a2d2d; color: #e8b8b8; }
+
+        .uds-log {
+            background: #0a0d14;
+            border: 1px solid #1f2536;
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            color: #6c7290;
+            max-height: 140px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .uds-log .row-ok  { color: #6ec47e; }
+        .uds-log .row-err { color: #e07b7b; }
 </head>
 <body>
 
@@ -282,10 +405,47 @@
             <button class="btn btn-go" onclick="startScenario()">Start</button>
             <button class="btn btn-halt" onclick="stopScenario()">Stop</button>
             <button class="btn btn-redo" onclick="restartScenario()">Reset</button>
+            <button class="btn btn-uds" id="udsToggleBtn"
+                    onclick="toggleUdsPanel()">UDS</button>
             <span class="info" id="scenarioInfo"></span>
         </div>
 
         <div class="result-overlay" id="resultOverlay"></div>
+
+        <!-- ── UDS Diagnostic Panel (right, toggled by UDS button) ── -->
+        <aside class="uds-panel" id="udsPanel">
+            <div class="uds-header">
+                <span class="title">UDS Diagnostics</span>
+                <span class="uds-conn">
+                    <span class="uds-dot idle" id="udsDot"></span>
+                    <span id="udsConnLbl">--</span>
+                </span>
+            </div>
+
+            <div class="uds-cards">
+                <div class="uds-card" id="udsTtcCard">
+                    <div class="lbl">DID 0xF100 — TTC</div>
+                    <div class="val" id="udsTtc">-- s</div>
+                </div>
+                <div class="uds-card" id="udsFsmCard">
+                    <div class="lbl">DID 0xF101 — FSM state</div>
+                    <div class="val" id="udsFsm">--</div>
+                    <div class="sub" id="udsFsmSub"></div>
+                </div>
+                <div class="uds-card" id="udsBrakeCard">
+                    <div class="lbl">DID 0xF102 — Brake pressure</div>
+                    <div class="val" id="udsBrake">-- %</div>
+                </div>
+            </div>
+
+            <div class="uds-actions">
+                <button class="uds-btn toggle-on" id="udsAebBtn"
+                        onclick="udsToggleAeb()">AEB: enabled — click to disable</button>
+                <button class="uds-btn" onclick="udsClearDtc()">Clear DTCs (0x14)</button>
+            </div>
+
+            <div class="uds-log" id="udsLog">[idle]</div>
+        </aside>
     </div>
 
     <!-- ── Bottom: Car Dashboard ───────────────────────────────────────── -->
@@ -594,6 +754,127 @@ async function tick() {
 loadScenarios();
 drawSpeedo(0, 80);
 setInterval(tick, 100);
+
+// ═════════════════════════════════════════════════════════════════════════
+//  UDS Diagnostic Panel
+// ═════════════════════════════════════════════════════════════════════════
+
+const UDS_RID_AEB = 0x0301;
+let udsPanelOpen = false;
+let udsPollHandle = null;
+let udsAebEnabled = true;   // tracked locally; reflects last toggle
+
+function udsLog(msg, level) {
+    const log = document.getElementById('udsLog');
+    const ts  = new Date().toLocaleTimeString();
+    const cls = level === 'err' ? 'row-err' : 'row-ok';
+    const row = document.createElement('div');
+    row.className = cls;
+    row.textContent = `[${ts}] ${msg}`;
+    log.insertBefore(row, log.firstChild);
+    while (log.children.length > 30) log.removeChild(log.lastChild);
+}
+
+function udsSetDot(state) {
+    const d = document.getElementById('udsDot');
+    const l = document.getElementById('udsConnLbl');
+    d.classList.remove('ok', 'err', 'idle');
+    if (state === 'ok')   { d.classList.add('ok');   l.textContent = 'connected'; }
+    else if (state === 'err') { d.classList.add('err'); l.textContent = 'error'; }
+    else                  { d.classList.add('idle'); l.textContent = 'idle'; }
+}
+
+async function udsPollSnapshot() {
+    try {
+        const resp = await fetch(API + '/uds/snapshot');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const s = await resp.json();
+        udsSetDot('ok');
+
+        if (s.ttc && s.ttc.ttc_s !== undefined) {
+            document.getElementById('udsTtc').textContent =
+                s.ttc.ttc_s.toFixed(2) + ' s';
+            document.getElementById('udsTtcCard').classList.remove('error');
+        } else if (s.ttc && s.ttc.error) {
+            document.getElementById('udsTtc').textContent = s.ttc.error;
+            document.getElementById('udsTtcCard').classList.add('error');
+        }
+
+        if (s.fsm && s.fsm.fsm_state !== undefined) {
+            document.getElementById('udsFsm').textContent =
+                s.fsm.fsm_state_name;
+            document.getElementById('udsFsmSub').textContent =
+                'raw = ' + s.fsm.fsm_state;
+            document.getElementById('udsFsmCard').classList.remove('error');
+        } else if (s.fsm && s.fsm.error) {
+            document.getElementById('udsFsm').textContent = s.fsm.error;
+            document.getElementById('udsFsmCard').classList.add('error');
+        }
+
+        if (s.brake && s.brake.brake_pct !== undefined) {
+            document.getElementById('udsBrake').textContent =
+                s.brake.brake_pct.toFixed(1) + ' %';
+            document.getElementById('udsBrakeCard').classList.remove('error');
+        } else if (s.brake && s.brake.error) {
+            document.getElementById('udsBrake').textContent = s.brake.error;
+            document.getElementById('udsBrakeCard').classList.add('error');
+        }
+    } catch (e) {
+        udsSetDot('err');
+    }
+}
+
+function toggleUdsPanel() {
+    udsPanelOpen = !udsPanelOpen;
+    document.getElementById('udsPanel').classList.toggle('open', udsPanelOpen);
+    document.getElementById('udsToggleBtn').classList.toggle('active', udsPanelOpen);
+    if (udsPanelOpen) {
+        udsPollSnapshot();
+        udsPollHandle = setInterval(udsPollSnapshot, 200);  // 5 Hz
+    } else {
+        if (udsPollHandle) {
+            clearInterval(udsPollHandle);
+            udsPollHandle = null;
+        }
+        udsSetDot('idle');
+    }
+}
+
+async function udsClearDtc() {
+    try {
+        const r = await fetch(API + '/uds/clear_dtc', {method: 'POST'});
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        udsLog('clear_dtc -> ok', 'ok');
+    } catch (e) {
+        udsLog('clear_dtc -> ' + e, 'err');
+    }
+}
+
+async function udsToggleAeb() {
+    const next = udsAebEnabled ? 0 : 1;
+    try {
+        const r = await fetch(API + '/uds/routine_control', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({rid: UDS_RID_AEB, value: next}),
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        udsAebEnabled = (next === 1);
+        const btn = document.getElementById('udsAebBtn');
+        if (udsAebEnabled) {
+            btn.classList.remove('toggle-off');
+            btn.classList.add('toggle-on');
+            btn.textContent = 'AEB: enabled — click to disable';
+        } else {
+            btn.classList.remove('toggle-on');
+            btn.classList.add('toggle-off');
+            btn.textContent = 'AEB: DISABLED — click to enable';
+        }
+        udsLog('routine_ctrl(0x0301, ' + next + ') -> ok', 'ok');
+    } catch (e) {
+        udsLog('routine_ctrl -> ' + e, 'err');
+    }
+}
 </script>
 
 </body>
