@@ -1,11 +1,15 @@
 #!/bin/bash
 # AEB SIL Environment Startup Script
-# Run from WSL2 Ubuntu-22.04:
-#   bash /mnt/c/Users/renat/OneDrive/Pos/AEB/modeling/gazebo_sim/start_sil.sh
+# Run from WSL2 Ubuntu (anywhere — the script resolves its own location):
+#   bash <repo>/sil/start_sil.sh
 
 set -e
 
+# Resolve this script's directory (where docker-compose.yml lives).
+SIL_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 echo "=== AEB SIL Environment ==="
+echo "SIL directory: ${SIL_DIR}"
 
 # Start Docker daemon if not running
 if ! pgrep -x dockerd > /dev/null; then
@@ -18,15 +22,13 @@ fi
 sudo docker info > /dev/null 2>&1 || { echo "ERROR: Docker not running"; exit 1; }
 echo "Docker: OK"
 
-# Set up vcan0
-sudo modprobe vcan
+# Set up vcan0 (legacy — the SIL uses TCP CAN now, but kept for compatibility
+# with older docker-compose.yml variants).
+sudo modprobe vcan 2>/dev/null || true
 sudo ip link add dev vcan0 type vcan 2>/dev/null || true
-sudo ip link set up vcan0
-echo "vcan0: $(ip link show vcan0 | grep -o 'state [A-Z]*')"
-
-# Navigate to project
-cd /mnt/c/Users/renat/OneDrive/Pos/AEB/modeling/gazebo_sim
+sudo ip link set up vcan0 2>/dev/null || true
 
 # Build and run
+cd "${SIL_DIR}"
 echo "=== Starting docker compose ==="
 sudo docker compose up --build
