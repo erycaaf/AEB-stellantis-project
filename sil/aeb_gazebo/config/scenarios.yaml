@@ -87,3 +87,16 @@ scenarios:
     target_decel: -6.0
     target_brake_time: 2.0
     pass_criterion: "v_impact < 15 km/h"
+
+  # Diagnostic mode: ego stopped, target far enough that the FSM stays
+  # in STANDBY. The dashboard's UDS panel drives ReadDID / ClearDTC /
+  # RoutineControl over the canbus relay; this scenario gives it a
+  # quiescent baseline so the responses reflect "system idle" semantics.
+  uds_diagnostic:
+    name: "UDS Diagnostic - quiescent baseline"
+    ego_speed_kmh: 0.0
+    target_speed_kmh: 0.0
+    initial_gap_m: 100.0
+    target_decel: 0.0
+    target_brake_time: 0.0
+    pass_criterion: "n/a (diagnostic mode)"

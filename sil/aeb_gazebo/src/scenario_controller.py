@@ -279,6 +279,31 @@ class ScenarioController(Node):
                     return
             self.publish_vel(self.ego_cmd_pub, 0.0)
             self.publish_vel(self.target_cmd_pub, 0.0)
+            # Keep refreshing /tmp/aeb_live.json so the dashboard reflects the
+            # current ECU state (FSM transitions to POST_BRAKE → STANDBY,
+            # brake release, etc.) even after the scenario's end-condition has
+            # fired. Without this, the dashboard freezes on the last values
+            # written before STOPPED — which is misleading for scenarios like
+            # `uds_diagnostic` that end early by design.
+            try:
+                import json
+                with self.can_lock:
+                    fsm = self.fsm_state_name
+                    brake_pct = self.brake_cmd_pct
+                distance = max(0.0, self.target_x - self.ego_x - 4.5)
+                ego_speed_kmh = self.ego_vx * 3.6
+                live = {
+                    'time': 0.0,
+                    'distance': round(distance, 1),
+                    'speed_kmh': round(ego_speed_kmh, 1),
+                    'brake_pct': round(brake_pct, 0),
+                    'fsm_state': fsm,
+                    'ttc': 10.0,
+                }
+                with open('/tmp/aeb_live.json', 'w') as f:
+                    json.dump(live, f)
+            except Exception:
+                pass
             return
 
         if not self.scenario_running:
