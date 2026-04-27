@@ -36,8 +36,12 @@ graph LR
 |----|-----------|
 | `scenario_controller.py` | Controla o movimento dos veículos, lê comandos de frenagem, detecta condições de fim de cenário |
 | `perception_node.py` | Simula radar (77 GHz, σ=0,25 m) + lidar (σ=0,05 m) com fusão sensorial, verificação de plausibilidade (FR-PER-006) e detecção de falhas (FR-PER-007) |
-| `aeb_node.py` | Controlador AEB baseado em FSM: STANDBY → WARNING → BRAKE_L1/L2/L3 → POST_BRAKE, com limiares de TTC conforme UNECE R152 |
 | `dashboard_node.py` | Painel em tempo real com matplotlib: velocímetro, barra de TTC, estado da FSM, indicador de frenagem, alertas |
+
+> **Nota:** o controlador AEB roda no contêiner `aeb-ecu` (Zephyr `native_sim`)
+> executando o código C embarcado real, não em um nó Python. Veja
+> [`sil/start_sil.sh`](../start_sil.sh) e a documentação de SIL no diretório
+> de docs do projeto.
 
 ### Cenários
 
@@ -52,6 +56,79 @@ graph LR
 | `ccrb_d6_g12` | 50 km/h | 50 km/h | 12 m | Car-to-Car Rear Braking (desacel. = 6 m/s²) |
 | `ccrb_d2_g40` | 50 km/h | 50 km/h | 40 m | Car-to-Car Rear Braking (desacel. = 2 m/s²) |
 | `ccrb_d6_g40` | 50 km/h | 50 km/h | 40 m | Car-to-Car Rear Braking (desacel. = 6 m/s²) |
+| `uds_diagnostic` | 0 km/h | 0 km/h | 100 m | Modo diagnóstico — base estática para o painel UDS |
+
+---
+
+## Diagnóstico UDS (em tempo de execução)
+
+O ECU em Zephyr atende serviços UDS (ISO 14229) sobre CAN — IDs
+`0x7DF` (request) e `0x7E8` (response) — completando FR-UDS-005
+*end-to-end*. A SIL expõe esses serviços via HTTP no contêiner `api`
+e via um painel lateral no `dashboard`.
+
+### Endpoints REST (`api`, porta `:8000`)
+
+| Endpoint | Método | Descrição |
+|----------|--------|-----------|
+| `/uds/health` | GET | Estado de conexão com o `canbus` |
+| `/uds/read_did/{did}` | GET | `ReadDataByIdentifier` (0x22). Aceita `0xF101` ou `61697` |
+| `/uds/snapshot` | GET | Lê `0xF100` + `0xF101` + `0xF102` em uma chamada |
+| `/uds/clear_dtc` | POST | `ClearDiagnosticInformation` (0x14) — limpa todos os DTCs |
+| `/uds/routine_control` | POST | `RoutineControl` (0x31). Body: `{"rid": 769, "value": 0\|1}` |
+
+DIDs suportados pelo ECU (ver `include/aeb_uds.h`):
+
+| DID | Conteúdo | Decodificação |
+|-----|----------|---------------|
+| `0xF100` | TTC (segundos) | uint16 little-endian, escala 1/100 |
+| `0xF101` | Estado da FSM | uint8 cru (0 OFF .. 6 POST_BRAKE) |
+| `0xF102` | Pressão de frenagem (%) | uint16 little-endian, escala 1/10 |
+
+RID conhecido: `0x0301` (AEB enable/disable; valor `0` desabilita,
+`1` habilita).
+
+### Painel no dashboard
+
+Botão **UDS** na barra de cenário (canto superior do Gazebo) abre um
+painel lateral à direita que faz *polling* a 5 Hz no `/uds/snapshot`,
+exibe os três DIDs ao vivo e expõe dois controles:
+
+- **Clear DTCs (0x14)** — emite `ClearDiagnosticInformation`.
+- **AEB enabled / DISABLED** — *toggle* via `RoutineControl` em RID
+  `0x0301`.
+
+O painel mantém um *log* das últimas 30 ações com cor (verde para
+sucesso, vermelho para erro UDS ou HTTP).
+
+### Cenário recomendado para demo
+
+```bash
+# Após docker compose up, no dashboard:
+#   1. Seleciona o cenário 'uds_diagnostic' e clica Start
+#   2. Clica no botão UDS para abrir o painel
+#   3. Observe o estado FSM = STANDBY e brake = 0%
+#   4. Clica em "AEB: enabled" para desabilitar; observe a
+#      mudança no log e nas próximas leituras
+```
+
+### Cliente Python reutilizável
+
+Para testes ou *scripting* externo, importe diretamente o cliente:
+
+```python
+from uds_client import UDSClient, DID_FSM_STATE, RID_AEB_CONTROL
+
+client = UDSClient(host="localhost", port=29536)  # se mapeado no compose
+print(client.read_did(DID_FSM_STATE))
+client.routine_control(RID_AEB_CONTROL, value=0)
+```
+
+Os testes de unidade ficam em
+[`sil/docker/api/tests/test_uds_client.py`](../docker/api/tests/test_uds_client.py)
+e cobrem encoding/decoding, *negative responses*, *timeouts* e
+serialização concorrente. Rodar com `pytest` a partir de
+`sil/docker/api/`.
 
 ---
 
