@@ -1,0 +1,12 @@
+========================================
+  AEB Alert — MC/DC Cross-Validation
+  (Independence — Rian, ISO 26262-6)
+========================================
+
+[MC/DC-01] alert_map NULL guard
+  PASS: alert_map survived NULL output (no crash)
+  PASS: alert_map NULL guard dominates FSM-state switch
+
+========================================
+  Results: 2/2 passed, 0 failed
+========================================

@@ -1,0 +1,50 @@
+========================================
+  AEB PID Controller — Unit Tests
+========================================
+
+[TEST] pid: no braking in STANDBY
+  PASS: brake_pct == 0 in STANDBY
+  PASS: brake_bar == 0 in STANDBY
+
+[TEST] pid: no braking in OFF
+  PASS: brake_pct == 0 in OFF even with decel_target > 0
+
+[TEST] pid: no braking in WARNING
+  PASS: brake_pct == 0 in WARNING
+
+[TEST] pid: BRAKE_L1 produces positive output
+  PASS: brake_pct > 0 after 50 cycles in BRAKE_L1
+  PASS: brake_bar >= 0
+
+[TEST] pid: output clamping [0, 100]%
+  PASS: brake_pct <= 100% after saturation
+  PASS: brake_pct >= 0%
+  PASS: brake_bar <= 10 bar
+
+[TEST] pid: jerk limiting <= 1.667 %/cycle
+  PASS: no jerk violations across 100 cycles
+
+[TEST] pid: steady-state convergence
+  PASS: PI output > 30% (controller actively braking)
+  PASS: output drift < 2% over 50 cycles (stable convergence)
+
+[TEST] pid: max braking capability >= 5.0 m/s^2
+  PASS: achievable deceleration >= 5.0 m/s^2
+
+[TEST] pid: POST_BRAKE maintains braking
+  PASS: braking continues in POST_BRAKE
+  PASS: brake output stable across BRAKE_L3 -> POST_BRAKE transition
+
+[TEST] pid: reset on return to STANDBY
+  PASS: brake_pct == 0 after returning to STANDBY
+  PASS: first cycle after reset has no integrator carry-over
+
+[TEST] pid: no deceleration jumps > 2 m/s^2
+  PASS: no jumps > 2 m/s^2 (33.3%) between cycles
+
+[TEST] pid: bar = pct / 10
+  PASS: brake_bar == brake_pct / 10
+
+========================================
+  Results: 19/19 passed, 0 failed
+========================================

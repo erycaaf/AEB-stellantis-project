@@ -1,0 +1,7 @@
+File 'src/communication/aeb_uds.c'
+Lines executed:100.00% of 122
+Branches executed:100.00% of 44
+Taken at least once:100.00% of 44
+Calls executed:100.00% of 12
+Creating 'aeb_uds.c.gcov'
+

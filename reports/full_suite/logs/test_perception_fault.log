@@ -1,0 +1,86 @@
+======================================================
+  Perception fault-injection suite (ASIL-D V&V)
+  ISO 26262-6:2018 Tab. 11 item 1e (++)
+======================================================
+
+--- Category A: NaN / inf in sensor inputs ---
+[A1] NaN injected in lidar_d (single frame)
+       distance=29.995872  v_rel=4.999996  conf=0.667735  fault=0x00
+  [PASS] A1: NaN lidar_d must produce fail-safe output
+  [PASS] A1: distance must be finite (no NaN propagation)
+
+[A2] NaN injected in radar_d (single frame)
+       distance=30.124697  v_rel=-0.075302  conf=0.436876  fault=0x00
+  [PASS] A2: NaN radar_d must produce fail-safe output
+  [PASS] A2: v_rel must be finite (no NaN propagation through Kalman)
+
+[A3] +inf injected in lidar_d
+       distance=29.995872  conf=0.667735  fault=0x00
+  [PASS] A3: +inf lidar_d must produce fail-safe output
+
+[A4] -inf injected in radar_vr
+       distance=30.124697  v_rel=-0.075302  conf=0.436876  fault=0x00
+  [PASS] A4: -inf radar_vr must produce fail-safe output
+  [PASS] A4: v_rel must remain finite
+
+[A5] NaN injected in v_ego (passthrough)
+       v_ego_out=0.000000  fault=0x80
+  [PASS] A5: NaN v_ego must be sanitised or trigger a fault flag
+
+--- Category B: Out-of-range numeric extremes ---
+[B1] FLT_MAX injected in radar_d for SENSOR_FAULT_CYCLES frames
+       distance=300.000000  conf=0.498554  fault=0x02
+  [PASS] B1: FLT_MAX radar_d must latch RADAR fault
+  [PASS] B1: distance must remain finite (clamped)
+
+[B2] Large negative lidar_d for SENSOR_FAULT_CYCLES frames
+       distance=0.500000  fault=0x01
+  [PASS] B2: large negative lidar_d must latch LIDAR fault
+
+[B3] Subnormal float (FLT_MIN/2) in radar_d
+       distance=29.312353  conf=0.993979  fault=0x00
+  [PASS] B3: subnormal input must produce finite, in-range output
+
+[B4] Extreme radar_vr (1000 m/s) for SENSOR_FAULT_CYCLES frames
+       v_rel=50.000000  fault=0x02
+  [PASS] B4: 1000 m/s radar_vr must latch RADAR fault
+  [PASS] B4: v_rel output must remain clamped to [-MAX_REL_VEL, +MAX_REL_VEL]
+
+[B5] Alternating ROC > DIST_ROC_LIMIT (radar) — regression guard
+       distance=30.825939  fault=0x00
+  [PASS] B5: alternating ROC (bad/good/bad) must NOT latch RADAR fault
+
+--- Category C: SEU / control-path corruption ---
+[C1] can_timeout asserted on the FIRST frame (state never seeded)
+       distance=0.500000  v_rel=0.000000  conf=0.000000  fault=0x83
+  [PASS] C1: confidence must be 0 when timeout fires before seed
+  [PASS] C1: CAN_TO bit must be set
+
+[C2] fi=0xAA (non-Boolean) with otherwise good data
+       conf=0.000000  fault=0x03
+  [PASS] C2: fi != 0 must propagate as LiDAR fault
+  [PASS] C2: fi != 0 must propagate as RADAR fault
+
+[C3] can_timeout=0x80 (high-bit-only SEU)
+       conf=0.000000  fault=0x83
+  [PASS] C3: any non-zero can_timeout byte must set CAN_TO bit
+  [PASS] C3: confidence must be zero when CAN timeout flagged
+
+--- Category D: Persistence / saturation ---
+[D1] LiDAR fault held for 300 cycles (uint8_t saturation)
+       fault=0x01  conf=0.698855
+  [PASS] D1: LiDAR fault must remain latched after 300 cycles
+  [PASS] D1: counter must saturate, not wrap (fault still latched on cycle 301)
+
+[D2] Rapid bad/good/bad oscillation (counter reset semantics)
+       fault=0x00
+  [PASS] D2: oscillating bad/good must not produce false-positive latch
+
+[D3] Recovery after latch (FR-PER-006: latched fault is sticky?)
+       after latch: fault=0x01
+       after 10 good frames: fault=0x00
+  [PASS] D3: LiDAR fault must clear after sustained good data
+
+======================================================
+  Results: 25 passed, 0 failed
+======================================================

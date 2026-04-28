@@ -1,0 +1,27 @@
+========================================
+  AEB PID — MC/DC Cross-Validation
+  (Independence — Rian, ISO 26262-6)
+========================================
+
+[MC/DC-01] clamp_f32 lower bound (result < lo)
+  PASS: brake_pct clamped to >= 0 (lower bound exercised)
+  PASS: brake_pct still within [0, 100] range
+
+[MC/DC-02] pid_brake_step NULL guard
+  PASS: pid_brake_step survived NULL output (no crash)
+
+[MC/DC-03] decel_target <= 0 while in BRAKE state
+  PASS: no braking produced when decel_target=0 in BRAKE_L1 (fail-safe)
+  PASS: no braking produced when decel_target<0 in BRAKE_L2 (fail-safe)
+
+[MC/DC-04] isfinite(decel_target) == false (NaN -> fail-safe)
+  PASS: brake_pct == 0 when decel_target is NaN (fail-safe)
+  PASS: brake_bar == 0 when decel_target is NaN (fail-safe)
+
+[MC/DC-05] isfinite(a_ego) == false (NaN -> fail-safe)
+  PASS: brake_pct == 0 when a_ego is NaN (fail-safe)
+  PASS: brake_bar == 0 when a_ego is NaN (fail-safe)
+
+========================================
+  Results: 9/9 passed, 0 failed
+========================================

@@ -1,0 +1,7 @@
+File 'src/decision/aeb_fsm.c'
+Lines executed:100.00% of 158
+Branches executed:100.00% of 112
+Taken at least once:99.11% of 112
+Calls executed:100.00% of 4
+Creating 'aeb_fsm.c.gcov'
+

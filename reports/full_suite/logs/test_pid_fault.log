@@ -1,0 +1,48 @@
+========================================
+  AEB PID — Fault Injection Tests
+  (ASIL-D Robustness — ISO 26262-6 §9.4.2)
+========================================
+
+[FAULT-A1] a_ego = NaN (faulty accelerometer)
+  PASS: brake_pct stays in [0,100] (no NaN propagation)
+  PASS: brake_bar stays in [0,10] (no NaN propagation)
+
+[FAULT-A2] a_ego = +Infinity (saturated sensor)
+  PASS: brake_pct stays in [0,100] with a_ego=+Inf
+  PASS: brake_bar stays in [0,10] with a_ego=+Inf
+
+[FAULT-A3] a_ego = -Infinity (sensor stuck low)
+  PASS: brake_pct stays in [0,100] with a_ego=-Inf
+  PASS: brake_bar stays in [0,10] with a_ego=-Inf
+
+[FAULT-A4] decel_target = NaN (corrupted FSM output)
+  PASS: brake_pct stays in [0,100] with decel_target=NaN
+
+[FAULT-B1] a_ego = 100 m/s^2 (impossible but finite)
+  PASS: brake_pct clamped to [0,100] under extreme a_ego
+
+[FAULT-B2] decel_target = 1000 m/s^2 (impossible command)
+  PASS: brake_pct saturates at 100 under extreme demand
+  PASS: brake_pct never exceeds BRAKE_OUT_MAX
+
+[FAULT-B3] a_ego = FLT_MAX (numerical overflow test)
+  PASS: brake_pct stays in [0,100] with a_ego=FLT_MAX
+
+[FAULT-C1] fsm_state = 99 (invalid state)
+  PASS: invalid fsm_state produces zero braking (fail-safe)
+  PASS: invalid fsm_state produces zero pressure
+
+[FAULT-C2] fsm_state = 255 (UINT8_MAX, bit-flip scenario)
+  PASS: fsm_state=255 produces zero braking (fail-safe)
+
+[FAULT-D1] integrator reset after invalid-state excursion
+  PASS: precondition: integrator accumulated braking output
+  PASS: invalid state forces reset: brake_pct drops to 0
+  PASS: no stale integrator carry-over after invalid-state excursion
+
+[FAULT-D2] jerk limit holds even with extreme target change
+  PASS: jerk limiter holds even under spike input (FR-BRK-004)
+
+========================================
+  Results: 18/18 passed, 0 failed
+========================================
