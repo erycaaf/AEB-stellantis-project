@@ -1,0 +1,34 @@
+
+======================================
+  AEB UDS — Fault Injection Suite
+  ISO 26262-6 Tab. 11 item 1e (++ ASIL-D)
+======================================
+
+-- Category A: NaN / Infinity --
+  [fault_a1_ttc_nan]
+  [fault_a2_ttc_pos_inf]
+  [fault_a3_ttc_neg_inf]
+  [fault_a4_brake_nan]
+  [fault_a5_brake_pos_inf]
+
+-- Category B: Numeric extremes --
+  [fault_b1_ttc_negative]
+  [fault_b2_ttc_overflow]
+  [fault_b3_ttc_float_max]
+  [fault_b4_brake_negative]
+  [fault_b5_brake_overflow]
+
+-- Category C: Corrupted state (SEU) --
+  [fault_c1_aeb_enabled_corrupted]
+  [fault_c2_dtc_flags_corrupted]
+  [fault_c3_single_dtc_corrupted]
+
+-- Category D: Persistence --
+  [fault_d1_clear_while_active]
+  [fault_d2_rapid_toggle]
+  [fault_d3_unknown_sid_does_not_spoof]
+
+======================================
+  Assertions: 18 run  18 passed  0 failed
+======================================
+

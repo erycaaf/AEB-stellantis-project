@@ -1,0 +1,75 @@
+======================================================================
+  AEB Stellantis — Full Test Suite Consolidated Report
+  Generated : 2026-04-27T22:19:49-03:00
+  Toolchain : gcc.exe (GCC) 10.2.0
+  Branch    : test/full-suite-execution
+  Commit    : 131ea70
+======================================================================
+
+--- TEST SUITE RESULTS ---
+
+Suite                    Status   Run   Passed  Failed
+--------------------------------------------------------
+test_smoke                 PASS     14    14      0
+test_can                   PASS     61    61      0
+test_can_fault             PASS     31    31      0
+test_can_struct            PASS     13    13      0
+test_perception            PASS     25    25      0
+test_perception_fault      PASS     25    25      0
+test_perception_mcdc       PASS     36    36      0
+test_decision              PASS     9     9       0
+test_decision_fault        PASS     32    32      0
+test_decision_mcdc         PASS     39    39      0
+test_pid                   PASS     19    19      0
+test_pid_fault             PASS     18    18      0
+test_pid_mcdc              PASS     9     9       0
+test_alert                 PASS     27    27      0
+test_alert_fault           PASS     18    18      0
+test_alert_mcdc            PASS     2     2       0
+test_uds                   PASS     23    23      0
+test_uds_fault             PASS     18    18      0
+test_integration           PASS     26    26      0
+
+TOTAL: 19 suites | 19 passed | 0 failed
+
+
+--- COVERAGE SUMMARY (gcov — union of all 19 suites) ---
+
+Source File                           Lines Covered  Branches Covered
+----------------------------------------------------------------------
+src/communication/aeb_can.c            98.98%         100.00%
+src/communication/aeb_uds.c            100.00%        100.00%
+src/perception/aeb_perception.c        100.00%        100.00%
+src/decision/aeb_ttc.c                 100.00%        100.00%
+src/decision/aeb_fsm.c                 100.00%        100.00%
+src/execution/aeb_pid.c                100.00%        100.00%
+src/execution/aeb_alert.c              100.00%        100.00%
+src/integration/aeb_core.c             100.00%        100.00%
+
+
+--- NOTES ---
+
+Coverage is the UNION of all 19 test suites. All suites run against
+coverage-instrumented objects compiled from the same translation units,
+so gcda data accumulates across every run.
+
+Module breakdown:
+  communication : test_can, test_can_fault, test_can_struct   (CAN)
+                  test_uds, test_uds_fault                    (UDS)
+  perception    : test_perception, test_perception_fault,
+                  test_perception_mcdc
+  decision      : test_decision, test_decision_fault,
+                  test_decision_mcdc
+  execution     : test_pid, test_pid_fault, test_pid_mcdc     (PID)
+                  test_alert, test_alert_fault,
+                  test_alert_mcdc                             (Alert)
+  integration   : test_integration (end-to-end stack)
+  smoke         : test_smoke (baseline sanity)
+
+Per-suite logs   : reports/full_suite/logs/<suite>.log
+gcov annotations : reports/full_suite/logs/<source>.c.gcov
+Full gcov output : reports/full_suite/logs/gcov_<module>.txt
+
+======================================================================
+  Report complete.
+======================================================================

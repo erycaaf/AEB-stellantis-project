@@ -1,0 +1,7 @@
+File 'src/perception/aeb_perception.c'
+Lines executed:100.00% of 168
+Branches executed:100.00% of 110
+Taken at least once:96.36% of 110
+Calls executed:100.00% of 19
+Creating 'aeb_perception.c.gcov'
+

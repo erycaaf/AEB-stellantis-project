@@ -1,0 +1,48 @@
+========================================
+  AEB Alert — Fault Injection Tests
+  (ASIL-D Robustness — ISO 26262-6 §9.4.2)
+========================================
+
+[FAULT-A1] alert_map(7) — one past valid range
+  PASS: fsm_state=7 -> ALERT_NONE (silent default)
+  PASS: fsm_state=7 -> alert_active=0
+  PASS: fsm_state=7 -> BUZZER_SILENT
+
+[FAULT-A2] alert_map(99) — grossly out of range
+  PASS: fsm_state=99 -> ALERT_NONE (silent default)
+  PASS: fsm_state=99 -> alert_active=0
+
+[FAULT-A3] alert_map(255) — UINT8_MAX (bit-flip scenario)
+  PASS: fsm_state=255 -> ALERT_NONE (silent default)
+  PASS: fsm_state=255 -> alert_active=0
+  PASS: fsm_state=255 -> BUZZER_SILENT
+
+[FAULT-B1] override_detect(NaN, 0)
+  PASS: override_detect returns valid 0/1 even with NaN input
+
+[FAULT-B2] override_detect(+Inf, 0)
+  PASS: override_detect(+Inf) treats as override
+
+[FAULT-B3] override_detect(-Inf, 0)
+  PASS: override_detect(-Inf) treats as override
+
+[FAULT-C1] override_detect(1e20, 0)
+  PASS: huge positive angle = override
+
+[FAULT-C2] override_detect(-1e20, 0)
+  PASS: huge negative angle = override
+
+[FAULT-C3] override_detect at exact 5.0 deg boundary
+  PASS: steering = +5.0 (exact threshold): no override
+  PASS: steering = -5.0 (exact threshold): no override
+  PASS: steering = 5.01 (just above): override active
+
+[FAULT-D1] override_detect(0, 2) — unexpected pedal value
+  PASS: brake_pedal=2 triggers override (safe default)
+
+[FAULT-D2] override_detect(0, 255) — corrupted pedal signal
+  PASS: brake_pedal=255 triggers override (safe default)
+
+========================================
+  Results: 18/18 passed, 0 failed
+========================================

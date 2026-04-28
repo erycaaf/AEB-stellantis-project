@@ -1,0 +1,7 @@
+File 'src/execution/aeb_alert.c'
+Lines executed:100.00% of 42
+Branches executed:100.00% of 13
+Taken at least once:100.00% of 13
+Calls executed:100.00% of 1
+Creating 'aeb_alert.c.gcov'
+

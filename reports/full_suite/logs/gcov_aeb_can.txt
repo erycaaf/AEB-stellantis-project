@@ -1,0 +1,7 @@
+File 'src/communication/aeb_can.c'
+Lines executed:98.98% of 196
+Branches executed:100.00% of 97
+Taken at least once:95.88% of 97
+Calls executed:100.00% of 45
+Creating 'aeb_can.c.gcov'
+
