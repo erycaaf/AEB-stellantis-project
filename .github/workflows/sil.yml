@@ -1,0 +1,122 @@
+name: AEB SIL — Compose & Docker Smoke
+
+# Validates the SIL stack on every PR touching sil/ or src/.
+# Heavy images (Gazebo, Zephyr) are not fully built here — they exceed the
+# GitHub-hosted runner budget. The gate covers:
+#   - docker-compose.yml is syntactically valid
+#   - small images (api, canbridge) build cleanly
+#   - Dockerfiles pass hadolint
+#   - Python scripts pass py_compile + ruff
+#   - shell scripts pass shellcheck
+
+on:
+  pull_request:
+    branches: [development, main]
+    paths:
+      - 'sil/**'
+      - 'src/**'
+      - 'include/**'
+      - '.github/workflows/sil.yml'
+  push:
+    branches: [development, main]
+    paths:
+      - 'sil/**'
+      - 'src/**'
+      - 'include/**'
+      - '.github/workflows/sil.yml'
+
+jobs:
+  compose-validate:
+    name: docker compose config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate compose file syntax
+        working-directory: sil
+        run: docker compose config --quiet
+
+  hadolint:
+    name: hadolint Dockerfiles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          recursive: true
+          dockerfile: 'sil/docker/Dockerfile.*'
+          # Allow apt-get update && install in one RUN; allow pinned base versions
+          ignore: DL3008,DL3013,DL3018
+
+  build-light-images:
+    name: docker build (api, canbridge)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build api image
+        uses: docker/build-push-action@v5
+        with:
+          context: sil
+          file: sil/docker/Dockerfile.api
+          push: false
+          cache-from: type=gha,scope=sil-api
+          cache-to: type=gha,scope=sil-api,mode=max
+
+      - name: Build canbridge image
+        uses: docker/build-push-action@v5
+        with:
+          context: sil
+          file: sil/docker/Dockerfile.canbridge
+          push: false
+          cache-from: type=gha,scope=sil-canbridge
+          cache-to: type=gha,scope=sil-canbridge,mode=max
+
+  python-lint:
+    name: python lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Compile-check all Python sources
+        run: |
+          python -m compileall -q \
+            sil/aeb_gazebo/src \
+            sil/docker/api \
+            sil/docker/canbus \
+            sil/docker/canbridge \
+            sil/zephyr_aeb
+
+      - name: Ruff (errors only)
+        run: |
+          ruff check \
+            --select=E,F \
+            --ignore=E501 \
+            sil/aeb_gazebo/src \
+            sil/docker/api \
+            sil/docker/canbus \
+            sil/docker/canbridge \
+            sil/zephyr_aeb
+
+  shellcheck:
+    name: shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: shellcheck
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck sil/start_sil.sh sil/aeb_gazebo/run.sh sil/aeb_gazebo/launcher.sh
