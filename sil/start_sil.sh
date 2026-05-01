@@ -29,7 +29,9 @@ fi
 if ! $DOCKER info >/dev/null 2>&1; then
     if command -v dockerd >/dev/null 2>&1; then
         echo "Docker daemon not running — starting dockerd..."
-        sudo dockerd &>/tmp/dockerd.log &
+        # Run the redirect inside the sudo'd shell so the log file is
+        # opened with root privileges (silences shellcheck SC2024).
+        sudo sh -c 'dockerd >/tmp/dockerd.log 2>&1' &
         # Wait up to 15 s for the socket to come up
         for _ in $(seq 1 15); do
             sleep 1
