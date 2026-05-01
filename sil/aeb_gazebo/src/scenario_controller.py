@@ -25,14 +25,13 @@ from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64, String
 from gazebo_msgs.srv import SetEntityState
 from gazebo_msgs.msg import EntityState
-import math
 import time
 import threading
 import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from can_codec import decode_brake_cmd, decode_fsm_state, decode_alert
+from can_codec import decode_brake_cmd, decode_fsm_state
 from can_tcp_client import TcpCanBus
 
 
@@ -83,7 +82,7 @@ class ScenarioController(Node):
             self.get_logger().info(f'CAN RX connected to {can_host}:{can_port}')
             self.bus.on_receive(self._can_rx_callback)
         else:
-            self.get_logger().error(f'Failed to connect to CAN bus')
+            self.get_logger().error('Failed to connect to CAN bus')
 
         # ── State ─────────────────────────────────────────────────────────
         self.ego_x = 0.0

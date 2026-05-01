@@ -2,9 +2,11 @@
 # AEB Simulation Launcher with GUI
 # Provides a simple button interface to launch scenarios
 
+# shellcheck disable=SC1091  # ROS setup files are runtime artefacts
 source /opt/ros/humble/setup.bash
-cd ~/aeb_ws
+cd ~/aeb_ws || { echo "aeb_ws not found"; exit 1; }
 colcon build --packages-select aeb_gazebo 2>/dev/null
+# shellcheck disable=SC1091
 source install/setup.bash
 
 python3 - <<'PYEOF'

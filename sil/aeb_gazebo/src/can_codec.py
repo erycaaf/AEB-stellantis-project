@@ -11,7 +11,6 @@ DBC formula: physical = raw * factor + offset
 Encode:      raw = (physical - offset) / factor
 """
 
-import struct
 
 
 def _pack(data: bytearray, start_bit: int, length: int, raw: int):

@@ -16,7 +16,6 @@ import socket
 import threading
 import sys
 import struct
-import time
 
 FRAME_SIZE = 16
 DEFAULT_PORT = 29536
@@ -79,7 +78,7 @@ def main():
     server.listen(10)
 
     print(f"[CAN BUS] TCP CAN bus server on port {port}", flush=True)
-    print(f"[CAN BUS] Frame format: 16 bytes [4B ID | 1B DLC | 3B pad | 8B data]",
+    print("[CAN BUS] Frame format: 16 bytes [4B ID | 1B DLC | 3B pad | 8B data]",
           flush=True)
 
     while True:

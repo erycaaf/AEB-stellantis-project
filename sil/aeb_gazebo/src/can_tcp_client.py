@@ -34,7 +34,7 @@ class TcpCanBus:
                 self.rx_thread = threading.Thread(target=self._rx_loop, daemon=True)
                 self.rx_thread.start()
                 return
-            except Exception as e:
+            except Exception:
                 if self.sock:
                     self.sock.close()
                 self.sock = None

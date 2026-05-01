@@ -15,7 +15,6 @@ plus a custom translation node for the AEB-specific message types.
 import rclpy
 from rclpy.node import Node
 from can_msgs.msg import Frame
-import struct
 
 
 # CAN IDs (from aeb_system.dbc)

@@ -12,8 +12,7 @@ from rclpy.node import Node
 from std_msgs.msg import Float64, String
 
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel,
-                              QVBoxLayout, QHBoxLayout, QProgressBar, QFrame,
-                              QGridLayout)
+                              QVBoxLayout, QHBoxLayout, QProgressBar, QFrame)
 from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from PyQt5.QtGui import QFont, QPalette, QColor
 import threading
