@@ -20,7 +20,7 @@ ROS 2 (Gazebo interface):
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Twist, Pose, Point, Quaternion
+from geometry_msgs.msg import Twist, Pose, Point, Quaternion  # noqa: F401
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Float64, String
 from gazebo_msgs.srv import SetEntityState
@@ -34,6 +34,22 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from can_codec import decode_brake_cmd, decode_fsm_state, decode_alert
 from can_tcp_client import TcpCanBus
+
+
+# Scenario presets — mirrors the launch file's SCENARIOS dict so a
+# /aeb/restart with a scenario name can update params without going
+# through `ros2 param set`. Keep these in sync if either side changes.
+SCENARIOS = {
+    'ccrs_20':     {'ego': 20.0, 'target': 0.0,  'gap': 100.0, 'decel': 0.0,  'brake_t': 0.0},
+    'ccrs_30':     {'ego': 30.0, 'target': 0.0,  'gap': 100.0, 'decel': 0.0,  'brake_t': 0.0},
+    'ccrs_40':     {'ego': 40.0, 'target': 0.0,  'gap': 100.0, 'decel': 0.0,  'brake_t': 0.0},
+    'ccrs_50':     {'ego': 50.0, 'target': 0.0,  'gap': 100.0, 'decel': 0.0,  'brake_t': 0.0},
+    'ccrm':        {'ego': 50.0, 'target': 20.0, 'gap': 50.0,  'decel': 0.0,  'brake_t': 0.0},
+    'ccrb_d2_g12': {'ego': 50.0, 'target': 50.0, 'gap': 12.0,  'decel': -2.0, 'brake_t': 2.0},
+    'ccrb_d2_g40': {'ego': 50.0, 'target': 50.0, 'gap': 40.0,  'decel': -2.0, 'brake_t': 2.0},
+    'ccrb_d6_g12': {'ego': 50.0, 'target': 50.0, 'gap': 12.0,  'decel': -6.0, 'brake_t': 2.0},
+    'ccrb_d6_g40': {'ego': 50.0, 'target': 50.0, 'gap': 40.0,  'decel': -6.0, 'brake_t': 2.0},
+}
 
 
 class ScenarioController(Node):
@@ -100,7 +116,10 @@ class ScenarioController(Node):
         # ── ROS 2 subscribers ─────────────────────────────────────────────
         self.create_subscription(Odometry, '/aeb/ego/odom', self.ego_odom_cb, 10)
         self.create_subscription(Odometry, '/aeb/target/odom', self.target_odom_cb, 10)
-        self.create_subscription(Float64, '/aeb/restart', self.restart_cb, 10)
+        # /aeb/restart carries an optional scenario name in the String data.
+        # Empty string = restart current scenario (Reset button).
+        self.create_subscription(String, '/aeb/restart', self.restart_cb, 10)
+        self.create_subscription(Float64, '/aeb/stop', self.stop_cb, 10)
 
         # Gazebo service for teleporting vehicles
         self.set_state_client = self.create_client(
@@ -152,7 +171,25 @@ class ScenarioController(Node):
         self.target_vx = msg.twist.twist.linear.x
 
     def restart_cb(self, msg):
-        self.get_logger().info('=== RESTARTING SCENARIO ===')
+        # If the message carries a known scenario name, switch to it;
+        # otherwise keep the currently-loaded preset (Reset semantics).
+        requested = (msg.data or '').strip()
+        if requested and requested in SCENARIOS:
+            cfg = SCENARIOS[requested]
+            self.scenario_name      = requested
+            self.ego_speed_ms       = cfg['ego']     / 3.6
+            self.target_speed_ms    = cfg['target']  / 3.6
+            self.initial_gap        = cfg['gap']
+            self.target_decel       = cfg['decel']
+            self.target_brake_time  = cfg['brake_t']
+
+        self.get_logger().info(
+            f'=== RESTARTING: {self.scenario_name} '
+            f'(ego={self.ego_speed_ms*3.6:.0f} km/h, '
+            f'target={self.target_speed_ms*3.6:.0f} km/h, '
+            f'gap={self.initial_gap:.0f} m) ==='
+        )
+
         self.ego_vx_cmd = 0.0
         self.target_vx_cmd = self.target_speed_ms
         self.brake_cmd_pct = 0.0
@@ -162,36 +199,69 @@ class ScenarioController(Node):
         self.collision_time = None
         self.max_decel_achieved = 0.0
         self.ego_has_braked = False
-        self.perceived_distance = 100.0
+        self.perceived_distance = self.initial_gap
         self.world_ready_time = time.time()
         self.publish_vel(self.ego_cmd_pub, 0.0)
         self.publish_vel(self.target_cmd_pub, 0.0)
         self.gazebo_ready = True
-        self.target_teleported = True
-        self.create_timer(2.0, self._start_scenario_once)
+
+        # Always teleport the target to the new initial gap on restart —
+        # the world spawns it at x=100, but CCRb scenarios use gap=12 or 40.
+        self.target_teleported = False
+        self._teleport_target()
+
+    def stop_cb(self, msg):
+        """Halt the running scenario — both vehicles stop, status frozen."""
+        self.get_logger().info('=== STOP requested via /aeb/stop ===')
+        self.scenario_running = False
+        self.scenario_ended = True
+        self.ego_vx_cmd = 0.0
+        self.target_vx_cmd = 0.0
+        self.publish_vel(self.ego_cmd_pub, 0.0)
+        self.publish_vel(self.target_cmd_pub, 0.0)
+        self.publish_status('STOPPED: user halt')
 
     # ── Teleport helpers ───────────────────────────────────────────────────
 
+    def _set_entity(self, name, x, y=-1.85):
+        """Send a single set_entity_state request (fire-and-forget).
+
+        Twist is zeroed so the planar_move plugin doesn't carry residual
+        velocity from the previous run.
+        """
+        req = SetEntityState.Request()
+        req.state = EntityState()
+        req.state.name = name
+        req.state.pose = Pose(
+            position=Point(x=float(x), y=float(y), z=0.0),
+            orientation=Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
+        )
+        req.state.twist = Twist()
+        return self.set_state_client.call_async(req)
+
     def _teleport_target(self):
-        self.get_logger().info(f'Teleporting target to x={self.initial_gap:.1f} m')
+        # Reset BOTH vehicles via set_entity_state — /reset_world doesn't
+        # always re-zero the planar_move plugin's internal odom integrator,
+        # so on restart the ego could stay near the previous run's end pose.
+        self.get_logger().info(
+            f'Resetting vehicles: ego x=0, target x={self.initial_gap:.1f}'
+        )
         if not self.set_state_client.wait_for_service(timeout_sec=5.0):
-            self.get_logger().warn('set_entity_state not available')
+            self.get_logger().warn('set_entity_state not available — skipping teleport')
             self.target_teleported = True
             self.create_timer(2.0, self._start_scenario_once)
             return
 
-        req = SetEntityState.Request()
-        req.state = EntityState()
-        req.state.name = 'target_vehicle'
-        req.state.pose = Pose(
-            position=Point(x=self.initial_gap, y=-1.85, z=0.0),
-            orientation=Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
-        )
-        future = self.set_state_client.call_async(req)
+        self._set_entity('ego_vehicle',    0.0)
+        future = self._set_entity('target_vehicle', self.initial_gap)
         future.add_done_callback(self._teleport_done)
 
     def _teleport_done(self, future):
         self.target_teleported = True
+        # Snap our internal odom-tracked positions so the controller's
+        # first publish doesn't rely on the next odom callback.
+        self.ego_x    = 0.0
+        self.target_x = self.initial_gap
         self.create_timer(2.0, self._start_scenario_once)
 
     def _start_scenario_once(self):
@@ -247,6 +317,13 @@ class ScenarioController(Node):
         if self.aeb_enabled and brake_pct > 1.0:
             self.ego_vx_cmd = max(0.0, self.ego_vx_cmd - brake_decel * dt)
             self.ego_has_braked = True
+        elif self.ego_has_braked and self.ego_vx_cmd > self.target_vx + 0.1:
+            # AEB has released but the ego is still closing on the target.
+            # Gazebo has no friction model in this world, so simulate a
+            # 2 m/s² coast-decel until the ego matches the target speed
+            # (CCRs: target_vx=0 → coast to a complete stop;
+            #  CCRm/CCRb: settle at the target's velocity).
+            self.ego_vx_cmd = max(0.0, self.ego_vx_cmd - 2.0 * dt)
         elif not self.ego_has_braked:
             self.ego_vx_cmd = self.ego_speed_ms
 
@@ -278,6 +355,23 @@ class ScenarioController(Node):
             self.scenario_ended = True
             self.get_logger().info(f'*** STOPPED: distance remaining = {distance:.1f} m ***')
             self.publish_status(f'STOPPED: gap={distance:.1f}m')
+
+        elif (self.ego_has_braked
+              and abs(self.ego_vx_cmd - self.target_vx) < 0.4
+              and brake_pct < 1.0
+              and elapsed > 4.0):
+            # CCRm/CCRb: AEB has matched the ego's speed to the target's
+            # and released. Distance is now stable or growing — no more
+            # threat, end the run cleanly instead of waiting 60 s.
+            self.scenario_ended = True
+            v_settled_kmh = self.ego_vx_cmd * 3.6
+            self.get_logger().info(
+                f'*** SETTLED: v_ego={v_settled_kmh:.1f}km/h '
+                f'gap={distance:.1f}m ***'
+            )
+            self.publish_status(
+                f'SETTLED: v={v_settled_kmh:.1f}km/h gap={distance:.1f}m'
+            )
 
         elif elapsed > 60.0:
             self.scenario_ended = True

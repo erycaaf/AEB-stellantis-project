@@ -23,9 +23,38 @@ RUN apt-get update && apt-get install -y \
 
 RUN pip3 install pyyaml python-can
 
+# ── Pull a curated set of models from osrf/gazebo_models ───────────────────
+# These are referenced via `<include><uri>model://NAME</uri></include>` in
+# aeb_highway.world for richer rural scenery (trees, houses, props, vehicles).
+# Sparse checkout keeps the image ~150 MB lighter than a full clone.
+RUN mkdir -p /root/.gazebo/models && \
+    git clone --depth 1 --filter=blob:none --sparse \
+        https://github.com/osrf/gazebo_models.git /tmp/gazebo_models && \
+    cd /tmp/gazebo_models && \
+    git sparse-checkout set \
+        hatchback hatchback_blue hatchback_red suv \
+        pickup polaris_ranger_xp900 \
+        oak_tree pine_tree \
+        mailbox fire_hydrant \
+        construction_cone jersey_barrier \
+        fast_food gas_station \
+        house_1 house_2 house_3 \
+        windmill cow && \
+    for m in hatchback hatchback_blue hatchback_red suv pickup polaris_ranger_xp900 \
+             oak_tree pine_tree mailbox fire_hydrant construction_cone jersey_barrier \
+             fast_food gas_station house_1 house_2 house_3 windmill cow ; do \
+      if [ -d "$m" ]; then cp -r "$m" /root/.gazebo/models/ ; fi ; \
+    done && \
+    rm -rf /tmp/gazebo_models
+
 # Create colcon workspace and copy package
 RUN mkdir -p /ws/src
 COPY aeb_gazebo /ws/src/aeb_gazebo
+
+# Normalize line endings — Windows checkouts can drop CRLF into .py/.sh,
+# which breaks `#!/usr/bin/env python3` shebangs on Linux.
+RUN find /ws/src/aeb_gazebo -type f \( -name '*.py' -o -name '*.sh' \) \
+        -exec sed -i 's/\r$//' {} +
 
 # Build the ROS 2 package (generates custom messages + installs launch files)
 WORKDIR /ws

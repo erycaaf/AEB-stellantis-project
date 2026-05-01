@@ -55,32 +55,57 @@ class StartRequest(BaseModel):
     scenario: str
 
 
-def ros2_pub(topic, msg_type, data_str):
-    """Publish a single message to a ROS 2 topic via CLI."""
-    cmd = [
-        "ros2", "topic", "pub", "--once",
-        topic, msg_type, data_str
-    ]
-    subprocess.Popen(
+def _run_with_timeout(cmd, timeout=8):
+    """Run a subprocess with a timeout, return (returncode, stdout, stderr).
+
+    Uses Popen + communicate(timeout=...) directly — sidesteps a Python
+    quirk in this image where subprocess.run forwards `timeout` to Popen.
+    """
+    proc = subprocess.Popen(
         cmd,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        env={**os.environ, "ROS_DOMAIN_ID": "0"}
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={**os.environ, "ROS_DOMAIN_ID": "0"},
     )
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        stdout, stderr = proc.communicate()
+        return -1, stdout, stderr
+    return proc.returncode, stdout, stderr
+
+
+def ros2_pub(topic, msg_type, data_str):
+    """Publish a single message to a ROS 2 topic via CLI, synchronously."""
+    cmd = ["ros2", "topic", "pub", "--once", topic, msg_type, data_str]
+    try:
+        rc, _stdout, stderr = _run_with_timeout(cmd, timeout=8)
+        if rc != 0:
+            print(
+                f"[ros2_pub] non-zero exit ({rc}) for {topic}: "
+                f"stderr={stderr.decode(errors='replace').strip()!r}",
+                flush=True,
+            )
+        else:
+            print(f"[ros2_pub] {topic} -> {data_str}", flush=True)
+    except Exception as e:
+        print(f"[ros2_pub] exception publishing to {topic}: {e!r}", flush=True)
 
 
 def ros2_service_call(service, srv_type, data_str="{}"):
-    """Call a ROS 2 service via CLI."""
-    cmd = [
-        "ros2", "service", "call",
-        service, srv_type, data_str
-    ]
-    subprocess.Popen(
-        cmd,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        env={**os.environ, "ROS_DOMAIN_ID": "0"}
-    )
+    """Call a ROS 2 service synchronously (e.g. /reset_world)."""
+    cmd = ["ros2", "service", "call", service, srv_type, data_str]
+    try:
+        rc, _stdout, stderr = _run_with_timeout(cmd, timeout=8)
+        if rc != 0:
+            print(
+                f"[ros2_service_call] non-zero exit ({rc}) for {service}: "
+                f"stderr={stderr.decode(errors='replace').strip()!r}",
+                flush=True,
+            )
+    except Exception as e:
+        print(f"[ros2_service_call] exception calling {service}: {e!r}", flush=True)
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────
@@ -103,7 +128,13 @@ def list_scenarios():
 
 @app.post("/scenarios/start")
 def start_scenario(req: StartRequest):
-    """Start or restart a scenario by ID."""
+    """Start or restart a scenario by ID.
+
+    The scenario name is shipped to the controller via /aeb/restart; the
+    controller has its own copy of the scenarios dict, so no `ros2 param
+    set` chain is needed (that round-trip used to add ~3 s before the run
+    even began, and the API/controller could race on it).
+    """
     if req.scenario not in scenarios:
         return {"error": f"Unknown scenario: {req.scenario}"}
 
@@ -113,18 +144,17 @@ def start_scenario(req: StartRequest):
         current_scenario["name"] = req.scenario
         current_scenario["status"] = "starting"
 
-    # Reset Gazebo world (reposition vehicles to initial poses)
-    ros2_service_call(
-        "/reset_world",
-        "std_srvs/srv/Empty"
-    )
+    # Reset Gazebo first (synchronous) so the controller's teleport
+    # doesn't race with the world reset.
+    ros2_service_call("/reset_world", "std_srvs/srv/Empty")
 
-    # Send restart signal to scenario_controller node
-    # (resets internal state: timers, flags, speed commands)
+    # Then tell the controller which scenario to load and reset its state.
+    # YAML flow style with unquoted key — the form `ros2 topic pub` parses
+    # most reliably in our testing.
     ros2_pub(
         "/aeb/restart",
-        "std_msgs/msg/Float64",
-        '{"data": 1.0}'
+        "std_msgs/msg/String",
+        f'{{data: "{req.scenario}"}}',
     )
 
     with lock:
@@ -139,12 +169,17 @@ def start_scenario(req: StartRequest):
 
 @app.post("/scenarios/stop")
 def stop_scenario():
-    """Pause the simulation."""
-    # Publish zero velocity to both vehicles
-    ros2_pub("/aeb/ego/cmd_vel", "geometry_msgs/msg/Twist",
-             '{"linear": {"x": 0.0}}')
-    ros2_pub("/aeb/target/cmd_vel", "geometry_msgs/msg/Twist",
-             '{"linear": {"x": 0.0}}')
+    """Halt the running scenario.
+
+    Sends /aeb/stop so scenario_controller flips into the ended state and
+    holds both vehicles at zero velocity. Without this signal, publishing
+    cmd_vel=0 once is overridden 10 ms later by the controller's own loop.
+    """
+    ros2_pub(
+        "/aeb/stop",
+        "std_msgs/msg/Float64",
+        '{"data": 1.0}'
+    )
 
     with lock:
         current_scenario["status"] = "stopped"
@@ -154,19 +189,12 @@ def stop_scenario():
 
 @app.post("/scenarios/restart")
 def restart_scenario():
-    """Restart the current scenario."""
-    # Reset Gazebo world
-    ros2_service_call(
-        "/reset_world",
-        "std_srvs/srv/Empty"
-    )
+    """Restart the current scenario (no scenario change).
 
-    # Signal scenario_controller to restart
-    ros2_pub(
-        "/aeb/restart",
-        "std_msgs/msg/Float64",
-        '{"data": 1.0}'
-    )
+    Empty data field tells the controller to keep its existing preset.
+    """
+    ros2_service_call("/reset_world", "std_srvs/srv/Empty")
+    ros2_pub("/aeb/restart", "std_msgs/msg/String", '{data: ""}')
 
     with lock:
         current_scenario["status"] = "running"

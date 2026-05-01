@@ -18,6 +18,10 @@ WORKDIR /workspace
 COPY aeb_gazebo /workspace/aeb_gazebo
 COPY docker/api /workspace/api
 
+# Normalize line endings (Windows CRLF would break the FastAPI entrypoint)
+RUN find /workspace -type f \( -name '*.py' -o -name '*.sh' \) \
+        -exec sed -i 's/\r$//' {} +
+
 EXPOSE 8000
 
 # Source ROS inline — no entrypoint script (avoids CRLF issues on Windows)

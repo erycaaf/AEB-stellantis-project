@@ -26,7 +26,7 @@ SCENARIOS = {
     'ccrs_40':   {'ego': 40.0, 'target': 0.0,  'gap': 100.0, 'decel': 0.0,  'brake_t': 0.0},
     'ccrs_50':        {'ego': 50.0, 'target': 0.0,  'gap': 100.0, 'decel': 0.0,  'brake_t': 0.0},
     'ccrs_50_no_aeb': {'ego': 50.0, 'target': 0.0,  'gap': 100.0, 'decel': 0.0,  'brake_t': 0.0, 'aeb_enabled': False},
-    'ccrm':      {'ego': 50.0, 'target': 20.0, 'gap': 100.0, 'decel': 0.0,  'brake_t': 0.0},
+    'ccrm':      {'ego': 50.0, 'target': 20.0, 'gap': 50.0,  'decel': 0.0,  'brake_t': 0.0},
     'ccrb_d2_g12': {'ego': 50.0, 'target': 50.0, 'gap': 12.0, 'decel': -2.0, 'brake_t': 2.0},
     'ccrb_d2_g40': {'ego': 50.0, 'target': 50.0, 'gap': 40.0, 'decel': -2.0, 'brake_t': 2.0},
     'ccrb_d6_g12': {'ego': 50.0, 'target': 50.0, 'gap': 12.0, 'decel': -6.0, 'brake_t': 2.0},

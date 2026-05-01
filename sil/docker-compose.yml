@@ -27,7 +27,7 @@ services:
     command: python3 /app/can_tcp_server.py 29536
     networks:
       aeb-net:
-        ipv4_address: 172.20.0.10
+        ipv4_address: 10.99.0.10
     healthcheck:
       test: ["CMD", "python3", "-c", "import socket; s=socket.socket(); s.connect(('127.0.0.1',29536)); s.close()"]
       interval: 2s
@@ -43,7 +43,7 @@ services:
     environment:
       - DISPLAY=:1
       - ROS_DOMAIN_ID=0
-      - CAN_TCP_HOST=172.20.0.10
+      - CAN_TCP_HOST=10.99.0.10
       - CAN_TCP_PORT=29536
     networks:
       - aeb-net
@@ -66,7 +66,10 @@ services:
         export ALSA_CARD=none
         export SDL_AUDIODRIVER=dummy
 
-        # VNC setup
+        # VNC setup — clean stale X locks left in the persistent /tmp volume
+        # by previous container runs (Xvfb exits silently if .X1-lock exists).
+        rm -f /tmp/.X*-lock
+        rm -rf /tmp/.X11-unix
         Xvfb :1 -screen 0 1280x720x24 &
         sleep 2
         x11vnc -display :1 -forever -nopw -rfbport 5900 -shared -bg
@@ -88,7 +91,7 @@ services:
       dockerfile: docker/Dockerfile.zephyr
     container_name: aeb-ecu
     environment:
-      - CAN_TCP_HOST=172.20.0.10
+      - CAN_TCP_HOST=10.99.0.10
       - CAN_TCP_PORT=29536
     networks:
       - aeb-net
@@ -101,7 +104,7 @@ services:
       - bash
       - -c
       - |
-        echo "Starting Zephyr AEB ECU (TCP CAN on canbus:29536)"
+        echo "Starting Zephyr AEB ECU (TCP CAN on $${CAN_TCP_HOST:-10.99.0.10}:$${CAN_TCP_PORT:-29536})"
         exec /app/build/zephyr/zephyr.exe
 
   # ── Scenario Control API ────────────────────────────────────────────────
@@ -147,4 +150,4 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 172.20.0.0/24
+        - subnet: 10.99.0.0/24

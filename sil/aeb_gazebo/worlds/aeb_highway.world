@@ -15,11 +15,23 @@
       </ode>
     </physics>
 
+    <!-- Sky / atmosphere -->
+    <scene>
+      <ambient>0.5 0.55 0.65 1</ambient>
+      <background>0.65 0.78 0.92 1</background>
+      <sky>
+        <clouds>
+          <speed>2.0</speed>
+        </clouds>
+      </sky>
+      <shadows>true</shadows>
+    </scene>
+
     <!-- Sun -->
     <light name="sun" type="directional">
       <cast_shadows>true</cast_shadows>
       <pose>0 0 100 0 0 0</pose>
-      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <diffuse>0.9 0.9 0.85 1</diffuse>
       <specular>0.3 0.3 0.3 1</specular>
       <direction>-0.3 0.2 -1.0</direction>
     </light>
@@ -119,6 +131,255 @@
         </script>
       </material>
     </road>
+
+    <!-- ============ ROADSIDE SCENERY ============ -->
+    <!-- Models referenced via <include><uri>model://NAME</uri> are bundled
+         in the gazebo container at /root/.gazebo/models/ from the
+         osrf/gazebo_models repository (see Dockerfile.gazebo).
+         The lidar uses physics raycast against <collision> bodies — these
+         decorative models all have collision-free wrapper SDFs in our case
+         OR sit far from the road (y ≥ 8 m / y ≤ -8 m), well outside the
+         lidar's ±15° forward cone, so they cannot trigger false braking. -->
+
+    <!-- ── Action zone: 0–110 m corridor ─────────────────────────────────
+         Density is high here because every CCRs/CCRm/CCRb scenario plays
+         out in this stretch (ego starts at x=0, target at x≈12–100). -->
+
+    <!-- Oak trees, south shoulder — pushed back to y ≈ -14 to -17 to leave
+         room for a dirt-free grass strip next to the road. Keep 85–115 m
+         clear around target spawn. -->
+    <include><name>oak_a1</name><pose>5    -14 0  0 0 0</pose><uri>model://oak_tree</uri></include>
+    <include><name>oak_a2</name><pose>14   -16 0  0 0 1.2</pose><uri>model://oak_tree</uri></include>
+    <include><name>oak_a3</name><pose>23   -14 0  0 0 0.4</pose><uri>model://oak_tree</uri></include>
+    <include><name>oak_a4</name><pose>40   -15 0  0 0 -0.7</pose><uri>model://oak_tree</uri></include>
+    <include><name>oak_a5</name><pose>50   -17 0  0 0 2.1</pose><uri>model://oak_tree</uri></include>
+    <include><name>oak_a6</name><pose>62   -14 0  0 0 0.9</pose><uri>model://oak_tree</uri></include>
+    <include><name>oak_a7</name><pose>72   -16 0  0 0 -0.3</pose><uri>model://oak_tree</uri></include>
+    <include><name>oak_a8</name><pose>82   -14 0  0 0 1.5</pose><uri>model://oak_tree</uri></include>
+    <!-- (no tree at ~100 m — target spawn area kept clear) -->
+    <!-- Sparse continuation past the action zone -->
+    <include><name>oak_b1</name><pose>140  -15 0  0 0 0</pose><uri>model://oak_tree</uri></include>
+    <include><name>oak_b2</name><pose>180  -16 0  0 0 1.0</pose><uri>model://oak_tree</uri></include>
+    <include><name>oak_b3</name><pose>220  -15 0  0 0 -0.5</pose><uri>model://oak_tree</uri></include>
+
+    <!-- Pine trees, north shoulder — also clear of the 85–115 m band -->
+    <include><name>pine_a1</name><pose>10   13 0  0 0 0</pose><uri>model://pine_tree</uri></include>
+    <include><name>pine_a2</name><pose>23   15 0  0 0 1.5</pose><uri>model://pine_tree</uri></include>
+    <include><name>pine_a3</name><pose>36   13 0  0 0 -0.4</pose><uri>model://pine_tree</uri></include>
+    <include><name>pine_a4</name><pose>49   14 0  0 0 0.7</pose><uri>model://pine_tree</uri></include>
+    <include><name>pine_a5</name><pose>62   13 0  0 0 -1.2</pose><uri>model://pine_tree</uri></include>
+    <include><name>pine_a6</name><pose>75   15 0  0 0 0.3</pose><uri>model://pine_tree</uri></include>
+    <!-- (no pine at ~88–101 m — keep target visible from camera + lidar) -->
+    <!-- Sparse continuation past the action zone -->
+    <include><name>pine_b1</name><pose>150  14 0  0 0 0</pose><uri>model://pine_tree</uri></include>
+    <include><name>pine_b2</name><pose>200  15 0  0 0 0.6</pose><uri>model://pine_tree</uri></include>
+
+    <!-- Shoulder furniture distributed through the action zone -->
+    <include><name>hydrant_1</name><pose>15  -6.5 0  0 0 0</pose><uri>model://fire_hydrant</uri></include>
+    <include><name>hydrant_2</name><pose>50  -6.5 0  0 0 0</pose><uri>model://fire_hydrant</uri></include>
+    <include><name>hydrant_3</name><pose>85  -6.5 0  0 0 0</pose><uri>model://fire_hydrant</uri></include>
+    <include><name>mailbox_1</name><pose>32  -6.5 0  0 0 1.5708</pose><uri>model://mailbox</uri></include>
+    <include><name>mailbox_2</name><pose>67  -6.5 0  0 0 1.5708</pose><uri>model://mailbox</uri></include>
+    <include><name>mailbox_3</name><pose>98  -6.5 0  0 0 1.5708</pose><uri>model://mailbox</uri></include>
+
+    <!-- Construction work zone framing the start (cones taper into the lane) -->
+    <include><name>cone_1</name><pose>-15 -3.2 0  0 0 0</pose><uri>model://construction_cone</uri></include>
+    <include><name>cone_2</name><pose>-10 -3.4 0  0 0 0</pose><uri>model://construction_cone</uri></include>
+    <include><name>cone_3</name><pose>-5  -3.6 0  0 0 0</pose><uri>model://construction_cone</uri></include>
+    <include><name>cone_4</name><pose>0   -3.7 0  0 0 0</pose><uri>model://construction_cone</uri></include>
+
+    <!-- South side ("our" lane side): pure countryside — guardrail, trees,
+         and a cow. No houses. -->
+    <include><name>cow_1</name>
+      <pose>15 -16 0  0 0 0.6</pose>
+      <uri>model://cow</uri>
+    </include>
+
+    <!-- ── Ground patches: paved access to the gas station, dirt drives
+         to the houses, and a dirt shoulder glued to the road on the
+         developed (north) side. All are <static>true</static> visual-only
+         thin boxes raised 0.01 m so they don't z-fight with the ground. -->
+
+    <!-- North-side dirt shoulder, glued to the road's north edge (y=+3.7).
+         Spans y=3.7 → y=5.7 (2 m wide). -->
+    <model name="dirt_shoulder_north">
+      <static>true</static>
+      <link name="link">
+        <pose>55 4.7 0.012 0 0 0</pose>
+        <visual name="v">
+          <geometry><box><size>200 2.0 0.02</size></box></geometry>
+          <material>
+            <ambient>0.55 0.42 0.28 1</ambient>
+            <diffuse>0.62 0.48 0.32 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Asphalt apron under the gas station canopy. Centred slightly west
+         and north of the building origin so the pavement sits under the
+         pumps and connects cleanly to the dirt shoulder at y=5.7. -->
+    <model name="gas_station_apron">
+      <static>true</static>
+      <link name="link">
+        <pose>60 16 0.014 0 0 0</pose>
+        <visual name="v">
+          <geometry><box><size>20 14 0.02</size></box></geometry>
+          <material>
+            <ambient>0.18 0.18 0.20 1</ambient>
+            <diffuse>0.25 0.25 0.27 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Painted lane stripes on the apron (purely visual) -->
+    <model name="apron_stripe_a"><static>true</static><link name="link"><pose>57 16 0.016 0 0 0</pose>
+      <visual name="v"><geometry><box><size>0.15 12 0.02</size></box></geometry>
+      <material><ambient>0.95 0.95 0.95 1</ambient><diffuse>1 1 1 1</diffuse></material></visual></link></model>
+    <model name="apron_stripe_b"><static>true</static><link name="link"><pose>63 16 0.016 0 0 0</pose>
+      <visual name="v"><geometry><box><size>0.15 12 0.02</size></box></geometry>
+      <material><ambient>0.95 0.95 0.95 1</ambient><diffuse>1 1 1 1</diffuse></material></visual></link></model>
+
+    <!-- Dirt driveways from the shoulder edge (y=5.7) up to each north
+         house's southern wall (~y=20). One per house. -->
+    <model name="dirt_drive_house_north_0">
+      <static>true</static>
+      <link name="link">
+        <pose>15 13 0.014 0 0 0</pose>
+        <visual name="v">
+          <geometry><box><size>3.2 14.6 0.02</size></box></geometry>
+          <material>
+            <ambient>0.55 0.42 0.28 1</ambient>
+            <diffuse>0.62 0.48 0.32 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="dirt_drive_house_north_1">
+      <static>true</static>
+      <link name="link">
+        <pose>40 13 0.014 0 0 0</pose>
+        <visual name="v">
+          <geometry><box><size>3.2 14.6 0.02</size></box></geometry>
+          <material>
+            <ambient>0.55 0.42 0.28 1</ambient>
+            <diffuse>0.62 0.48 0.32 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="dirt_drive_house_north_2">
+      <static>true</static>
+      <link name="link">
+        <pose>95 13 0.014 0 0 0</pose>
+        <visual name="v">
+          <geometry><box><size>3.2 14.6 0.02</size></box></geometry>
+          <material>
+            <ambient>0.55 0.42 0.28 1</ambient>
+            <diffuse>0.62 0.48 0.32 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- North side: three houses + gas station. Yaw=π makes the front
+         face -Y (toward the road) — these models have +Y as their default
+         front, so a 180° rotation puts the entrance on the road side. -->
+    <include><name>house_north_0</name>
+      <pose>15   24 0  0 0 3.14159</pose>
+      <uri>model://house_1</uri>
+    </include>
+    <include><name>house_north_1</name>
+      <pose>40   24 0  0 0 3.14159</pose>
+      <uri>model://house_3</uri>
+    </include>
+    <include><name>gas_station</name>
+      <pose>65   22 0  0 0 3.14159</pose>
+      <uri>model://gas_station</uri>
+    </include>
+    <include><name>house_north_2</name>
+      <pose>95   24 0  0 0 3.14159</pose>
+      <uri>model://house_2</uri>
+    </include>
+
+    <!-- South-side guardrail running through the whole action zone. -->
+    <model name="guardrail_south">
+      <static>true</static>
+      <link name="link">
+        <pose>55 -5.6 0.45 0 0 0</pose>
+        <visual name="rail">
+          <geometry><box><size>200 0.08 0.9</size></box></geometry>
+          <material>
+            <ambient>0.75 0.75 0.78 1</ambient>
+            <diffuse>0.9 0.9 0.92 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <!-- Guardrail support posts every 8 m -->
+    <model name="guardrail_post_a"><static>true</static><link name="link"><pose>0   -5.6 0.4 0 0 0</pose>
+      <visual name="p"><geometry><cylinder><radius>0.06</radius><length>0.85</length></cylinder></geometry>
+      <material><ambient>0.45 0.45 0.48 1</ambient><diffuse>0.55 0.55 0.58 1</diffuse></material></visual></link></model>
+    <model name="guardrail_post_b"><static>true</static><link name="link"><pose>16  -5.6 0.4 0 0 0</pose>
+      <visual name="p"><geometry><cylinder><radius>0.06</radius><length>0.85</length></cylinder></geometry>
+      <material><ambient>0.45 0.45 0.48 1</ambient><diffuse>0.55 0.55 0.58 1</diffuse></material></visual></link></model>
+    <model name="guardrail_post_c"><static>true</static><link name="link"><pose>32  -5.6 0.4 0 0 0</pose>
+      <visual name="p"><geometry><cylinder><radius>0.06</radius><length>0.85</length></cylinder></geometry>
+      <material><ambient>0.45 0.45 0.48 1</ambient><diffuse>0.55 0.55 0.58 1</diffuse></material></visual></link></model>
+    <model name="guardrail_post_d"><static>true</static><link name="link"><pose>48  -5.6 0.4 0 0 0</pose>
+      <visual name="p"><geometry><cylinder><radius>0.06</radius><length>0.85</length></cylinder></geometry>
+      <material><ambient>0.45 0.45 0.48 1</ambient><diffuse>0.55 0.55 0.58 1</diffuse></material></visual></link></model>
+    <model name="guardrail_post_e"><static>true</static><link name="link"><pose>64  -5.6 0.4 0 0 0</pose>
+      <visual name="p"><geometry><cylinder><radius>0.06</radius><length>0.85</length></cylinder></geometry>
+      <material><ambient>0.45 0.45 0.48 1</ambient><diffuse>0.55 0.55 0.58 1</diffuse></material></visual></link></model>
+    <model name="guardrail_post_f"><static>true</static><link name="link"><pose>80  -5.6 0.4 0 0 0</pose>
+      <visual name="p"><geometry><cylinder><radius>0.06</radius><length>0.85</length></cylinder></geometry>
+      <material><ambient>0.45 0.45 0.48 1</ambient><diffuse>0.55 0.55 0.58 1</diffuse></material></visual></link></model>
+    <model name="guardrail_post_g"><static>true</static><link name="link"><pose>96  -5.6 0.4 0 0 0</pose>
+      <visual name="p"><geometry><cylinder><radius>0.06</radius><length>0.85</length></cylinder></geometry>
+      <material><ambient>0.45 0.45 0.48 1</ambient><diffuse>0.55 0.55 0.58 1</diffuse></material></visual></link></model>
+    <model name="guardrail_post_h"><static>true</static><link name="link"><pose>112 -5.6 0.4 0 0 0</pose>
+      <visual name="p"><geometry><cylinder><radius>0.06</radius><length>0.85</length></cylinder></geometry>
+      <material><ambient>0.45 0.45 0.48 1</ambient><diffuse>0.55 0.55 0.58 1</diffuse></material></visual></link></model>
+
+    <!-- Parked vehicles on the north shoulder (y = +10), inside the action
+         zone but well clear of the lidar's ±15° forward cone in the
+         opposite lane — pure scenery, not AEB targets. -->
+    <include><name>parked_pickup</name>
+      <pose>22 10 0  0 0 -1.5708</pose>
+      <static>true</static>
+      <uri>model://pickup</uri>
+    </include>
+    <include><name>parked_hatch_red</name>
+      <pose>55 10 0  0 0 -1.5708</pose>
+      <static>true</static>
+      <uri>model://hatchback_red</uri>
+    </include>
+    <include><name>parked_polaris</name>
+      <pose>75 10 0  0 0 -1.5708</pose>
+      <static>true</static>
+      <uri>model://polaris_ranger_xp900</uri>
+    </include>
+
+    <!-- Distance reference markers — every 25 m through the action zone,
+         red pylon at the 100 m target spawn -->
+    <model name="km_marker_25"><static>true</static><link name="link"><pose>25 -6.0 0.5 0 0 0</pose>
+      <visual name="v"><geometry><box><size>0.3 0.3 1.0</size></box></geometry>
+        <material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse></material></visual>
+    </link></model>
+    <model name="km_marker_50"><static>true</static><link name="link"><pose>50 -6.0 0.5 0 0 0</pose>
+      <visual name="v"><geometry><box><size>0.3 0.3 1.0</size></box></geometry>
+        <material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse></material></visual>
+    </link></model>
+    <model name="km_marker_75"><static>true</static><link name="link"><pose>75 -6.0 0.5 0 0 0</pose>
+      <visual name="v"><geometry><box><size>0.3 0.3 1.0</size></box></geometry>
+        <material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse></material></visual>
+    </link></model>
+    <model name="km_marker_100"><static>true</static><link name="link"><pose>100 -6.0 0.6 0 0 0</pose>
+      <visual name="v"><geometry><box><size>0.4 0.4 1.2</size></box></geometry>
+        <material><ambient>0.95 0.2 0.2 1</ambient><diffuse>1 0.3 0.3 1</diffuse></material></visual>
+    </link></model>
 
     <!-- ============ EGO VEHICLE (hatchback_blue) ============ -->
     <model name="ego_vehicle">
@@ -226,8 +487,10 @@
       </plugin>
     </model>
 
-    <!-- Camera: user-defined view showing both vehicles -->
-    <gui fullscreen="0">
+    <!-- Camera: user-defined view showing both vehicles.
+         fullscreen="1" hides the menu bar, side panels, and toolbars so
+         the noVNC view shows only the 3D scene. -->
+    <gui fullscreen="1">
       <camera name="user_camera">
         <pose>1.687 -45.415 35.389 0.0 0.526 0.9428</pose>
         <view_controller>orbit</view_controller>

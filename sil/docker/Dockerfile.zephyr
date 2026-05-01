@@ -30,10 +30,21 @@ RUN pip3 install -r ${ZEPHYR_BASE}/scripts/requirements.txt
 WORKDIR /app
 COPY zephyr_aeb /app/zephyr_aeb
 
-# Clone the repo C sources
-RUN git clone --depth 1 https://github.com/erycaaf/AEB-stellantis-project.git /app/zephyr_aeb/repo
+# Normalize line endings (Windows CRLF would break shebangs and shell scripts)
+RUN find /app/zephyr_aeb -type f \
+        \( -name '*.py' -o -name '*.sh' -o -name '*.c' -o -name '*.h' \) \
+        -exec sed -i 's/\r$//' {} +
 
-# Patch FSM: continue braking below V_EGO_MIN (distance floors apply)
+# Clone the repo C sources from `development` — that branch carries the
+# latest robustness/MISRA work (e.g. NaN / SEU guards in aeb_fsm.c) and is
+# ahead of `main`. The Priority-3 speed-range block patched below is
+# unchanged between the two branches, so the patch applies cleanly.
+RUN git clone --depth 1 --branch development \
+        https://github.com/erycaaf/AEB-stellantis-project.git /app/zephyr_aeb/repo
+
+# Patch FSM: enter POST_BRAKE early when v_ego drops below V_EGO_MIN
+# while braking. Tracks issue #95 — see patch_fsm.py for the proposed
+# upstream fix in src/decision/aeb_fsm.c.
 RUN python3 /app/zephyr_aeb/patch_fsm.py /app/zephyr_aeb/repo/src/decision/aeb_fsm.c
 
 # ── Build ─────────────────────────────────────────────────────────────────

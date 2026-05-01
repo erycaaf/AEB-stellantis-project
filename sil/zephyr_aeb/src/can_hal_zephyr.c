@@ -97,6 +97,11 @@ int32_t can_hal_init(uint32_t baud_rate)
 
     LOG_INF("Connecting to CAN TCP bus at %s:%d", host, port);
 
+    /* Note: Zephyr's POSIX subset on native_sim does not expose
+     * getaddrinfo()/<netdb.h>, so the host MUST be a dotted IPv4 literal.
+     * The Docker entrypoint resolves the service name with `getent hosts`
+     * before launching the ECU and exports CAN_TCP_HOST as an IP. */
+
     for (int attempt = 0; attempt < 30; attempt++) {
         sock_fd = socket(AF_INET, SOCK_STREAM, 0);
         if (sock_fd < 0) {

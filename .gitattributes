@@ -1,0 +1,16 @@
+# Force LF line endings on files that must run on Linux containers / SIL.
+# Without this, Windows checkouts with core.autocrlf=true add CRLF, which
+# breaks `#!/usr/bin/env python3` shebangs and shell entrypoints inside Docker.
+
+*.sh   text eol=lf
+*.py   text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+
+# Dockerfiles and compose files: same reasoning.
+Dockerfile*    text eol=lf
+docker-compose.yml text eol=lf
+
+# CMake on Linux is fine with both, but keep LF for consistency in CI.
+*.cmake text eol=lf
+CMakeLists.txt text eol=lf
