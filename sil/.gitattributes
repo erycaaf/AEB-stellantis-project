@@ -1,6 +1,13 @@
 # Force LF line endings on files that must run on Linux containers / SIL.
 # Without this, Windows checkouts with core.autocrlf=true add CRLF, which
-# breaks `#!/usr/bin/env python3` shebangs and shell entrypoints inside Docker.
+# breaks `#!/usr/bin/env python3` shebangs and shell entrypoints inside
+# Docker.
+#
+# Scoped to sil/ on purpose — the rest of the repo's line-ending policy
+# is governed by the user's local git config, and adding repo-wide rules
+# without team agreement is out of scope for the SIL PR. If a future
+# decision promotes these rules to the whole repo, move this file up
+# one directory.
 
 *.sh   text eol=lf
 *.py   text eol=lf

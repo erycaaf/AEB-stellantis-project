@@ -87,8 +87,12 @@ services:
   # ── Zephyr AEB ECU ─────────────────────────────────────────────────────
   aeb-ecu:
     build:
-      context: .
-      dockerfile: docker/Dockerfile.zephyr
+      # Build context is the repo root so the Dockerfile can COPY the AEB
+      # C sources directly from src/, include/, stubs/ — the image is then
+      # bound to whatever code is under review in this PR, not to a
+      # mutable upstream branch.
+      context: ..
+      dockerfile: sil/docker/Dockerfile.zephyr
     container_name: aeb-ecu
     environment:
       - CAN_TCP_HOST=10.99.0.10

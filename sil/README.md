@@ -300,12 +300,15 @@ related PR for the path forward.
    simulated brake hold into a follow-up POST_BRAKE phase in the AEB code
    itself.
 
-3. **`Dockerfile.zephyr` clones the AEB repo from GitHub** (`development`
-   branch — that branch carries the latest robustness work and is ahead
-   of `main`). This still means PR-time SIL builds do not see in-PR
-   changes to `src/`. A future iteration should switch the build context
-   to the repo root and `COPY` local sources so a PR's own modifications
-   are exercised by its own SIL run.
+3. **`Dockerfile.zephyr` builds against the in-tree C sources.** The
+   compose file's `aeb-ecu` service uses `context: ..` (the repo root)
+   and the Dockerfile `COPY`s `src/`, `include/`, and `stubs/` directly
+   into `/app/zephyr_aeb/repo/`. No external `git clone` — rebuilding
+   the image always produces an ECU binary tied to the exact commit
+   under review in the current PR, which is what SIL evidence needs
+   to be auditable. (The previous version cloned the `development`
+   branch at build time; that approach was reverted on Rian's review
+   of #120 because it made the image non-reproducible.)
 
 4. **Zephyr CAN HAL doesn't resolve hostnames.** `can_hal_zephyr.c` uses
    `inet_pton`, so `CAN_TCP_HOST` must be a dotted-IPv4 literal — that's

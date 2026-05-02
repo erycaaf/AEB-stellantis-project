@@ -1,7 +1,21 @@
 #!/usr/bin/env python3
 """
-AEB Dashboard Node (GUI)
-========================
+AEB Dashboard Node (GUI) — DEPRECATED
+=====================================
+
+@deprecated since the SIL PR landed the web dashboard at
+http://localhost:3000 (sil/docker/dashboard/index.html). The web
+dashboard is the supported visualization for the SIL stack: it shows
+the same telemetry plus an embedded Gazebo 3D view, and runs in any
+browser without a desktop matplotlib backend.
+
+This file is kept temporarily to avoid breaking
+`aeb_with_dashboard.launch.py`, which still wires it in for
+contributors who prefer a standalone GUI window. It will be removed
+in a follow-up cleanup PR — do not extend it.
+
+----
+
 Real-time matplotlib dashboard. Shows speedometer, TTC, FSM state,
 brake bar, and alert indicators.
 
