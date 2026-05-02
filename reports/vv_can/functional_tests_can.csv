@@ -1,0 +1,14 @@
+﻿Requirement,Test function,Input,Expected,P/F,Evidence
+FR-CAN-001,can_init,valid state pointer,returns CAN_OK,P,reports/vv_can/logs/test_can.log
+FR-CAN-002,can_tx_fsm_state,FSM_BRAKE_L1,ttc_raw=30,P,reports/vv_can/logs/test_can_struct.log
+FR-CAN-003,can_tx_fsm_state,FSM_BRAKE_L2,ttc_raw=22,P,reports/vv_can/logs/test_can_struct.log
+FR-CAN-004,can_tx_fsm_state,FSM_BRAKE_L3,ttc_raw=18,P,reports/vv_can/logs/test_can_struct.log
+FR-CAN-005,can_tx_brake_cmd,FSM_WARNING,brake_mode=1,P,reports/vv_can/logs/test_can_struct.log
+FR-CAN-006,can_tx_brake_cmd,FSM_BRAKE_L1,brake_mode=2,P,reports/vv_can/logs/test_can_struct.log
+FR-CAN-007,can_tx_brake_cmd,FSM_BRAKE_L3,brake_mode=4,P,reports/vv_can/logs/test_can_struct.log
+NFR-SAF-ROB,fault_initialised,corrupt after init,no functional impact,P,reports/vv_can/fault_injection/run.log
+NFR-SAF-ROB,fault_payload_null,NULL pointer,returns CAN_ERR_TX,P,reports/vv_can/fault_injection/run.log
+NFR-SAF-ROB,fault_hal_fail,HAL send fail,returns CAN_ERR_TX,P,reports/vv_can/fault_injection/run.log
+NFR-SAF-ROB,encode_unsigned_neg,negative pressure,clamped to 0,P,reports/vv_can/logs/test_can_struct.log
+NFR-MEM-001,valgrind_check,nominal suite,0 leaks / 0 errors,P,reports/vv_can/memory_safety/valgrind_test_can.log
+NFR-MIS-001,cppcheck_scan,aeb_can.c,linked to Issue #74,P,reports/vv_can/misra/run.log

@@ -1,0 +1,1 @@
+genhtml reports/vv_can/coverage_mcdc/can.info --output-directory reports/vv_can/coverage_mcdc/ --branch-coverage --legend --title 'CAN Coverage'
