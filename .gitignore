@@ -58,6 +58,13 @@ reports/vv_can/misra_html/
 reports/vv_can/memory_html/
 reports/vv_can/fault_html/
 
+# V&V generated artifacts — CAN
+reports/vv_can/coverage_mcdc/*.info
+reports/vv_can/coverage_mcdc/*.png
+reports/vv_can/coverage_mcdc/html/
+reports/vv_can/coverage_mcdc/report.html
+reports/vv_can/misra/html/
+
 # Consolidated V&V reports live in the team docs area, not in the repo
 reports/vv_uds/*.tex
 reports/vv_uds/*.pdf

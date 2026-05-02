@@ -82,7 +82,37 @@ jobs:
       - name: Gate 1 — MC/DC coverage (gate ≥ 95%)
         run: |
           make mcdc-can
-          # Logic to parse coverage.xml remains the same as your previous version
+          XML="reports/vv_can/coverage_mcdc/coverage.xml"
+          if [ ! -s "$XML" ]; then
+            echo "::error title=Coverage::coverage.xml not produced by mcdc-can"
+            exit 1
+          fi
+          read LINE BRCH MCDC < <(python3 - <<PY
+          import re, xml.etree.ElementTree as ET
+          root = ET.parse("$XML").getroot()
+          line = float(root.get("line-rate", "0")) * 100.0
+          brch = float(root.get("branch-rate", "0")) * 100.0
+          tot = 0; hit = 0
+          for ln in root.iter("line"):
+              cc = ln.get("condition-coverage")
+              if not cc:
+                  continue
+              m = re.search(r"\((\d+)/(\d+)\)", cc)
+              if m:
+                  hit += int(m.group(1))
+                  tot += int(m.group(2))
+          mcdc = (hit / tot * 100.0) if tot else 100.0
+          print(f"{line:.2f} {brch:.2f} {mcdc:.2f}")
+          PY
+          )
+          echo "CAN coverage — stmt=${LINE}% branch=${BRCH}% mcdc=${MCDC}%"
+          for metric in "Statement:$LINE" "Branch:$BRCH" "MC/DC:$MCDC"; do
+            name="${metric%%:*}"; value="${metric##*:}"
+            if [ "$(echo "$value < 95.0" | bc -l)" = "1" ]; then
+              echo "::error title=CAN coverage regression::${name} dropped to ${value}% (required ≥95%)"
+              exit 1
+            fi
+          done
 
       - name: Gate 2 — Memory safety (Valgrind + ASan + UBSan)
         run: |
@@ -108,8 +138,40 @@ jobs:
       - name: Step summary
         if: always()
         run: |
-          echo "## CAN V&V — run #${{ github.run_number }}" >> "$GITHUB_STEP_SUMMARY"
-          # Summary logic follows your pattern
+          {
+            echo "## CAN V&V — run #${{ github.run_number }}"
+            echo ""
+            if [ "${{ github.event_name }}" = "push" ]; then
+              echo "📊 **Browse reports:** https://erycaaf.github.io/AEB-stellantis-project/vv_can/${{ github.ref_name }}/"
+              echo ""
+            fi
+            echo "### Structural coverage (merged nominal + structural + fault)"
+            echo '```'
+            cat reports/vv_can/coverage_mcdc/coverage_summary.txt 2>/dev/null \
+              || cat reports/vv_can/coverage_mcdc/gcov_summary.txt 2>/dev/null \
+              || echo "(coverage summary not produced)"
+            echo '```'
+            echo ""
+            echo "### Fault injection"
+            echo '```'
+            tail -5 reports/vv_can/fault_injection/run.log 2>/dev/null \
+              || echo "(no fault log)"
+            echo '```'
+            echo ""
+            echo "### Memory safety"
+            for f in reports/vv_can/memory_safety/*.log; do
+              [ -e "$f" ] || continue
+              name=$(basename "$f")
+              if [ -s "$f" ]; then
+                echo "**${name}:**"
+                echo '```'
+                head -20 "$f"
+                echo '```'
+              else
+                echo "**${name}:** _clean_"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artefacts
         if: always()
