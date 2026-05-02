@@ -735,9 +735,10 @@ mcdc-can:
 	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_struct_cov \
 		$(SRC_CAN_STRUCT_TEST) $(LDFLAGS)
 	cd $(VV_REPORT_DIR)/coverage_mcdc && \
-		./test_can_cov        > $(VV_REPORT_DIR)/coverage_mcdc/run_nominal.log 2>&1 ; \
-		./test_can_fault_cov  > $(VV_REPORT_DIR)/coverage_mcdc/run_fault.log   2>&1 ; \
-		./test_can_struct_cov > $(VV_REPORT_DIR)/coverage_mcdc/run_struct.log  2>&1
+		./test_can_cov        > run_nominal.log 2>&1 ; \
+		./test_can_fault_cov  > run_fault.log   2>&1 ; \
+		./test_can_struct_cov > run_struct.log  2>&1 ; \
+		cd -
 	@echo "--- Nominal suite ---"
 	@grep -E "Results|passed" $(VV_REPORT_DIR)/coverage_mcdc/run_nominal.log || true
 	@echo "--- Structural complementary suite ---"
@@ -846,9 +847,11 @@ html-can:
 	lcov --capture --directory $(VV_REPORT_DIR)/coverage_mcdc \
 		--gcov-tool $(GCOV) \
 		--rc branch_coverage=1 \
+		--ignore-errors inconsistent \
 		--output-file $(VV_REPORT_DIR)/coverage_html/coverage.info
 	lcov --extract $(VV_REPORT_DIR)/coverage_html/coverage.info '*aeb_can.c' \
 		--rc branch_coverage=1 \
+		--ignore-errors inconsistent \
 		--output-file $(VV_REPORT_DIR)/coverage_html/coverage_can.info
 	genhtml $(VV_REPORT_DIR)/coverage_html/coverage_can.info \
 		--branch-coverage \
