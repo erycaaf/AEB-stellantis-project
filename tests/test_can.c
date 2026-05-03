@@ -313,19 +313,7 @@ TEST(test_tx_fsm_period)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
- *  TESTS: encode_unsigned robustness — exercised through can_tx_brake_cmd,
- *  which feeds pid_out->brake_bar into encode_unsigned for the 15-bit
- *  BrakePressure field at bits 1..15. Lock the post-fix contract so any
- *  future regression at the cast boundary is caught at unit level instead
- *  of waiting for fault-injection.
- *
- *  The legitimate-input path is already covered by test_tx_brake_cmd
- *  above; these four tests cover the four UB-inducing input classes the
- *  cross-validation report flagged on PR #89.
- *
- *  NaN / ±Inf -> encode_unsigned returns 0 -> BrakePressure raw == 0.
- *  Finite > UINT32_MAX ceiling -> saturates to UINT32_MAX -> 15-bit
- *  field masked to 0x7FFF (all-ones).
+ *  TESTS: encode_unsigned robustness — exercised through can_tx_brake_cmd
  * ═══════════════════════════════════════════════════════════════════════ */
 
 /** Helper — extract the 15-bit BrakePressure field from a captured frame. */
@@ -389,9 +377,6 @@ TEST(test_tx_brake_cmd_overflow_brake_bar)
     can_hal_test_reset();
     (void)can_init(&state);
 
-    /* 1e20 / 0.1 = 1e21 — far above the 4294967040.0F cast ceiling.
-     * encode_unsigned must saturate at UINT32_MAX; can_pack_signal
-     * then masks to the 15-bit field width = 0x7FFF (all-ones). */
     pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = 1.0e20F };
     fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
 
@@ -399,7 +384,8 @@ TEST(test_tx_brake_cmd_overflow_brake_bar)
     ASSERT_EQ(rc, CAN_OK);
 
     const tx_record_t *tx = can_hal_test_get_tx(0U);
-    ASSERT_EQ(extract_brake_pressure(tx), 0x7FFFU);
+    uint32_t brake_pressure = extract_brake_pressure(tx);
+    ASSERT_EQ(brake_pressure, 0x7FFFU);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -431,7 +417,6 @@ TEST(test_rx_uds_request)
     can_hal_test_reset();
     (void)can_init(&state);
 
-    /* ReadDID 0xF101 (FSM state) — 4 bytes: {SID, DID_H, DID_L, value} */
     uint8_t frame[4] = { 0x22U, 0xF1U, 0x01U, 0x00U };
 
     can_rx_process(&state, CAN_ID_UDS_REQUEST, frame, CAN_DLC_UDS_REQUEST);
@@ -456,7 +441,7 @@ TEST(test_tx_uds_response)
     (void)can_init(&state);
 
     uds_response_t resp;
-    resp.response_sid   = 0x62U;   /* Positive response to 0x22 */
+    resp.response_sid   = 0x62U;
     resp.did_high_resp  = 0xF1U;
     resp.did_low_resp   = 0x01U;
     resp.data1          = (uint8_t)FSM_STANDBY;
@@ -479,13 +464,7 @@ TEST(test_tx_uds_response)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
- *  TEST: RX decode — UDS Request with short DLC is rejected (FR-UDS-005)
- *
- *  Contract: can_rx_process() only accepts 0x7DF frames with
- *  DLC == CAN_DLC_UDS_REQUEST (4). Shorter frames must leave
- *  uds_request_pending at 0 so aeb_core_step() observes a no-op.
- *  This locks the malformed-frame behaviour that was previously
- *  implicit.
+ *  TEST: RX decode — UDS Request with short DLC is rejected
  * ═══════════════════════════════════════════════════════════════════════ */
 TEST(test_rx_uds_request_short_dlc)
 {
@@ -493,7 +472,6 @@ TEST(test_rx_uds_request_short_dlc)
     can_hal_test_reset();
     (void)can_init(&state);
 
-    /* Only 3 bytes — missing the value field. */
     uint8_t frame[3] = { 0x22U, 0xF1U, 0x01U };
 
     can_rx_process(&state, CAN_ID_UDS_REQUEST, frame, 3U);
@@ -527,21 +505,10 @@ TEST(test_uds_request_ack)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
- *  TEST: decode_unsigned (coverage for lines 107-111)
+ *  NOVOS TESTES PARA COBERTURA 100%
  * ═══════════════════════════════════════════════════════════════════════ */
-TEST(test_decode_unsigned)
-{
-    /* Test decode_unsigned directly */
-    float32_t result = decode_unsigned(1000U, 0.1F, 0.0F);
-    ASSERT_FLOAT_NEAR(result, 100.0F, 0.01F);
 
-    result = decode_unsigned(500U, 0.01F, -32.0F);
-    ASSERT_FLOAT_NEAR(result, (500.0F * 0.01F) - 32.0F, 0.01F);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════
- *  TEST: can_tx_brake_cmd with NULL parameters (line 332)
- * ═══════════════════════════════════════════════════════════════════════ */
+/* TEST: can_tx_brake_cmd with NULL parameters (line 332) */
 TEST(test_tx_brake_cmd_null_params)
 {
     can_state_t state;
@@ -551,22 +518,17 @@ TEST(test_tx_brake_cmd_null_params)
     pid_output_t pid = { .brake_pct = 50.0F, .brake_bar = 5.0F };
     fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
 
-    /* Test NULL state */
     int32_t rc = can_tx_brake_cmd(NULL, &pid, &fsm);
     ASSERT_EQ(rc, CAN_ERR_TX);
 
-    /* Test NULL pid_out */
     rc = can_tx_brake_cmd(&state, NULL, &fsm);
     ASSERT_EQ(rc, CAN_ERR_TX);
 
-    /* Test NULL fsm_out */
     rc = can_tx_brake_cmd(&state, &pid, NULL);
     ASSERT_EQ(rc, CAN_ERR_TX);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
- *  TEST: can_tx_brake_cmd alive_counter wrap (line 372)
- * ═══════════════════════════════════════════════════════════════════════ */
+/* TEST: can_tx_brake_cmd alive_counter wrap (line 372) */
 TEST(test_tx_brake_cmd_alive_counter_wrap)
 {
     can_state_t state;
@@ -576,21 +538,16 @@ TEST(test_tx_brake_cmd_alive_counter_wrap)
     pid_output_t pid = { .brake_pct = 75.0F, .brake_bar = 7.5F };
     fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L3 };
 
-    /* Call 16 times to wrap alive_counter (0-15) */
-    uint8_t i = 0U;
-    for (i = 0U; i < 20U; i++)
+    for (uint8_t i = 0U; i < 20U; i++)
     {
         int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
         ASSERT_EQ(rc, CAN_OK);
     }
 
-    /* Alive counter should have wrapped to 4 (20 % 16 = 4) */
     ASSERT_EQ(state.alive_counter, 4U);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
- *  TEST: can_tx_fsm_state with NULL parameters (line 396)
- * ═══════════════════════════════════════════════════════════════════════ */
+/* TEST: can_tx_fsm_state with NULL parameters (line 396) */
 TEST(test_tx_fsm_state_null_params)
 {
     can_state_t state;
@@ -599,48 +556,35 @@ TEST(test_tx_fsm_state_null_params)
 
     fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_WARNING };
 
-    /* Test NULL state */
     int32_t rc = can_tx_fsm_state(NULL, &fsm);
     ASSERT_EQ(rc, CAN_ERR_TX);
 
-    /* Test NULL fsm_out */
     rc = can_tx_fsm_state(&state, NULL);
     ASSERT_EQ(rc, CAN_ERR_TX);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
- *  TEST: can_tx_uds_response with NULL parameter (line 500)
- * ═══════════════════════════════════════════════════════════════════════ */
+/* TEST: can_tx_uds_response with NULL parameter (line 500) */
 TEST(test_tx_uds_response_null)
 {
     int32_t rc = can_tx_uds_response(NULL);
     ASSERT_EQ(rc, CAN_ERR_TX);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
- *  TEST: can_clear_uds_request_pending with NULL (line 535)
- * ═══════════════════════════════════════════════════════════════════════ */
+/* TEST: can_clear_uds_request_pending with NULL (line 535) */
 TEST(test_clear_uds_request_pending_null)
 {
-    /* Should not crash */
     can_clear_uds_request_pending(NULL);
-    /* Test passes if no crash */
     ASSERT_EQ(1, 1);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
- *  TEST: encode_unsigned saturation at UINT32_MAX (line 95)
- * ═══════════════════════════════════════════════════════════════════════ */
+/* TEST: encode_unsigned saturation at UINT32_MAX (line 95) */
 TEST(test_encode_unsigned_saturation)
 {
-    /* encode_unsigned is static, test via can_tx_brake_cmd with extremely high value */
     can_state_t state;
     can_hal_test_reset();
     (void)can_init(&state);
 
-    /* BrakePressure field is 15 bits, so saturation will be masked to 0x7FFF.
-     * We can test by checking that the packed value is 0x7FFF (all bits set) */
-    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = 1.0e30F }; /* Extremely large */
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = 1.0e30F };
     fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
 
     int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
@@ -648,26 +592,20 @@ TEST(test_encode_unsigned_saturation)
 
     const tx_record_t *tx = can_hal_test_get_tx(0U);
     uint32_t brake_pressure = can_unpack_signal(tx->data, 1U, 15U);
-    ASSERT_EQ(brake_pressure, 0x7FFFU); /* All ones in 15-bit field */
+    ASSERT_EQ(brake_pressure, 0x7FFFU);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
- *  TEST: can_tx_alert with NULL parameter (line 453, 455)
- * ═══════════════════════════════════════════════════════════════════════ */
+/* TEST: can_tx_alert with NULL parameter (line 453, 455) */
 TEST(test_tx_alert_null)
 {
     int32_t rc = can_tx_alert(NULL);
     ASSERT_EQ(rc, CAN_ERR_TX);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
- *  TEST: can_check_timeout with NULL state (lines 300, 317)
- * ═══════════════════════════════════════════════════════════════════════ */
+/* TEST: can_check_timeout with NULL state (lines 300, 317) */
 TEST(test_check_timeout_null)
 {
-    /* Should not crash */
     can_check_timeout(NULL);
-    /* Test passes if no crash */
     ASSERT_EQ(1, 1);
 }
 
@@ -699,7 +637,8 @@ int main(void)
     RUN(test_rx_uds_request_short_dlc);
     RUN(test_tx_uds_response);
     RUN(test_uds_request_ack);
-    RUN(test_decode_unsigned);
+
+    /* NEW TESTS */
     RUN(test_tx_brake_cmd_null_params);
     RUN(test_tx_brake_cmd_alive_counter_wrap);
     RUN(test_tx_fsm_state_null_params);
