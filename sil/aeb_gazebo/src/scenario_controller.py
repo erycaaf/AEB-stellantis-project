@@ -316,15 +316,13 @@ class ScenarioController(Node):
         if self.aeb_enabled and brake_pct > 1.0:
             self.ego_vx_cmd = max(0.0, self.ego_vx_cmd - brake_decel * dt)
             self.ego_has_braked = True
-        elif self.ego_has_braked and self.ego_vx_cmd > self.target_vx + 0.1:
-            # AEB has released but the ego is still closing on the target.
-            # Gazebo has no friction model in this world, so simulate a
-            # 2 m/s² coast-decel until the ego matches the target speed
-            # (CCRs: target_vx=0 → coast to a complete stop;
-            #  CCRm/CCRb: settle at the target's velocity).
-            self.ego_vx_cmd = max(0.0, self.ego_vx_cmd - 2.0 * dt)
         elif not self.ego_has_braked:
             self.ego_vx_cmd = self.ego_speed_ms
+        # else: AEB has released; hold ego_vx_cmd at its last value. With
+        # PR #121's brake-hold-below-V_EGO_MIN fix on the Zephyr ECU, the
+        # FSM keeps decel_target > 0 via the distance-floor logic until
+        # v_ego < V_STOP_THRESHOLD, at which point POST_BRAKE takes over.
+        # No SIL-side coast-decel hack is needed.
 
         self.publish_vel(self.ego_cmd_pub, self.ego_vx_cmd)
 

@@ -143,7 +143,18 @@ class PerceptionNode(Node):
     # ── Sensor simulation ──────────────────────────────────────────────────
 
     def _simulate_sensor(self, gt_dist, range_min, range_max, noise_std, fail_param):
-        """Simulate one sensor reading with noise and fault injection."""
+        """Simulate one sensor reading with noise and fault injection.
+
+        Noise model:
+          - default: sigma = `noise_sigma_d` parameter (single global value
+            applied identically to radar and lidar, so the Kalman fusion
+            sees perfectly-correlated readings — useful for nominal runs).
+          - CAN_SIL_NOISE=1 in the gazebo container env: sigma is the
+            per-sensor `noise_std` argument (radar = 0.25 m, lidar =
+            0.05 m), so the two sensors disagree by realistic amounts.
+            That actually stresses the fusion's plausibility / cross-
+            sensor-tolerance branches in `_fuse_sensors`.
+        """
         fail = self.get_parameter(fail_param).value
         fi = self.get_parameter('fault_inject').value
 
@@ -151,8 +162,13 @@ class PerceptionNode(Node):
             return None
 
         if range_min <= gt_dist <= range_max:
-            sigma = self.get_parameter('noise_sigma_d').value
-            return gt_dist + random.gauss(0, sigma if sigma > 0 else noise_std)
+            if os.environ.get('CAN_SIL_NOISE') == '1':
+                sigma = noise_std
+            else:
+                sigma = self.get_parameter('noise_sigma_d').value
+                if sigma <= 0:
+                    sigma = noise_std
+            return gt_dist + random.gauss(0, sigma)
         return None
 
     def _fuse_sensors(self, gt_dist):

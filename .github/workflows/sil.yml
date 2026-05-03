@@ -81,6 +81,31 @@ jobs:
           cache-from: type=gha,scope=sil-canbridge
           cache-to: type=gha,scope=sil-canbridge,mode=max
 
+  build-zephyr-setup:
+    # Structural-only build of Dockerfile.zephyr — stops at the
+    # `zephyr-setup` stage so we exercise apt install, COPY paths
+    # (src/ include/ stubs/ + sil/zephyr_aeb), `west init` /
+    # `west update`, and the pip requirements pull, but skip the
+    # ~3-5 min `west build` step. Catches Dockerfile syntax / COPY
+    # regressions without exceeding the hosted-runner budget.
+    name: docker build (zephyr-setup)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build zephyr-setup target
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: sil/docker/Dockerfile.zephyr
+          target: zephyr-setup
+          push: false
+          cache-from: type=gha,scope=sil-zephyr-setup
+          cache-to: type=gha,scope=sil-zephyr-setup,mode=max
+
   python-lint:
     name: python lint
     runs-on: ubuntu-latest

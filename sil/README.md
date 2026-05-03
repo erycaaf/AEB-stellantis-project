@@ -43,7 +43,7 @@ frames between the perception, ECU, and scenario containers.
 ```
 perception_node ──► canbus ──► aeb-ecu ──► canbus ──► scenario_controller
                                   │
-                                  └─► dashboard_node (state, alerts, brake %)
+                                  └─► nginx :3000 (web dashboard, live telemetry)
 ```
 
 The Zephyr ECU runs the **same C code** that ships in this repository
@@ -136,6 +136,22 @@ Definitive list lives in [`aeb_gazebo/config/scenarios.yaml`](aeb_gazebo/config/
 The same dict is mirrored in `aeb_gazebo/src/scenario_controller.py` and the
 launch file — keep them in sync.
 
+### Stress-mode sensor noise (`CAN_SIL_NOISE`)
+
+By default, `perception_node.py` applies the same `noise_sigma_d`
+parameter to both radar and lidar, so the Kalman fusion sees
+perfectly-correlated readings — fine for nominal validation runs.
+Setting `CAN_SIL_NOISE=1` on the gazebo container switches to
+**per-sensor** noise (radar = 0.25 m σ, lidar = 0.05 m σ), which
+exercises the fusion's plausibility / cross-sensor-tolerance branches
+in `_fuse_sensors`. Useful when investigating sensor-disagreement
+robustness:
+
+```bash
+CAN_SIL_NOISE=1 sudo docker compose up --build
+# or via the compose file: add `- CAN_SIL_NOISE=1` to gazebo's environment
+```
+
 ---
 
 ## Setup on a fresh Windows + WSL machine
@@ -220,11 +236,10 @@ sil/
 │   ├── config/scenarios.yaml  preset definitions (ego speed, target speed, gap, …)
 │   ├── launch/*.launch.py     scenario launchers
 │   ├── models/                SDF wrapper models for ego + target vehicles
-│   ├── msg/                   AEB_*.msg type definitions
+│   ├── msg/                   Aeb*.msg type definitions
 │   ├── src/                   ROS 2 nodes:
 │   │                            scenario_controller (drives ego/target, end criteria)
 │   │                            perception_node     (radar + lidar fusion → CAN)
-│   │                            dashboard_node      (legacy matplotlib panel)
 │   │                            can_tcp_client      (Python TCP CAN client)
 │   └── worlds/aeb_highway.world  3-lane road + rural scenery (houses, gas station,
 │                                  trees, cow, guardrail, dirt drives, distance markers)
@@ -278,29 +293,7 @@ related PR for the path forward.
 
 ## Known limitations and follow-up work
 
-1. **`patch_fsm.py` modifies `aeb_fsm.c` at build time** (tracks
-   [#95](https://github.com/erycaaf/AEB-stellantis-project/issues/95)).
-   The patch makes the FSM enter `POST_BRAKE` as soon as the ego drops
-   below `V_EGO_MIN` while braking, instead of forcing `STANDBY` and
-   releasing the brakes. The proper fix is to re-shape the Priority 3
-   speed-range branch in `src/decision/aeb_fsm.c` so the case "actively
-   braking, speed has dipped below `V_EGO_MIN`" no longer falls into the
-   `else { FSM_STANDBY; }` clear-everything block — see
-   [`zephyr_aeb/patch_fsm.py`](zephyr_aeb/patch_fsm.py) for the exact
-   replacement. Once that lands and is re-validated, delete `patch_fsm.py`
-   and the `RUN python3 /app/zephyr_aeb/patch_fsm.py …` step in
-   `Dockerfile.zephyr`.
-
-2. **Coast-decel hack in `scenario_controller.py`.** Gazebo's
-   `gazebo_ros_planar_move` plugin has no friction model, so an ego with
-   non-zero `cmd_vel` rolls forever. After the AEB releases the brake we
-   manually decelerate at 2 m/s² until the ego matches the target's speed
-   (zero for CCRs, target's speed for CCRm/CCRb). Removing this requires
-   either adding wheel/contact friction to the world or moving the
-   simulated brake hold into a follow-up POST_BRAKE phase in the AEB code
-   itself.
-
-3. **`Dockerfile.zephyr` builds against the in-tree C sources.** The
+1. **`Dockerfile.zephyr` builds against the in-tree C sources.** The
    compose file's `aeb-ecu` service uses `context: ..` (the repo root)
    and the Dockerfile `COPY`s `src/`, `include/`, and `stubs/` directly
    into `/app/zephyr_aeb/repo/`. No external `git clone` — rebuilding
@@ -310,19 +303,22 @@ related PR for the path forward.
    branch at build time; that approach was reverted on Rian's review
    of #120 because it made the image non-reproducible.)
 
-4. **Zephyr CAN HAL doesn't resolve hostnames.** `can_hal_zephyr.c` uses
+2. **Zephyr CAN HAL doesn't resolve hostnames.** `can_hal_zephyr.c` uses
    `inet_pton`, so `CAN_TCP_HOST` must be a dotted-IPv4 literal — that's
    why the compose file pins a static IP for the canbus service. If
    Zephyr's POSIX subset gains `getaddrinfo`, the static-IP requirement
    can go away.
 
-5. **`/reset_world` doesn't fully zero the planar_move plugin's odom
+3. **`/reset_world` doesn't fully zero the planar_move plugin's odom
    integrator.** As a result the controller now teleports both vehicles
    itself via `set_entity_state` on every restart, with their `Twist`
    zeroed. If a future Gazebo Classic version fixes this we can drop the
    manual teleport.
 
-6. **No headless scenario runner in CI.** Only the build-time smoke gate
-   runs in CI. A future workflow could spawn the ECU + canbus services
-   without Gazebo and replay a recorded perception trace, comparing FSM
-   transitions against a golden log.
+4. **No headless scenario runner in CI.** Build-time CI gate covers
+   `docker compose config`, hadolint, ruff, shellcheck, and `docker build`
+   for the small images (api, canbridge) plus a structural-only build of
+   `Dockerfile.zephyr` (Zephyr SDK pull + west update, no `west build`).
+   A future workflow could spawn the ECU + canbus services without Gazebo
+   and replay a recorded perception trace, comparing FSM transitions
+   against a golden log.

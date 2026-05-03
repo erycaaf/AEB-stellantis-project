@@ -32,7 +32,6 @@ install(PROGRAMS
   src/aeb_node.py
   src/scenario_controller.py
   src/target_vehicle_controller.py
-  src/dashboard_node.py
   src/dashboard_overlay.py
   src/perception_node.py
   DESTINATION lib/${PROJECT_NAME}

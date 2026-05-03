@@ -30,14 +30,11 @@ graph LR
     PERC -->|distance, TTC,<br/>speed| AEB[aeb_node<br/><i>FSM + braking</i>]
     AEB -->|brake_cmd| SC[scenario_controller<br/><i>vehicle control</i>]
     SC -->|cmd_vel| GZ
-    PERC -->|data| DASH[dashboard_node<br/><i>matplotlib (legacy)</i>]
-    AEB -->|FSM state,<br/>alerts| DASH
 
     style GZ fill:#2196F3,color:#fff
     style PERC fill:#FF9800,color:#fff
     style AEB fill:#F44336,color:#fff
     style SC fill:#4CAF50,color:#fff
-    style DASH fill:#9C27B0,color:#fff
 ```
 
 ### ROS 2 nodes
@@ -47,7 +44,6 @@ graph LR
 | `scenario_controller.py` | Drives both vehicles, reads brake commands from CAN, detects scenario end conditions. |
 | `perception_node.py`     | Simulated radar (77 GHz, σ = 0.25 m) + lidar (σ = 0.05 m) with sensor fusion, plausibility check (FR-PER-006), and fault detection (FR-PER-007). |
 | `aeb_node.py`            | Reference Python AEB controller (FSM-based: STANDBY → WARNING → BRAKE_L1/L2/L3 → POST_BRAKE) with TTC thresholds per UNECE R152. **Not used in the SIL stack** — there the FSM runs on the Zephyr ECU. Kept here for standalone testing. |
-| `dashboard_node.py`      | **Deprecated.** Matplotlib panel: speedometer, TTC bar, FSM state, brake indicator, alerts. Superseded by the web dashboard at `http://localhost:3000` in the SIL stack. |
 
 ### Scenarios
 
@@ -116,10 +112,7 @@ sudo apt install -y ros-humble-desktop
 sudo apt install -y \
   python3-colcon-common-extensions \
   ros-humble-gazebo-ros-pkgs \
-  python3-pip \
-  python3-pyqt5
-
-pip3 install matplotlib
+  python3-pip
 
 # Source ROS 2 from your shell
 echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
@@ -184,11 +177,10 @@ ros2 launch aeb_gazebo aeb_with_dashboard.launch.py scenario:=ccrs_40
 
 1. **Gazebo window** — 3D view of the road with the ego vehicle (blue
    hatchback) and the target vehicle (SUV).
-2. **Dashboard window** — real-time matplotlib panel with speedometer,
-   TTC, FSM state, brake indicator, and visual / audible alerts;
-   includes a **RESTART** button. Note: this dashboard is the legacy
-   path, deprecated in favour of the web dashboard (`:3000`) when the
-   full SIL stack is running.
+2. Telemetry on the ROS 2 topics listed below — view with
+   `ros2 topic echo /aeb/<topic>`. The standalone flow has no GUI
+   panel of its own; the supported visualisation in the SIL stack is
+   the web dashboard at `http://localhost:3000`.
 
 ---
 
@@ -237,15 +229,6 @@ wsl --update
    ```bash
    killall -9 gzserver gzclient 2>/dev/null
    ```
-
-### Dashboard crashes (SIGSEGV)
-
-Install the Qt5 backend for matplotlib:
-
-```bash
-sudo apt install -y python3-pyqt5
-pip3 install PyQt5
-```
 
 ### `python3\r: No such file or directory`
 
