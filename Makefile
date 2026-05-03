@@ -41,7 +41,7 @@
 #   make fault-can         — systematic fault-injection suite
 #   make memory-can        — Valgrind + ASan + UBSan on CAN suites
 #   make misra-can         — cppcheck MISRA scoped to aeb_can.{c,h}
-#   make html-can          — navigable HTML reports (lcov genhtml + cppcheck-htmlreport + wrappers)
+#   make html-can          — navigable HTML reports (gcovr + cppcheck-htmlreport + wrappers)
 #   make vv-can            — full V&V stack
 #
 # V&V artefacts land under reports/vv_<module>/. Consolidated reports
@@ -893,17 +893,23 @@ vv-clean:
 	       reports/vv_perception/fault_injection/test_perception* \
 	       reports/vv_perception/memory_safety/test_perception* \
 	       reports/vv_can/coverage_mcdc/test_can* \
+	       reports/vv_can/coverage_mcdc/test_can_fault* \
+	       reports/vv_can/coverage_mcdc/test_can_struct* \
 	       reports/vv_can/coverage_mcdc/*.gcda \
 	       reports/vv_can/coverage_mcdc/*.gcno \
 	       reports/vv_can/coverage_mcdc/*.gcov \
-	       reports/vv_can/coverage_mcdc/html \
+	       reports/vv_can/coverage_mcdc/report.*.html \
+	       reports/vv_can/coverage_mcdc/report.css \
+	       reports/vv_can/coverage_mcdc/*.info \
+	       reports/vv_can/coverage_mcdc/*.png \
+	       reports/vv_can/coverage_mcdc/html/ \
+	       reports/vv_can/coverage_mcdc/communication/ \
 	       reports/vv_can/fault_injection/test_can* \
 	       reports/vv_can/memory_safety/test_can* \
-	       reports/vv_can/coverage_html \
-	       reports/vv_can/misra_html \
-	       reports/vv_can/memory_html \
-	       reports/vv_can/fault_html \
-	       reports/vv_can/misra
+	       reports/vv_can/coverage_html/ \
+	       reports/vv_can/misra_html/ \
+	       reports/vv_can/memory_html/ \
+	       reports/vv_can/fault_html/
 	rm -f test_can_exe test_can_exe-* \
 	      test_can_fault_exe test_can_fault_exe-* \
 	      test_can_struct_exe test_can_struct_exe-* \
