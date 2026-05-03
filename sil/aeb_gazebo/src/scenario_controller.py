@@ -300,33 +300,11 @@ class ScenarioController(Node):
         elapsed = time.time() - self.start_time
         dt = 0.01
 
-        # Realistic acceleration cap. The Zephyr ECU's perception module
-        # rejects radar / lidar frames whose v_rel changes by more than
-        # VEL_ROC_LIMIT (2.0 m/s per 10 ms cycle) — see
-        # `radar_fault_detect` in src/perception/aeb_perception.c. A naive
-        # step-change of cmd_vel from 0 to ego_speed_ms in one cycle
-        # generates an unphysical v_rel slope (~1100 m/s²) and trips that
-        # detector, which latches AEB_FAULT_RADAR / AEB_FAULT_LIDAR and
-        # forces the FSM into FR-FSM-002 OFF. 3.0 m/s² is a comfortable
-        # passenger-car launch and keeps |Δv_rel| ≈ 0.03 m/s/cycle, well
-        # under the 2.0 m/s/cycle limit.
-        EGO_MAX_ACCEL = 3.0       # m/s²
-        TARGET_MAX_ACCEL = 3.0    # m/s²
-
         # Target vehicle motion
         if self.target_decel != 0.0 and elapsed >= self.target_brake_time:
-            # Braking phase — use the scenario-defined deceleration directly.
             self.target_vx_cmd = max(0.0, self.target_vx_cmd + self.target_decel * dt)
         else:
-            # Acceleration phase — ramp toward the scenario's nominal speed
-            # at a realistic rate so radar v_rel stays inside ROC limits.
-            target_setpoint = self.target_speed_ms
-            if self.target_vx_cmd < target_setpoint:
-                self.target_vx_cmd = min(target_setpoint,
-                                         self.target_vx_cmd + TARGET_MAX_ACCEL * dt)
-            elif self.target_vx_cmd > target_setpoint:
-                self.target_vx_cmd = max(target_setpoint,
-                                         self.target_vx_cmd - TARGET_MAX_ACCEL * dt)
+            self.target_vx_cmd = self.target_speed_ms
         self.publish_vel(self.target_cmd_pub, self.target_vx_cmd)
 
         # Ego: apply brake from Zephyr ECU (0-100% → 0-10 m/s²)
@@ -339,11 +317,7 @@ class ScenarioController(Node):
             self.ego_vx_cmd = max(0.0, self.ego_vx_cmd - brake_decel * dt)
             self.ego_has_braked = True
         elif not self.ego_has_braked:
-            # Ramp toward ego_speed_ms instead of stepping — see comment
-            # at the top of control_loop on the perception ROC limit.
-            if self.ego_vx_cmd < self.ego_speed_ms:
-                self.ego_vx_cmd = min(self.ego_speed_ms,
-                                      self.ego_vx_cmd + EGO_MAX_ACCEL * dt)
+            self.ego_vx_cmd = self.ego_speed_ms
         # else: AEB has released; hold ego_vx_cmd at its last value. With
         # PR #121's brake-hold-below-V_EGO_MIN fix on the Zephyr ECU, the
         # FSM keeps decel_target > 0 via the distance-floor logic until
