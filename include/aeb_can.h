@@ -112,8 +112,7 @@ typedef struct
 {
     uint8_t   alive_counter;       /**< 4-bit TX rolling counter         */
     uint8_t   rx_miss_count;       /**< Consecutive missed RX frames     */
-    uint32_t  tx_cycle_counter;    /**< Counts 10 ms ticks for FSM TX    */
-    uint32_t  tx_ego_counter;      /**< Counts 10 ms ticks for ego TX    */
+    uint32_t  tx_cycle_counter;    /**< Counts 10 ms ticks for 50 ms TX  */
     uint8_t   initialised;         /**< 1 after successful can_init()    */
     can_rx_data_t  last_rx;        /**< Most recent decoded RX data      */
 } can_state_t;
@@ -200,28 +199,6 @@ int32_t can_tx_fsm_state(can_state_t       *state,
  * @req FR-CAN-003  DBC signal encoding.
  */
 int32_t can_tx_alert(const alert_output_t *alert_out);
-
-/**
- * @brief Transmit AEB_EgoVehicle (0x100) every 50 ms.
- *
- * Broadcasts ego dynamics (processed speed from Perception, plus
- * longitudinal acceleration, yaw rate and steering angle received
- * from the vehicle bus) so that other nodes can consume them.
- *
- * DBC layout — AEB_EgoVehicle (0x100), DLC 8:
- *   VehicleSpeed   bits  0..15  factor 0.01   offset    0
- *   LongAccel      bits 16..31  factor 0.001  offset  -32
- *   YawRate        bits 32..47  factor 0.01   offset -327.68
- *   SteeringAngle  bits 48..63  factor 0.1    offset -3276.8
- *
- * @param[in,out] state  Module state (ego TX counter incremented).
- * @param[in]     perc   Perception output — provides processed v_ego.
- * @return CAN_OK if transmitted, 1 if not yet due, CAN_ERR_TX on failure.
- *
- * @req FR-CAN-001  Transmit ego dynamics at 50 ms cadence.
- */
-int32_t can_tx_ego_vehicle(can_state_t               *state,
-                           const perception_output_t *perc);
 
 /**
  * @brief Get a copy of the latest decoded RX data.

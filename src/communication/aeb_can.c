@@ -476,64 +476,6 @@ int32_t can_tx_alert(const alert_output_t *alert_out)
 }
 
 /**
- * @brief Transmit AEB_EgoVehicle (0x100) every 50 ms.
- * @req FR-CAN-001
- */
-int32_t can_tx_ego_vehicle(can_state_t               *state,
-                           const perception_output_t *perc)
-{
-    int32_t result = 1;   /* 1 = not yet due */
-
-    if ((state == NULL) || (perc == NULL))
-    {
-        result = CAN_ERR_TX;
-    }
-    else
-    {
-        state->tx_ego_counter++;
-
-        /* 50 ms / 10 ms = every 5 ticks */
-        if (state->tx_ego_counter >= 5U)
-        {
-            uint8_t frame[8] = {0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U};
-
-            state->tx_ego_counter = 0U;
-
-            /* VehicleSpeed: bits 0..15, factor 0.01, offset 0 */
-            uint32_t raw_spd = encode_unsigned(perc->v_ego, 0.01F, 0.0F);
-            can_pack_signal(frame, 0U, 16U, raw_spd);
-
-            /* LongAccel: bits 16..31, factor 0.001, offset -32 */
-            uint32_t raw_acc = encode_unsigned(state->last_rx.long_accel,
-                                               0.001F, -32.0F);
-            can_pack_signal(frame, 16U, 16U, raw_acc);
-
-            /* YawRate: bits 32..47, factor 0.01, offset -327.68 */
-            uint32_t raw_yaw = encode_unsigned(state->last_rx.yaw_rate,
-                                               0.01F, -327.68F);
-            can_pack_signal(frame, 32U, 16U, raw_yaw);
-
-            /* SteeringAngle: bits 48..63, factor 0.1, offset -3276.8 */
-            uint32_t raw_str = encode_unsigned(state->last_rx.steering_angle,
-                                               0.1F, -3276.8F);
-            can_pack_signal(frame, 48U, 16U, raw_str);
-
-            if (can_hal_send(CAN_ID_EGO_VEHICLE, frame,
-                             CAN_DLC_EGO_VEHICLE) != 0)
-            {
-                result = CAN_ERR_TX;
-            }
-            else
-            {
-                result = CAN_OK;
-            }
-        }
-    }
-
-    return result;
-}
-
-/**
  * @brief Copy latest RX data to caller's struct.
  */
 void can_get_rx_data(const can_state_t *state,

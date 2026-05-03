@@ -147,6 +147,5 @@ void aeb_core_step(aeb_core_state_t *state,
     /* ── 11. CAN TX ───────────────────────────────────────────────────── */
     (void)can_tx_brake_cmd(&state->can, &state->pid, &state->fsm);
     (void)can_tx_fsm_state(&state->can, &state->fsm);
-    (void)can_tx_ego_vehicle(&state->can, &state->perception);
     (void)can_tx_alert(&state->alert);
 }
