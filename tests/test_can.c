@@ -527,6 +527,151 @@ TEST(test_uds_request_ack)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: decode_unsigned (coverage for lines 107-111)
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_decode_unsigned)
+{
+    /* Test decode_unsigned directly */
+    float32_t result = decode_unsigned(1000U, 0.1F, 0.0F);
+    ASSERT_FLOAT_NEAR(result, 100.0F, 0.01F);
+
+    result = decode_unsigned(500U, 0.01F, -32.0F);
+    ASSERT_FLOAT_NEAR(result, (500.0F * 0.01F) - 32.0F, 0.01F);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: can_tx_brake_cmd with NULL parameters (line 332)
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_tx_brake_cmd_null_params)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    pid_output_t pid = { .brake_pct = 50.0F, .brake_bar = 5.0F };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    /* Test NULL state */
+    int32_t rc = can_tx_brake_cmd(NULL, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_ERR_TX);
+
+    /* Test NULL pid_out */
+    rc = can_tx_brake_cmd(&state, NULL, &fsm);
+    ASSERT_EQ(rc, CAN_ERR_TX);
+
+    /* Test NULL fsm_out */
+    rc = can_tx_brake_cmd(&state, &pid, NULL);
+    ASSERT_EQ(rc, CAN_ERR_TX);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: can_tx_brake_cmd alive_counter wrap (line 372)
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_tx_brake_cmd_alive_counter_wrap)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    pid_output_t pid = { .brake_pct = 75.0F, .brake_bar = 7.5F };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L3 };
+
+    /* Call 16 times to wrap alive_counter (0-15) */
+    uint8_t i = 0U;
+    for (i = 0U; i < 20U; i++)
+    {
+        int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+        ASSERT_EQ(rc, CAN_OK);
+    }
+
+    /* Alive counter should have wrapped to 4 (20 % 16 = 4) */
+    ASSERT_EQ(state.alive_counter, 4U);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: can_tx_fsm_state with NULL parameters (line 396)
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_tx_fsm_state_null_params)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_WARNING };
+
+    /* Test NULL state */
+    int32_t rc = can_tx_fsm_state(NULL, &fsm);
+    ASSERT_EQ(rc, CAN_ERR_TX);
+
+    /* Test NULL fsm_out */
+    rc = can_tx_fsm_state(&state, NULL);
+    ASSERT_EQ(rc, CAN_ERR_TX);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: can_tx_uds_response with NULL parameter (line 500)
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_tx_uds_response_null)
+{
+    int32_t rc = can_tx_uds_response(NULL);
+    ASSERT_EQ(rc, CAN_ERR_TX);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: can_clear_uds_request_pending with NULL (line 535)
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_clear_uds_request_pending_null)
+{
+    /* Should not crash */
+    can_clear_uds_request_pending(NULL);
+    /* Test passes if no crash */
+    ASSERT_EQ(1, 1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: encode_unsigned saturation at UINT32_MAX (line 95)
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_encode_unsigned_saturation)
+{
+    /* encode_unsigned is static, test via can_tx_brake_cmd with extremely high value */
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    /* BrakePressure field is 15 bits, so saturation will be masked to 0x7FFF.
+     * We can test by checking that the packed value is 0x7FFF (all bits set) */
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = 1.0e30F }; /* Extremely large */
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    uint32_t brake_pressure = can_unpack_signal(tx->data, 1U, 15U);
+    ASSERT_EQ(brake_pressure, 0x7FFFU); /* All ones in 15-bit field */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: can_tx_alert with NULL parameter (line 453, 455)
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_tx_alert_null)
+{
+    int32_t rc = can_tx_alert(NULL);
+    ASSERT_EQ(rc, CAN_ERR_TX);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: can_check_timeout with NULL state (lines 300, 317)
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_check_timeout_null)
+{
+    /* Should not crash */
+    can_check_timeout(NULL);
+    /* Test passes if no crash */
+    ASSERT_EQ(1, 1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
  *  MAIN
  * ═══════════════════════════════════════════════════════════════════════ */
 int main(void)
@@ -554,6 +699,15 @@ int main(void)
     RUN(test_rx_uds_request_short_dlc);
     RUN(test_tx_uds_response);
     RUN(test_uds_request_ack);
+    RUN(test_decode_unsigned);
+    RUN(test_tx_brake_cmd_null_params);
+    RUN(test_tx_brake_cmd_alive_counter_wrap);
+    RUN(test_tx_fsm_state_null_params);
+    RUN(test_tx_uds_response_null);
+    RUN(test_clear_uds_request_pending_null);
+    RUN(test_encode_unsigned_saturation);
+    RUN(test_tx_alert_null);
+    RUN(test_check_timeout_null);
 
     printf("\n=== Results: %d run, %d passed, %d failed ===\n",
            tests_run, tests_passed, tests_failed);
