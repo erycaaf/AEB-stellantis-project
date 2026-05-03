@@ -118,3 +118,8 @@ venv/
 # OS
 Thumbs.db
 .DS_Store
+
+# Development tools (compiled binaries)
+tools/sim_manual
+tools/sim_manual.exe
+tools/output/

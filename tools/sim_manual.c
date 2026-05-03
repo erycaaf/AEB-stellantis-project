@@ -1,6 +1,6 @@
 /**
  * @file  sim_manual.c
- * @brief AEB manual simulator — interactive terminal input.
+ * @brief AEB manual simulator -- interactive terminal input.
  *
  * Allows entering sensor and driver values manually and observing
  * system behavior (FSM, braking, alerts, TTC) cycle by cycle.
@@ -18,6 +18,35 @@
 #include "aeb_config.h"
 #include "can_hal.h"
 #include "can_hal_test.h"
+
+/* TX capture buffer capacity -- must match TX_BUF_SIZE in stubs/can_hal.c */
+#define CAN_TX_BUF_CAP 32U
+
+/* =========================================================================
+ *  Input helpers
+ * ========================================================================= */
+
+static int32_t read_float(const char *prompt, float32_t *out)
+{
+    printf("%s", prompt);
+    if (scanf("%f", out) != 1)
+    {
+        printf("  Invalid input -- value unchanged.\n");
+        return 0;
+    }
+    return 1;
+}
+
+static int32_t read_int(const char *prompt, int32_t *out)
+{
+    printf("%s", prompt);
+    if (scanf("%d", out) != 1)
+    {
+        printf("  Invalid input -- value unchanged.\n");
+        return 0;
+    }
+    return 1;
+}
 
 /* =========================================================================
  *  State description helpers
@@ -98,6 +127,7 @@ static void inject_radar(aeb_core_state_t *st,
 {
     uint8_t  frame[8] = {0};
     uint32_t raw_dist = (uint32_t)(dist  / 0.01F);
+    /* DBC offset/factor for RelativeSpeed signal -- see aeb_can.c */
     uint32_t raw_vrel = (uint32_t)((v_rel + 327.68F) / 0.01F);
     can_pack_signal(frame, 0,  16, raw_dist);
     can_pack_signal(frame, 16, 16, raw_vrel);
@@ -108,10 +138,10 @@ static void inject_radar(aeb_core_state_t *st,
  *  Print system state
  * ========================================================================= */
 
-static void print_state(const aeb_core_state_t *st, int cycle)
+static void print_state(const aeb_core_state_t *st, int32_t cycle)
 {
     printf("\n+---------------------------------------------+\n");
-    printf("| SYSTEM STATE  --  cycle %-4d               |\n", cycle);
+    printf("| SYSTEM STATE  --  cycle %-4d               |\n", (int)cycle);
     printf("+---------------------------------------------+\n");
 
     printf("| PERCEPTION\n");
@@ -214,10 +244,11 @@ static void print_can_bus(const aeb_core_state_t *st)
     printf("+---------------------------------------------+\n");
 
     tx_count = can_hal_test_get_tx_count();
-    printf("| TRANSMITTED (TX) -- %u frame(s) since last run\n",
-           (unsigned)tx_count);
+    printf("| TRANSMITTED (TX) -- %u frame(s) captured%s\n",
+           (unsigned)tx_count,
+           (tx_count >= CAN_TX_BUF_CAP) ? " (buffer full -- older frames dropped)" : "");
 
-    for (i = 0U; i < tx_count; i++)
+    for (i = 0U; i < tx_count && i < CAN_TX_BUF_CAP; i++)
     {
         const tx_record_t *rec = can_hal_test_get_tx(i);
         if (rec != NULL)
@@ -304,7 +335,7 @@ static void uds_menu(aeb_core_state_t *st)
     uds_request_t  req;
     uds_response_t resp;
     uds_output_t   out;
-    int            in_uds = 1;
+    int32_t        in_uds = 1;
     char           choice;
 
     while (in_uds)
@@ -413,7 +444,7 @@ static void uds_menu(aeb_core_state_t *st)
 typedef enum { RAMP_V_EGO, RAMP_V_REL, RAMP_RADAR_D, RAMP_LIDAR_D } ramp_target_t;
 
 static void run_ramp(aeb_core_state_t *st,
-                     int             *total_cycle,
+                     int32_t         *total_cycle,
                      float32_t       *p_radar_d,
                      float32_t       *p_lidar_d,
                      float32_t       *p_v_ego,
@@ -425,36 +456,36 @@ static void run_ramp(aeb_core_state_t *st,
                      ramp_target_t    target)
 {
     static const char *names[] = { "v_ego", "v_rel", "radar_d", "lidar_d" };
-    const char        *var_name = names[(int)target];
-    float32_t          v_start    = 0.0F;
-    float32_t          v_end      = 0.0F;
-    float32_t          duration_s = 0.0F;
-    int                track_vrel = 0;
-    int                n_cycles;
-    int                i;
+    const char        *var_name    = names[(int32_t)target];
+    float32_t          v_start     = 0.0F;
+    float32_t          v_end       = 0.0F;
+    float32_t          duration_s  = 0.0F;
+    int32_t            track_vrel  = 0;
+    int32_t            n_cycles;
+    int32_t            i;
     uint8_t            last_state;
 
     printf("\n=== %s ramp ===\n", var_name);
     printf("  %s start: ", var_name);
-    (void)scanf("%f", &v_start);
+    if (scanf("%f", &v_start) != 1) { return; }
     printf("  %s end  : ", var_name);
-    (void)scanf("%f", &v_end);
+    if (scanf("%f", &v_end) != 1) { return; }
     printf("  Duration [s]: ");
-    (void)scanf("%f", &duration_s);
+    if (scanf("%f", &duration_s) != 1) { return; }
 
     if (target == RAMP_V_EGO)
     {
         printf("  Track v_rel = v_ego (target stopped)? "
                "[1=yes / 0=keep v_rel=%.2f]: ",
                (double)(*p_v_rel));
-        (void)scanf("%d", &track_vrel);
+        if (scanf("%d", &track_vrel) != 1) { track_vrel = 0; }
     }
 
-    n_cycles = (int)(duration_s / 0.01F + 0.5F);
+    n_cycles = (int32_t)(duration_s / 0.01F + 0.5F);
     if (n_cycles < 1) { n_cycles = 1; }
 
     printf("\n  Ramp %s: %.3f -> %.3f  |  %d cycles  |  %d ms\n",
-           var_name, (double)v_start, (double)v_end, n_cycles, n_cycles * 10);
+           var_name, (double)v_start, (double)v_end, (int)n_cycles, (int)(n_cycles * 10));
 
     can_hal_test_reset();
 
@@ -506,8 +537,8 @@ static void run_ramp(aeb_core_state_t *st,
         now = st->fsm.fsm_state;
 
         printf("%-6d  %-8d  %-10.3f  %-10.3f  %-8.1f  %-9s  %-8.2f  %-6s",
-               *total_cycle,
-               (*total_cycle) * 10,
+               (int)(*total_cycle),
+               (int)((*total_cycle) * 10),
                (double)(*p_v_ego),
                (double)(*p_v_rel),
                (double)(*p_radar_d),
@@ -524,7 +555,7 @@ static void run_ramp(aeb_core_state_t *st,
     }
 
     printf("\n=== Ramp done.  %d cycles  (%d ms simulated) ===\n",
-           n_cycles, n_cycles * 10);
+           (int)n_cycles, (int)(n_cycles * 10));
 }
 
 /* =========================================================================
@@ -535,6 +566,11 @@ int main(void)
 {
     aeb_core_state_t   state;
     raw_sensor_input_t raw;
+    int32_t            running     = 1;
+    int32_t            n_cycles    = 10;
+    int32_t            total_cycle = 0;
+    char               choice;
+    float32_t          kmh;
 
     /* Default: ego at 40 km/h, stationary target at 50 m */
     float32_t radar_d      = 50.0F;
@@ -545,8 +581,6 @@ int main(void)
     uint8_t   accel        = 0U;
     uint8_t   aeb_on       = 1U;
     uint8_t   fault_inject = 0U;
-    int       n_cycles     = 10;
-    int       total_cycle  = 0;
 
     printf("================================================\n");
     printf("  AEB MANUAL SIMULATOR -- Stellantis\n");
@@ -560,10 +594,9 @@ int main(void)
 
     printf("System initialized. FSM starts in STANDBY.\n");
 
-    int running = 1;
     while (running)
     {
-        float kmh = v_ego * 3.6F;
+        kmh = v_ego * 3.6F;
 
         printf("\n================================================\n");
         printf("  CURRENT INPUTS\n");
@@ -582,7 +615,8 @@ int main(void)
         printf("  8. Fault injection   : %s\n",
                fault_inject ? "ACTIVE" : "off");
         printf("  9. Cycles to run     : %d  (= %d ms)\n",
-               n_cycles, n_cycles * 10);
+               (int)n_cycles, (int)(n_cycles * 10));
+        printf("  p. Scenario presets\n");
         printf("  r. RUN simulation\n");
         printf("  e. v_ego ramp\n");
         printf("  f. v_rel ramp\n");
@@ -594,34 +628,32 @@ int main(void)
         printf("  q. Quit\n");
         printf("  Choice: ");
 
-        char choice;
         if (scanf(" %c", &choice) != 1) { break; }
 
         switch (choice)
         {
             case '1':
-                printf("  Radar distance [m] (0.5 - 200): ");
-                (void)scanf("%f", &radar_d);
+                (void)read_float("  Radar distance [m] (0.5 - 200): ", &radar_d);
                 break;
 
             case '2':
-                printf("  LiDAR distance [m] (1.0 - 100): ");
-                (void)scanf("%f", &lidar_d);
+                (void)read_float("  LiDAR distance [m] (1.0 - 100): ", &lidar_d);
                 break;
 
             case '3':
             {
-                float input_kmh = 0.0F;
-                printf("  Ego speed [km/h] (10 - 60): ");
-                (void)scanf("%f", &input_kmh);
-                v_ego = input_kmh / 3.6F;
+                float32_t input_kmh = 0.0F;
+                if (read_float("  Ego speed [km/h] (10 - 60): ", &input_kmh))
+                {
+                    v_ego = input_kmh / 3.6F;
+                }
                 break;
             }
 
             case '4':
                 printf("  Relative speed [m/s]\n");
                 printf("  (use ego speed if target is stopped, 0 if same speed): ");
-                (void)scanf("%f", &v_rel);
+                (void)read_float("", &v_rel);
                 break;
 
             case '5':
@@ -646,23 +678,79 @@ int main(void)
                 break;
 
             case '9':
-                printf("  Number of cycles (1 - 500): ");
-                (void)scanf("%d", &n_cycles);
-                if (n_cycles < 1)   { n_cycles = 1;   }
-                if (n_cycles > 500) { n_cycles = 500; }
+            {
+                int32_t input_cycles = n_cycles;
+                if (read_int("  Number of cycles (1 - 500): ", &input_cycles))
+                {
+                    if (input_cycles < 1)   { input_cycles = 1;   }
+                    if (input_cycles > 500) { input_cycles = 500; }
+                    n_cycles = input_cycles;
+                }
                 break;
+            }
+
+            case 'p':
+            case 'P':
+            {
+                char preset;
+                printf("\n+---------------------------------------------+\n");
+                printf("| SCENARIO PRESETS\n");
+                printf("+---------------------------------------------+\n");
+                printf("|  1. Emergency brake  -- d=8m  v_ego=120km/h\n");
+                printf("|  2. Highway cruise   -- d=80m v_ego=80km/h\n");
+                printf("|  3. Urban stop-and-go-- d=15m v_ego=30km/h\n");
+                printf("|  4. Sensor fault     -- d=50m fault_inject=ON\n");
+                printf("|  b. Back\n");
+                printf("| Choice: ");
+                if (scanf(" %c", &preset) != 1) { break; }
+                switch (preset)
+                {
+                    case '1':
+                        radar_d = 8.0F; lidar_d = 8.0F;
+                        v_ego = 33.33F; v_rel = 33.33F;
+                        brake = 0U; accel = 0U; aeb_on = 1U; fault_inject = 0U;
+                        printf("  Preset: Emergency brake loaded.\n");
+                        break;
+                    case '2':
+                        radar_d = 80.0F; lidar_d = 80.0F;
+                        v_ego = 22.22F; v_rel = 5.0F;
+                        brake = 0U; accel = 0U; aeb_on = 1U; fault_inject = 0U;
+                        printf("  Preset: Highway cruise loaded.\n");
+                        break;
+                    case '3':
+                        radar_d = 15.0F; lidar_d = 15.0F;
+                        v_ego = 8.33F; v_rel = 8.33F;
+                        brake = 0U; accel = 0U; aeb_on = 1U; fault_inject = 0U;
+                        printf("  Preset: Urban stop-and-go loaded.\n");
+                        break;
+                    case '4':
+                        radar_d = 50.0F; lidar_d = 50.0F;
+                        v_ego = 11.11F; v_rel = 11.11F;
+                        brake = 0U; accel = 0U; aeb_on = 1U; fault_inject = 1U;
+                        printf("  Preset: Sensor fault loaded.\n");
+                        break;
+                    default:
+                        break;
+                }
+                break;
+            }
 
             case 'r':
             case 'R':
             {
+                uint8_t last_state;
+                int32_t i;
+
                 printf("\n=== Running %d cycle(s) [%d ms] ===\n",
-                       n_cycles, n_cycles * 10);
+                       (int)n_cycles, (int)(n_cycles * 10));
 
-                can_hal_test_reset();   /* clear TX buffer for fresh inspection */
-                uint8_t last_state = state.fsm.fsm_state;
+                can_hal_test_reset();
+                last_state = state.fsm.fsm_state;
 
-                for (int i = 0; i < n_cycles; i++)
+                for (i = 0; i < n_cycles; i++)
                 {
+                    uint8_t now;
+
                     total_cycle++;
 
                     (void)memset(&raw, 0, sizeof(raw));
@@ -677,7 +765,7 @@ int main(void)
 
                     aeb_core_step(&state, &raw);
 
-                    uint8_t now = state.fsm.fsm_state;
+                    now = state.fsm.fsm_state;
                     if (now != last_state || i == n_cycles - 1)
                     {
                         print_state(&state, total_cycle);
@@ -690,7 +778,7 @@ int main(void)
                     }
                 }
                 printf("=== Done. Total cycles: %d  (%d ms simulated) ===\n",
-                       total_cycle, total_cycle * 10);
+                       (int)total_cycle, (int)(total_cycle * 10));
                 break;
             }
 
@@ -749,6 +837,6 @@ int main(void)
     }
 
     printf("\nSimulation ended. Total cycles: %d  (%d ms simulated).\n",
-           total_cycle, total_cycle * 10);
+           (int)total_cycle, (int)(total_cycle * 10));
     return 0;
 }

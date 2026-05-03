@@ -120,6 +120,8 @@ SRC_UDS_FAULT_TEST = src/communication/aeb_uds.c tests/test_uds_fault.c
 
 SRC_INTEGRATION_TEST = $(SRC_ALL) tests/test_integration.c
 
+SRC_SIM_MANUAL = $(SRC_ALL) tools/sim_manual.c
+
 # ── MISRA — all non-stub sources ────────────────────────────────────────
 
 SRC_MISRA = src/communication/aeb_can.c \
@@ -136,7 +138,7 @@ SRC_MISRA = src/communication/aeb_can.c \
 TEST_BINS = test_smoke test_can test_perception test_decision \
             test_pid test_alert test_uds test_integration
 
-.PHONY: build test misra clean vv-clean \
+.PHONY: build test misra sim_manual clean vv-clean \
         mcdc-uds fault-uds memory-uds misra-uds html-uds vv-uds \
         mcdc-decision fault-decision memory-decision misra-decision html-decision vv-decision \
         mcdc-pid-alert fault-pid-alert memory-pid-alert misra-pid-alert html-pid-alert vv-pid-alert \
@@ -176,6 +178,9 @@ test_uds: $(SRC_UDS_TEST)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 test_integration: $(SRC_INTEGRATION_TEST)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+sim_manual: $(SRC_SIM_MANUAL)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 misra:
