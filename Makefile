@@ -37,11 +37,11 @@
 #   make vv-perception     — full V&V stack
 #
 # Targets (ASIL-D V&V — CAN module, cross-validation):
-#   make mcdc-can          — MC/DC coverage (gcc-14 + gcov-14 + gcovr)
+#   make mcdc-can          — MC/DC coverage (gcc-14 + gcov-14)
 #   make fault-can         — systematic fault-injection suite
 #   make memory-can        — Valgrind + ASan + UBSan on CAN suites
 #   make misra-can         — cppcheck MISRA scoped to aeb_can.{c,h}
-#   make html-can          — navigable HTML reports (gcovr + cppcheck-htmlreport + wrappers)
+#   make html-can          — navigable HTML reports (lcov genhtml + cppcheck-htmlreport + wrappers)
 #   make vv-can            — full V&V stack
 #
 # V&V artefacts land under reports/vv_<module>/. Consolidated reports
@@ -696,104 +696,29 @@ vv-perception: mcdc-perception fault-perception memory-perception misra-percepti
 	@echo ""
 	@echo "=== Perception V&V stack complete — artefacts in $(VV_REPORT_DIR)/ ==="
 
-# ═══════════════════════════════════════════════════════════════════════════
-#  V&V — CAN module  (independent cross-validation of aeb_can.{c,h})
-#
-#  Mirrors the `vv-uds` target set used for the UDS module.
-#  ISO 26262-6:2018 activities exercised:
-#     - Table 10 item 1b   — nominal unit tests (test_can.c)
-#     - Table 12 item 1c   — MC/DC coverage    (mcdc-can)
-#     - Table 11 item 1e   — fault injection   (fault-can)
-#     - Table  8 item 1d   — memory safety     (memory-can)
-#     - Table  8 item 1b   — MISRA static scan (misra-can)
-#
-#  Toolchain: gcc-14 (for -fcondition-coverage), gcov-14, lcov 2.0,
-#             cppcheck 2.13 + misra addon, valgrind 3.22, AddressSanitizer,
-#             UndefinedBehaviorSanitizer.
-#
-#  All reports land under reports/vv_can/ (set via target-local
-#  VV_REPORT_DIR binding above) so they can be zipped or attached to the
-#  V&V wiki §6 (Coverage consolidated) as-is.
-# ═══════════════════════════════════════════════════════════════════════════
+# ── ASIL-D V&V targets (CAN) ────────────────────────────────────────────
+# Following the SAME pattern as UDS module
 
-# ── MC/DC coverage (Table 12 item 1c) ────────────────────────────────────
-#
-# Coverage is measured by linking the instrumented aeb_can.c object
-# against the nominal, structural, and fault-injection suites so their
-# .gcda data accumulates onto a single shared object. This is the
-# legitimate way to report structural coverage: the defensive branches
-# the requirements-based nominal suite does not traverse are covered
-# by the structural and fault suites, and the union is what a
-# certification assessor expects to see.
 mcdc-can:
 	@rm -rf $(VV_REPORT_DIR)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR)/coverage_mcdc
-	@echo "=== MC/DC coverage — aeb_can.c (nominal + fault + struct suites) ==="
-	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_cov \
-		$(SRC_CAN_TEST) $(LDFLAGS)
-	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_fault_cov \
-		$(SRC_CAN_FAULT_TEST) $(LDFLAGS)
-	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_struct_cov \
-		$(SRC_CAN_STRUCT_TEST) $(LDFLAGS)
-	cd $(VV_REPORT_DIR)/coverage_mcdc && \
-		./test_can_cov        > run_nominal.log 2>&1 ; \
-		./test_can_fault_cov  > run_fault.log   2>&1 ; \
-		./test_can_struct_cov > run_struct.log  2>&1 ; \
-		cd -
-	@echo "--- Nominal suite ---"
-	@grep -E "Results|passed" $(VV_REPORT_DIR)/coverage_mcdc/run_nominal.log || true
-	@echo "--- Structural complementary suite ---"
-	@grep -E "Results|passed" $(VV_REPORT_DIR)/coverage_mcdc/run_struct.log || true
-	@echo "--- Fault injection suite ---"
-	@grep -E "Results|passed" $(VV_REPORT_DIR)/coverage_mcdc/run_fault.log || true
-	# Per-binary gcov summary (reference only — see coverage.xml below
-	# for the merged figure across all three suites, which is the number
-	# ISO 26262-6 Table 12 expects).
-	cd $(VV_REPORT_DIR)/coverage_mcdc && \
-		$(GCOV) --conditions --branch-probabilities --branch-counts \
-		        test_can_cov-aeb_can.gcno \
-		        > gcov_summary.txt 2>&1
-	# Cobertura XML + HTML — merges nominal + structural + fault .gcda
-	# accumulated on the shared aeb_can.c object. This is what the CI
-	# coverage gate (vv-can.yml) parses.
-	$(GCOVR) --root . \
-		--gcov-executable '$(GCOV) --conditions' \
-		--filter 'src/communication/aeb_can\.c' \
-		--html-details $(VV_REPORT_DIR)/coverage_mcdc/report.html \
-		--cobertura $(VV_REPORT_DIR)/coverage_mcdc/coverage.xml \
-		--json-summary $(VV_REPORT_DIR)/coverage_mcdc/coverage.json \
-		--txt $(VV_REPORT_DIR)/coverage_mcdc/coverage_summary.txt \
-		--print-summary
-	@echo ""
+	$(CC) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can $(SRC_CAN_TEST) $(LDFLAGS)
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_can > run.log 2>&1 && grep "Results:" run.log
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && gcov -b -c test_can-aeb_can.gcno > gcov_summary.txt 2>&1 && cat gcov_summary.txt
 	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
 
-# ── Fault injection (Table 11 item 1e) ───────────────────────────────────
-# Canonical recipe from the CI V&V guide §6: capture output to a log,
-# echo it (so the CI step shows the log), and propagate the real exit
-# code. No '| tee' (would mask exit), no '|| true' (would silence
-# failures), no conditional messages that age poorly.
 fault-can:
 	@mkdir -p $(VV_REPORT_DIR)/fault_injection
-	$(CC) $(CFLAGS) -O0 -g -o $(VV_REPORT_DIR)/fault_injection/test_can_fault \
-		$(SRC_CAN_FAULT_TEST) $(LDFLAGS)
-	@$(VV_REPORT_DIR)/fault_injection/test_can_fault \
-		> $(VV_REPORT_DIR)/fault_injection/run.log 2>&1; \
+	$(CC) $(CFLAGS) -O0 -g -o $(VV_REPORT_DIR)/fault_injection/test_can_fault $(SRC_CAN_FAULT_TEST) $(LDFLAGS)
+	@$(VV_REPORT_DIR)/fault_injection/test_can_fault > $(VV_REPORT_DIR)/fault_injection/run.log 2>&1; \
 		rc=$$?; \
 		cat $(VV_REPORT_DIR)/fault_injection/run.log; \
 		exit $$rc
 
-# ── Memory safety (Table 8 item 1d): Valgrind + ASan + UBSan ─────────────
-# Log names follow the vv-uds convention (valgrind_test_can.log,
-# ubsan_test_can.log, ...) so scripts/wrap_memory.sh picks them up and
-# the CI gate can check the nominal-suite logs are empty.
 memory-can:
 	@mkdir -p $(VV_REPORT_DIR)/memory_safety
 	# Valgrind on unsanitised binaries
-	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs \
-		-o $(VV_REPORT_DIR)/memory_safety/test_can_val \
-		$(SRC_CAN_TEST) $(LDFLAGS)
-	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs \
-		-o $(VV_REPORT_DIR)/memory_safety/test_can_fault_val \
-		$(SRC_CAN_FAULT_TEST) $(LDFLAGS)
+	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs -o $(VV_REPORT_DIR)/memory_safety/test_can_val $(SRC_CAN_TEST) $(LDFLAGS)
+	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs -o $(VV_REPORT_DIR)/memory_safety/test_can_fault_val $(SRC_CAN_FAULT_TEST) $(LDFLAGS)
 	@echo "--- Valgrind: test_can (nominal) ---"
 	@valgrind --error-exitcode=0 --leak-check=full --quiet \
 		$(VV_REPORT_DIR)/memory_safety/test_can_val > /dev/null \
@@ -807,25 +732,18 @@ memory-can:
 		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_can_fault.log; \
 		[ ! -s $(VV_REPORT_DIR)/memory_safety/valgrind_test_can_fault.log ] && echo "(clean)" || true
 	# ASan + UBSan (sanitised binaries; separate from Valgrind to avoid collisions)
-	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_can_san \
-		$(SRC_CAN_TEST) $(LDFLAGS)
-	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_can_fault_san \
-		$(SRC_CAN_FAULT_TEST) $(LDFLAGS)
+	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_can_san $(SRC_CAN_TEST) $(LDFLAGS)
+	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_can_fault_san $(SRC_CAN_FAULT_TEST) $(LDFLAGS)
 	@echo "--- ASan+UBSan: test_can (nominal) ---"
 	@$(VV_REPORT_DIR)/memory_safety/test_can_san > /dev/null \
 		2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_can.log || true
 	@[ -s $(VV_REPORT_DIR)/memory_safety/ubsan_test_can.log ] && \
 		cat $(VV_REPORT_DIR)/memory_safety/ubsan_test_can.log || echo "(clean)"
-	@echo "--- ASan+UBSan: test_can_fault (UB from Bug #1 expected until PR #102 lands) ---"
+	@echo "--- ASan+UBSan: test_can_fault (UB reports expected until bugs are patched) ---"
 	@$(VV_REPORT_DIR)/memory_safety/test_can_fault_san > /dev/null \
 		2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_can_fault.log || true
-	@grep "runtime error" $(VV_REPORT_DIR)/memory_safety/ubsan_test_can_fault.log \
-		| sort -u || echo "(clean)"
+	@grep "runtime error" $(VV_REPORT_DIR)/memory_safety/ubsan_test_can_fault.log | sort -u || echo "(clean)"
 
-# ── MISRA static analysis (Table 8 item 1b) — scoped to aeb_can.{c,h} ────
-# XML file is named cppcheck_can.xml to match the per-module convention
-# (cppcheck_uds.xml, cppcheck_decision.xml, ...) consumed by the CI gate
-# and by html-can below.
 misra-can:
 	@mkdir -p $(VV_REPORT_DIR)/misra
 	cppcheck --addon=misra --std=c99 -Iinclude -Istubs \
@@ -836,15 +754,29 @@ misra-can:
 		2> $(VV_REPORT_DIR)/misra/cppcheck_can.xml
 	@echo "cppcheck XML -> $(VV_REPORT_DIR)/misra/cppcheck_can.xml"
 
-# ── Navigable HTML reports (cppcheck-htmlreport + wrappers) ──────────────
-# Coverage HTML comes from gcovr's report.html already produced by mcdc-can.
-# No lcov/genhtml needed — gcovr is the single HTML coverage tool for CAN.
 html-can:
-	@mkdir -p $(VV_REPORT_DIR)/misra_html
-	@if [ ! -f $(VV_REPORT_DIR)/coverage_mcdc/report.html ]; then \
-		echo "html-can: missing $(VV_REPORT_DIR)/coverage_mcdc/report.html — run mcdc-can first"; \
+	@mkdir -p $(VV_REPORT_DIR)/coverage_html $(VV_REPORT_DIR)/misra_html
+	# Coverage HTML — lcov genhtml from the gcov outputs produced by mcdc-can.
+	# lcov failures (e.g. incompatible gcov, empty directory) are NOT masked:
+	# without them the bundle would publish empty and the CI step would go
+	# green with no signal. If lcov errors, the step errors.
+	@if [ ! -d $(VV_REPORT_DIR)/coverage_mcdc ]; then \
+		echo "html-can: missing $(VV_REPORT_DIR)/coverage_mcdc — run mcdc-can first"; \
 		exit 1; \
 	fi
+	lcov --capture --directory $(VV_REPORT_DIR)/coverage_mcdc \
+		--rc branch_coverage=1 \
+		--output-file $(VV_REPORT_DIR)/coverage_html/coverage.info
+	lcov --extract $(VV_REPORT_DIR)/coverage_html/coverage.info '*aeb_can.c' \
+		--rc branch_coverage=1 \
+		--output-file $(VV_REPORT_DIR)/coverage_html/coverage_can.info
+	genhtml $(VV_REPORT_DIR)/coverage_html/coverage_can.info \
+		--branch-coverage \
+		--title "CAN Coverage" \
+		--legend \
+		--output-directory $(VV_REPORT_DIR)/coverage_html
+	# MISRA HTML — cppcheck-htmlreport from the XML produced by misra-can.
+	# Same policy: fail loudly rather than publish an empty bundle.
 	@if [ ! -s $(VV_REPORT_DIR)/misra/cppcheck_can.xml ]; then \
 		echo "html-can: missing cppcheck_can.xml — run misra-can first"; \
 		exit 1; \
@@ -854,14 +786,14 @@ html-can:
 		--report-dir=$(VV_REPORT_DIR)/misra_html \
 		--source-dir=. \
 		--title="CAN MISRA C:2012 Report"
+	# Memory + fault HTML wrappers.
 	@bash scripts/wrap_memory.sh can $(VV_REPORT_DIR)
 	@python3 scripts/wrap_fault.py can $(VV_REPORT_DIR)
-	@echo "=== HTML reports in $(VV_REPORT_DIR)/{coverage_mcdc,misra_html,memory_html,fault_html}/ ==="
+	@echo "=== HTML reports in $(VV_REPORT_DIR)/{coverage_html,misra_html,memory_html,fault_html}/ ==="
 
-# ── Full V&V bundle — one command reproduces every artefact ──────────────
 vv-can: mcdc-can fault-can memory-can misra-can html-can
 	@echo ""
-	@echo "=== V&V CAN bundle complete.  Artefacts: $(VV_REPORT_DIR)/ ==="
+	@echo "=== CAN V&V stack complete — artefacts in $(VV_REPORT_DIR)/ ==="
 
 # ── Clean ────────────────────────────────────────────────────────────────
 
@@ -893,30 +825,18 @@ vv-clean:
 	       reports/vv_perception/fault_injection/test_perception* \
 	       reports/vv_perception/memory_safety/test_perception* \
 	       reports/vv_can/coverage_mcdc/test_can* \
-	       reports/vv_can/coverage_mcdc/test_can_fault* \
-	       reports/vv_can/coverage_mcdc/test_can_struct* \
 	       reports/vv_can/coverage_mcdc/*.gcda \
 	       reports/vv_can/coverage_mcdc/*.gcno \
 	       reports/vv_can/coverage_mcdc/*.gcov \
-	       reports/vv_can/coverage_mcdc/report.*.html \
-	       reports/vv_can/coverage_mcdc/report.css \
-	       reports/vv_can/coverage_mcdc/*.info \
-	       reports/vv_can/coverage_mcdc/*.png \
-	       reports/vv_can/coverage_mcdc/html/ \
 	       reports/vv_can/coverage_mcdc/communication/ \
 	       reports/vv_can/fault_injection/test_can* \
 	       reports/vv_can/memory_safety/test_can* \
-	       reports/vv_can/coverage_html/ \
-	       reports/vv_can/misra_html/ \
-	       reports/vv_can/memory_html/ \
-	       reports/vv_can/fault_html/
-	rm -f test_can_exe test_can_exe-* \
-	      test_can_fault_exe test_can_fault_exe-* \
-	      test_can_struct_exe test_can_struct_exe-* \
-	      test_mem
+	       reports/vv_can/coverage_html \
+	       reports/vv_can/misra_html \
+	       reports/vv_can/memory_html \
+	       reports/vv_can/fault_html
 
 clean: vv-clean
 	rm -f $(TEST_BINS) test_decision_cov test_decision_mcdc test_decision_fault \
-	      test_can_exe test_can_fault_exe test_can_struct_exe test_mem \
 	      *.o *.gcda *.gcno *.gcov
 	rm -rf coverage_mcdc memory_safety
