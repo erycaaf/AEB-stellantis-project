@@ -37,7 +37,7 @@
 #   make vv-perception     — full V&V stack
 #
 # Targets (ASIL-D V&V — CAN module, cross-validation):
-#   make mcdc-can          — MC/DC coverage (gcc-14 + gcov-14)
+#   make mcdc-can          — MC/DC coverage (gcc-14 + gcov-14) with 3 suites (nominal + fault + struct)
 #   make fault-can         — systematic fault-injection suite
 #   make memory-can        — Valgrind + ASan + UBSan on CAN suites
 #   make misra-can         — cppcheck MISRA scoped to aeb_can.{c,h}
@@ -189,8 +189,14 @@ misra:
 mcdc-uds:
 	@rm -rf $(VV_REPORT_DIR)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR)/coverage_mcdc
 	$(CC) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_uds $(SRC_UDS_TEST) $(LDFLAGS)
-	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_uds > run.log 2>&1 && grep "Results:" run.log
-	@cd $(VV_REPORT_DIR)/coverage_mcdc && gcov -b -c test_uds-aeb_uds.gcno > gcov_summary.txt 2>&1 && cat gcov_summary.txt
+	$(CC) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_uds_fault $(SRC_UDS_FAULT_TEST) $(LDFLAGS)
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
+		./test_uds > run.log 2>&1 && \
+		./test_uds_fault >> run.log 2>&1 && \
+		grep "Results:" run.log
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
+		gcov -b -c test_uds-aeb_uds.gcno > gcov_summary.txt 2>&1 && \
+		cat gcov_summary.txt
 	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
 
 fault-uds:
@@ -697,13 +703,25 @@ vv-perception: mcdc-perception fault-perception memory-perception misra-percepti
 	@echo "=== Perception V&V stack complete — artefacts in $(VV_REPORT_DIR)/ ==="
 
 # ── ASIL-D V&V targets (CAN) ────────────────────────────────────────────
-# Following the SAME pattern as UDS module
+# Following the SAME pattern as UDS module but with 3 test suites
+# (nominal + fault + struct) to accumulate full coverage
 
 mcdc-can:
 	@rm -rf $(VV_REPORT_DIR)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR)/coverage_mcdc
+	# Compile all 3 test binaries with coverage
 	$(CC) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can $(SRC_CAN_TEST) $(LDFLAGS)
-	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_can > run.log 2>&1 && grep "Results:" run.log
-	@cd $(VV_REPORT_DIR)/coverage_mcdc && gcov -b -c test_can-aeb_can.gcno > gcov_summary.txt 2>&1 && cat gcov_summary.txt
+	$(CC) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_fault $(SRC_CAN_FAULT_TEST) $(LDFLAGS)
+	$(CC) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_struct $(SRC_CAN_STRUCT_TEST) $(LDFLAGS)
+	# Run all 3 tests (accumulate .gcda on the same object)
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
+		./test_can > run.log 2>&1 && \
+		./test_can_fault >> run.log 2>&1 && \
+		./test_can_struct >> run.log 2>&1 && \
+		grep "Results:" run.log
+	# Generate combined coverage report (gcov -b -c)
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
+		gcov -b -c test_can-aeb_can.gcno > gcov_summary.txt 2>&1 && \
+		cat gcov_summary.txt
 	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
 
 fault-can:
@@ -719,6 +737,7 @@ memory-can:
 	# Valgrind on unsanitised binaries
 	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs -o $(VV_REPORT_DIR)/memory_safety/test_can_val $(SRC_CAN_TEST) $(LDFLAGS)
 	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs -o $(VV_REPORT_DIR)/memory_safety/test_can_fault_val $(SRC_CAN_FAULT_TEST) $(LDFLAGS)
+	$(CC) -Wall -std=c99 -O0 -g -Iinclude -Istubs -o $(VV_REPORT_DIR)/memory_safety/test_can_struct_val $(SRC_CAN_STRUCT_TEST) $(LDFLAGS)
 	@echo "--- Valgrind: test_can (nominal) ---"
 	@valgrind --error-exitcode=0 --leak-check=full --quiet \
 		$(VV_REPORT_DIR)/memory_safety/test_can_val > /dev/null \
@@ -731,9 +750,16 @@ memory-can:
 		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_can_fault.log; \
 		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_can_fault.log; \
 		[ ! -s $(VV_REPORT_DIR)/memory_safety/valgrind_test_can_fault.log ] && echo "(clean)" || true
+	@echo "--- Valgrind: test_can_struct ---"
+	@valgrind --error-exitcode=0 --leak-check=full --quiet \
+		$(VV_REPORT_DIR)/memory_safety/test_can_struct_val > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/valgrind_test_can_struct.log; \
+		cat $(VV_REPORT_DIR)/memory_safety/valgrind_test_can_struct.log; \
+		[ ! -s $(VV_REPORT_DIR)/memory_safety/valgrind_test_can_struct.log ] && echo "(clean)" || true
 	# ASan + UBSan (sanitised binaries; separate from Valgrind to avoid collisions)
 	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_can_san $(SRC_CAN_TEST) $(LDFLAGS)
 	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_can_fault_san $(SRC_CAN_FAULT_TEST) $(LDFLAGS)
+	$(CC) $(CFLAGS_SAN) -o $(VV_REPORT_DIR)/memory_safety/test_can_struct_san $(SRC_CAN_STRUCT_TEST) $(LDFLAGS)
 	@echo "--- ASan+UBSan: test_can (nominal) ---"
 	@$(VV_REPORT_DIR)/memory_safety/test_can_san > /dev/null \
 		2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_can.log || true
@@ -742,7 +768,13 @@ memory-can:
 	@echo "--- ASan+UBSan: test_can_fault (UB reports expected until bugs are patched) ---"
 	@$(VV_REPORT_DIR)/memory_safety/test_can_fault_san > /dev/null \
 		2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_can_fault.log || true
-	@grep "runtime error" $(VV_REPORT_DIR)/memory_safety/ubsan_test_can_fault.log | sort -u || echo "(clean)"
+	@grep "runtime error" $(VV_REPORT_DIR)/memory_safety/ubsan_test_can_fault.log \
+		| sort -u || echo "(clean)"
+	@echo "--- ASan+UBSan: test_can_struct ---"
+	@$(VV_REPORT_DIR)/memory_safety/test_can_struct_san > /dev/null \
+		2> $(VV_REPORT_DIR)/memory_safety/ubsan_test_can_struct.log || true
+	@grep "runtime error" $(VV_REPORT_DIR)/memory_safety/ubsan_test_can_struct.log \
+		| sort -u || echo "(clean)"
 
 misra-can:
 	@mkdir -p $(VV_REPORT_DIR)/misra
