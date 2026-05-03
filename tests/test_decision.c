@@ -193,12 +193,13 @@ static void test_fsm_continue_braking_below_vmin(void)
     {
         fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
     }
-    TEST_ASSERT(fsm_out.fsm_state >= (uint8_t)FSM_BRAKE_L1,
+    TEST_ASSERT(fsm_out.fsm_state >= (uint8_t)FSM_BRAKE_L1 &&
+                fsm_out.fsm_state <= (uint8_t)FSM_BRAKE_L3,
                 "FSM enters a BRAKE_Lx state under TTC + distance floor");
 
-    /* Now ego drops below V_EGO_MIN (10 km/h = 2.78 m/s) but is not yet
-     * fully stopped. Target is still close (distance still in floor). */
-    perc.v_ego = 1.5f;            /* < V_EGO_MIN, > 0.01 */
+    /* Now ego drops below V_EGO_MIN (10 km/h = 2.78 m/s) but is still
+     * above V_STOP_THRESHOLD. Target is still close (distance in floor). */
+    perc.v_ego = 1.5f;            /* < V_EGO_MIN, > V_STOP_THRESHOLD */
     perc.distance = 6.5f;         /* still under the 10 m floor */
     fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
 
@@ -211,12 +212,12 @@ static void test_fsm_continue_braking_below_vmin(void)
     TEST_ASSERT(fsm_out.decel_target > 0.0f,
                 "decel_target stays > 0 when actively braking below V_EGO_MIN");
 
-    /* Once ego truly stops (v_ego < 0.01) the existing branch hands off
-     * to POST_BRAKE — same behaviour as before #95. */
-    perc.v_ego = 0.005f;
+    /* Once ego truly stops (v_ego < V_STOP_THRESHOLD) the existing branch
+     * hands off to POST_BRAKE — same behaviour as before #95. */
+    perc.v_ego = V_STOP_THRESHOLD * 0.5f;   /* guaranteed below the threshold */
     fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
     TEST_ASSERT(fsm_out.fsm_state == (uint8_t)FSM_POST_BRAKE,
-                "FSM enters POST_BRAKE once v_ego < 0.01 m/s");
+                "FSM enters POST_BRAKE once v_ego < V_STOP_THRESHOLD");
 }
 
 /* When the ego is below V_EGO_MIN and *not* in a braking state (e.g. the

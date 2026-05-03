@@ -284,15 +284,7 @@ void fsm_step(float32_t delta_t_s,
          * distance-floor logic in evaluate_desired_state resolves to
          * BRAKE_L1/L2/L3 while the ego is still close to the target, so
          * the brake stays applied until v_ego < V_STOP_THRESHOLD hits
-         * the first branch above and hands off to POST_BRAKE.
-         *
-         * Closes #95: previously every speed_out_of_range case forced
-         * STANDBY and zeroed the brake — the ego coasted the last few
-         * metres of every CCRs run with no braking command, missing the
-         * Euro NCAP residual-speed criterion. The SIL stack worked
-         * around this with a build-time string patch
-         * (sil/zephyr_aeb/patch_fsm.py); with this change the patch can
-         * be removed. */
+         * the first branch above and hands off to POST_BRAKE. */
     }
 
     /* ===== PRIORITY 4: State Transition Logic ===== */
