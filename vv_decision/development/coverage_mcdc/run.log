@@ -18,11 +18,20 @@ Requirements: FR-DEC-001 to FR-DEC-011
   ✅ PASS: FSM goes to OFF on fault
   ✅ PASS: Driver override goes to STANDBY
 
+--- Issue #95: brake-hold below V_EGO_MIN ---
+  ✅ PASS: FSM enters a BRAKE_Lx state under TTC + distance floor
+  ✅ PASS: FSM stays in BRAKE_Lx when v_ego dips below V_EGO_MIN while distance floor still applies (#95)
+  ✅ PASS: Brake remains active when actively braking below V_EGO_MIN
+  ✅ PASS: decel_target stays > 0 when actively braking below V_EGO_MIN
+  ✅ PASS: FSM enters POST_BRAKE once v_ego < V_STOP_THRESHOLD
+  ✅ PASS: Low-speed idle (not braking) falls to STANDBY
+  ✅ PASS: Brake is released in STANDBY at low speed
+
 --- Parameter Validation (SRS Table 10) ---
   ✅ PASS: Deceleration values (2/4/6 m/s² per Table 10)
 
 ========================================
-RESULTS: 9 passed, 0 failed
+RESULTS: 16 passed, 0 failed
 ========================================
 
 ✅ ALL TESTS PASSED - Decision Logic ready for integration

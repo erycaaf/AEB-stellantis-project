@@ -6,224 +6,225 @@
         -:    2: * @file aeb_fsm.c
         -:    3: * @brief Implementation of 7-state AEB Finite State Machine.
         -:    4: * @author Lourenço Jamba Mphili
-        -:    5: * @requirements FR-FSM-001 to FR-FSM-006, FR-DEC-004 to FR-DEC-011
-        -:    6: * @misra Fully compliant with MISRA C:2012
-        -:    7: */
-        -:    8:
-        -:    9:#include "aeb_fsm.h"
-        -:   10:#include "aeb_config.h"
-        -:   11:#include "aeb_types.h"
-        -:   12:#include <math.h>    /* isfinite() — Bug #3 guard in fsm_step entry */
-        -:   13:#include <stddef.h>
-        -:   14:
-        -:   15:/* Steering override threshold (degrees) - FR-FSM-006 */
-        -:   16:#ifndef STEERING_OVERRIDE_DEG
-        -:   17:#define STEERING_OVERRIDE_DEG   5.0f
-        -:   18:#endif
-        -:   19:
-        -:   20:/* FSM internal persistent memory (private to this module) */
-        -:   21:static struct {
-        -:   22:    float32_t warn_timer_s;       /**< Time spent in WARNING state */
-        -:   23:    float32_t debounce_timer_s;   /**< Debounce timer for de-escalation */
-        -:   24:    float32_t post_brake_timer_s; /**< Hold timer for POST_BRAKE state */
-        -:   25:} m_fsm_mem = {0.0f, 0.0f, 0.0f};
-        -:   26:
-        -:   27:/**
-        -:   28: * @brief Converts FSM state to deceleration target.
-        -:   29: * @requirement FR-BRK-001, SRS Table 10
-        -:   30: */
+        -:    5: * @requirements FR-FSM-001 to FR-FSM-006, FR-DEC-004 to FR-DEC-011,
+        -:    6: *               FR-BRK-001 (low-speed brake hold via Priority-3 fall-through)
+        -:    7: * @misra Fully compliant with MISRA C:2012
+        -:    8: */
+        -:    9:
+        -:   10:#include "aeb_fsm.h"
+        -:   11:#include "aeb_config.h"
+        -:   12:#include "aeb_types.h"
+        -:   13:#include <math.h>    /* isfinite() — Bug #3 guard in fsm_step entry */
+        -:   14:#include <stddef.h>
+        -:   15:
+        -:   16:/* Steering override threshold (degrees) - FR-FSM-006 */
+        -:   17:#ifndef STEERING_OVERRIDE_DEG
+        -:   18:#define STEERING_OVERRIDE_DEG   5.0f
+        -:   19:#endif
+        -:   20:
+        -:   21:/* FSM internal persistent memory (private to this module) */
+        -:   22:static struct {
+        -:   23:    float32_t warn_timer_s;       /**< Time spent in WARNING state */
+        -:   24:    float32_t debounce_timer_s;   /**< Debounce timer for de-escalation */
+        -:   25:    float32_t post_brake_timer_s; /**< Hold timer for POST_BRAKE state */
+        -:   26:} m_fsm_mem = {0.0f, 0.0f, 0.0f};
+        -:   27:
+        -:   28:/**
+        -:   29: * @brief Converts FSM state to deceleration target.
+        -:   30: * @requirement FR-BRK-001, SRS Table 10
+        -:   31: */
 function state_to_decel_target called 1610 returned 100% blocks executed 100%
-     1610:   31:static float32_t state_to_decel_target(fsm_state_e state)
-        -:   32:{
-     1610:   33:    float32_t decel = 0.0f;
-        -:   34:
-     1610:   35:    switch (state) {
+     1610:   32:static float32_t state_to_decel_target(fsm_state_e state)
+        -:   33:{
+     1610:   34:    float32_t decel = 0.0f;
+        -:   35:
+     1610:   36:    switch (state) {
 branch  0 taken 8
 branch  1 taken 2
 branch  2 taken 23
 branch  3 taken 1577
-        8:   36:        case FSM_BRAKE_L1:
-        8:   37:            decel = DECEL_L1;  /* 2.0f m/s² */
-        8:   38:            break;
-        2:   39:        case FSM_BRAKE_L2:
-        2:   40:            decel = DECEL_L2;  /* 4.0f m/s² */
-        2:   41:            break;
-       23:   42:        case FSM_BRAKE_L3:
-       23:   43:            decel = DECEL_L3;  /* 6.0f m/s² */
-       23:   44:            break;
-     1577:   45:        default:
-     1577:   46:            decel = 0.0f;
-     1577:   47:            break;
-        -:   48:    }
-        -:   49:
-     1610:   50:    return decel;
-        -:   51:}
-        -:   52:
-        -:   53:/**
-        -:   54: * @brief Converts FSM state to alert level (0..2)
-        -:   55: */
+        8:   37:        case FSM_BRAKE_L1:
+        8:   38:            decel = DECEL_L1;  /* 2.0f m/s² */
+        8:   39:            break;
+        2:   40:        case FSM_BRAKE_L2:
+        2:   41:            decel = DECEL_L2;  /* 4.0f m/s² */
+        2:   42:            break;
+       23:   43:        case FSM_BRAKE_L3:
+       23:   44:            decel = DECEL_L3;  /* 6.0f m/s² */
+       23:   45:            break;
+     1577:   46:        default:
+     1577:   47:            decel = 0.0f;
+     1577:   48:            break;
+        -:   49:    }
+        -:   50:
+     1610:   51:    return decel;
+        -:   52:}
+        -:   53:
+        -:   54:/**
+        -:   55: * @brief Converts FSM state to alert level (0..2)
+        -:   56: */
 function state_to_alert_level called 1610 returned 100% blocks executed 100%
-     1610:   56:static uint8_t state_to_alert_level(fsm_state_e state)
-        -:   57:{
-     1610:   58:    uint8_t alert = 0U;
-        -:   59:
-     1610:   60:    if ((state == FSM_WARNING) || (state == FSM_BRAKE_L1))
+     1610:   57:static uint8_t state_to_alert_level(fsm_state_e state)
+        -:   58:{
+     1610:   59:    uint8_t alert = 0U;
+        -:   60:
+     1610:   61:    if ((state == FSM_WARNING) || (state == FSM_BRAKE_L1))
 branch  0 taken 350 (fallthrough)
 branch  1 taken 1260
 branch  2 taken 8 (fallthrough)
 branch  3 taken 342
 condition outcomes covered 4/4
-        -:   61:    {
-     1268:   62:        alert = 1U;  /* Warning alert */
-        -:   63:    }
-      342:   64:    else if ((state == FSM_BRAKE_L2) || (state == FSM_BRAKE_L3))
+        -:   62:    {
+     1268:   63:        alert = 1U;  /* Warning alert */
+        -:   64:    }
+      342:   65:    else if ((state == FSM_BRAKE_L2) || (state == FSM_BRAKE_L3))
 branch  0 taken 340 (fallthrough)
 branch  1 taken 2
 branch  2 taken 23 (fallthrough)
 branch  3 taken 317
 condition outcomes covered 4/4
-        -:   65:    {
-       25:   66:        alert = 2U;  /* Emergency alert */
-        -:   67:    }
-        -:   68:    else
-        -:   69:    {
-      317:   70:        alert = 0U;  /* No alert */
-        -:   71:    }
-        -:   72:
-     1610:   73:    return alert;
-        -:   74:}
-        -:   75:
-        -:   76:/**
-        -:   77: * @brief Evaluates desired state based on TTC, distance, and braking distance.
-        -:   78: * @return Desired FSM state
-        -:   79: * @requirement FR-DEC-004, FR-DEC-005
-        -:   80: */
+        -:   66:    {
+       25:   67:        alert = 2U;  /* Emergency alert */
+        -:   68:    }
+        -:   69:    else
+        -:   70:    {
+      317:   71:        alert = 0U;  /* No alert */
+        -:   72:    }
+        -:   73:
+     1610:   74:    return alert;
+        -:   75:}
+        -:   76:
+        -:   77:/**
+        -:   78: * @brief Evaluates desired state based on TTC, distance, and braking distance.
+        -:   79: * @return Desired FSM state
+        -:   80: * @requirement FR-DEC-004, FR-DEC-005
+        -:   81: */
 function evaluate_desired_state called 1617 returned 100% blocks executed 100%
-     1617:   81:static fsm_state_e evaluate_desired_state(const perception_output_t * const perception,
-        -:   82:                                           const ttc_output_t * const ttc_in)
-        -:   83:{
-     1617:   84:    fsm_state_e desired = FSM_STANDBY;
-        -:   85:
-        -:   86:    /* FR-DEC-004: No threat if not closing */
-     1617:   87:    if (ttc_in->is_closing == 0U)
+     1617:   82:static fsm_state_e evaluate_desired_state(const perception_output_t * const perception,
+        -:   83:                                           const ttc_output_t * const ttc_in)
+        -:   84:{
+     1617:   85:    fsm_state_e desired = FSM_STANDBY;
+        -:   86:
+        -:   87:    /* FR-DEC-004: No threat if not closing */
+     1617:   88:    if (ttc_in->is_closing == 0U)
 branch  0 taken 341 (fallthrough)
 branch  1 taken 1276
 condition outcomes covered 2/2
-        -:   88:    {
-      341:   89:        desired = FSM_STANDBY;
-        -:   90:    }
-        -:   91:    /* FR-DEC-005: Braking floor condition (highest priority) */
-     1276:   92:    else if (ttc_in->d_brake >= perception->distance)
+        -:   89:    {
+      341:   90:        desired = FSM_STANDBY;
+        -:   91:    }
+        -:   92:    /* FR-DEC-005: Braking floor condition (highest priority) */
+     1276:   93:    else if (ttc_in->d_brake >= perception->distance)
 branch  0 taken 2 (fallthrough)
 branch  1 taken 1274
 condition outcomes covered 2/2
-        -:   93:    {
-        2:   94:        desired = FSM_BRAKE_L3;
-        -:   95:    }
-        -:   96:    /* Distance floors - per SRS Table 10 */
-     1274:   97:    else if (perception->distance <= 5.0f)
+        -:   94:    {
+        2:   95:        desired = FSM_BRAKE_L3;
+        -:   96:    }
+        -:   97:    /* Distance floors - per SRS Table 10 */
+     1274:   98:    else if (perception->distance <= 5.0f)
 branch  0 taken 3 (fallthrough)
 branch  1 taken 1271
 condition outcomes covered 2/2
-        -:   98:    {
-        3:   99:        desired = FSM_BRAKE_L3;
-        -:  100:    }
-     1271:  101:    else if (perception->distance <= 10.0f)
+        -:   99:    {
+        3:  100:        desired = FSM_BRAKE_L3;
+        -:  101:    }
+     1271:  102:    else if (perception->distance <= 10.0f)
 branch  0 taken 1 (fallthrough)
 branch  1 taken 1270
 condition outcomes covered 2/2
-        -:  102:    {
-        1:  103:        desired = FSM_BRAKE_L2;
-        -:  104:    }
-     1270:  105:    else if (perception->distance <= 20.0f)
+        -:  103:    {
+        1:  104:        desired = FSM_BRAKE_L2;
+        -:  105:    }
+     1270:  106:    else if (perception->distance <= 20.0f)
 branch  0 taken 27 (fallthrough)
 branch  1 taken 1243
 condition outcomes covered 2/2
-        -:  106:    {
-       27:  107:        desired = FSM_BRAKE_L1;
-        -:  108:    }
-        -:  109:    /* TTC-based evaluation - per SRS Table 10 */
-     1243:  110:    else if (ttc_in->ttc <= TTC_BRAKE_L3)
+        -:  107:    {
+       27:  108:        desired = FSM_BRAKE_L1;
+        -:  109:    }
+        -:  110:    /* TTC-based evaluation - per SRS Table 10 */
+     1243:  111:    else if (ttc_in->ttc <= TTC_BRAKE_L3)
 branch  0 taken 3 (fallthrough)
 branch  1 taken 1240
 condition outcomes covered 2/2
-        -:  111:    {
-        3:  112:        desired = FSM_BRAKE_L3;
-        -:  113:    }
-     1240:  114:    else if (ttc_in->ttc <= TTC_BRAKE_L2)
+        -:  112:    {
+        3:  113:        desired = FSM_BRAKE_L3;
+        -:  114:    }
+     1240:  115:    else if (ttc_in->ttc <= TTC_BRAKE_L2)
 branch  0 taken 3 (fallthrough)
 branch  1 taken 1237
 condition outcomes covered 2/2
-        -:  115:    {
-        3:  116:        desired = FSM_BRAKE_L2;
-        -:  117:    }
-     1237:  118:    else if (ttc_in->ttc <= TTC_BRAKE_L1)
+        -:  116:    {
+        3:  117:        desired = FSM_BRAKE_L2;
+        -:  118:    }
+     1237:  119:    else if (ttc_in->ttc <= TTC_BRAKE_L1)
 branch  0 taken 1 (fallthrough)
 branch  1 taken 1236
 condition outcomes covered 2/2
-        -:  119:    {
-        1:  120:        desired = FSM_BRAKE_L1;
-        -:  121:    }
-     1236:  122:    else if (ttc_in->ttc <= TTC_WARNING)
+        -:  120:    {
+        1:  121:        desired = FSM_BRAKE_L1;
+        -:  122:    }
+     1236:  123:    else if (ttc_in->ttc <= TTC_WARNING)
 branch  0 taken 1211 (fallthrough)
 branch  1 taken 25
 condition outcomes covered 2/2
-        -:  123:    {
-     1211:  124:        desired = FSM_WARNING;
-        -:  125:    }
-        -:  126:    else
-        -:  127:    {
-       25:  128:        desired = FSM_STANDBY;
-        -:  129:    }
-        -:  130:
-     1617:  131:    return desired;
-        -:  132:}
-        -:  133:
+        -:  124:    {
+     1211:  125:        desired = FSM_WARNING;
+        -:  126:    }
+        -:  127:    else
+        -:  128:    {
+       25:  129:        desired = FSM_STANDBY;
+        -:  130:    }
+        -:  131:
+     1617:  132:    return desired;
+        -:  133:}
+        -:  134:
 function fsm_init called 33 returned 100% blocks executed 100%
-       33:  134:void fsm_init(fsm_output_t * const fsm_out)
-        -:  135:{
-       33:  136:    if (fsm_out != NULL)
+       33:  135:void fsm_init(fsm_output_t * const fsm_out)
+        -:  136:{
+       33:  137:    if (fsm_out != NULL)
 branch  0 taken 33 (fallthrough)
 branch  1 taken 0
 condition outcomes covered 1/2
 condition  0 not covered (false)
-        -:  137:    {
-        -:  138:        /* FR-FSM-001: Initial state is STANDBY */
-       33:  139:        fsm_out->fsm_state = (uint8_t)FSM_STANDBY;
-       33:  140:        fsm_out->decel_target = 0.0f;
-       33:  141:        fsm_out->brake_active = 0U;
-       33:  142:        fsm_out->alert_level = 0U;
-       33:  143:        fsm_out->warn_timer = 0.0f;
-       33:  144:        fsm_out->state_timer = 0.0f;
-        -:  145:
-        -:  146:        /* Reset internal memory */
-       33:  147:        m_fsm_mem.warn_timer_s = 0.0f;
-       33:  148:        m_fsm_mem.debounce_timer_s = 0.0f;
-       33:  149:        m_fsm_mem.post_brake_timer_s = 0.0f;
-        -:  150:    }
-       33:  151:}
-        -:  152:
-function fsm_step called 1623 returned 100% blocks executed 99%
-     1623:  153:void fsm_step(float32_t delta_t_s,
-        -:  154:              const perception_output_t * const perception,
-        -:  155:              const driver_input_t * const driver,
-        -:  156:              const ttc_output_t * const ttc_in,
-        -:  157:              fsm_output_t * const fsm_out)
-        -:  158:{
-        -:  159:    fsm_state_e current_state;
-        -:  160:    fsm_state_e desired_state;
-        -:  161:    fsm_state_e new_state;
-     1623:  162:    uint8_t driver_override = 0U;
-     1623:  163:    uint8_t speed_out_of_range = 0U;
-        -:  164:    uint8_t aeb_enabled_norm;
-        -:  165:
-        -:  166:    /* Defensive checks.
-        -:  167:     * Bug #3: reject non-finite delta_t_s. IEEE 754 comparisons with NaN
-        -:  168:     * are always false, so (delta_t_s <= 0.0f) alone lets NaN through.
-        -:  169:     * A NaN delta_t would poison the warn_timer / debounce_timer
-        -:  170:     * accumulators on the first `+= delta_t_s`, silently breaking
-        -:  171:     * debounce, escalation, and POST_BRAKE timeout logic. */
-     1623:  172:    if ((!isfinite(delta_t_s)) || (delta_t_s <= 0.0f) ||
+        -:  138:    {
+        -:  139:        /* FR-FSM-001: Initial state is STANDBY */
+       33:  140:        fsm_out->fsm_state = (uint8_t)FSM_STANDBY;
+       33:  141:        fsm_out->decel_target = 0.0f;
+       33:  142:        fsm_out->brake_active = 0U;
+       33:  143:        fsm_out->alert_level = 0U;
+       33:  144:        fsm_out->warn_timer = 0.0f;
+       33:  145:        fsm_out->state_timer = 0.0f;
+        -:  146:
+        -:  147:        /* Reset internal memory */
+       33:  148:        m_fsm_mem.warn_timer_s = 0.0f;
+       33:  149:        m_fsm_mem.debounce_timer_s = 0.0f;
+       33:  150:        m_fsm_mem.post_brake_timer_s = 0.0f;
+        -:  151:    }
+       33:  152:}
+        -:  153:
+function fsm_step called 1623 returned 100% blocks executed 97%
+     1623:  154:void fsm_step(float32_t delta_t_s,
+        -:  155:              const perception_output_t * const perception,
+        -:  156:              const driver_input_t * const driver,
+        -:  157:              const ttc_output_t * const ttc_in,
+        -:  158:              fsm_output_t * const fsm_out)
+        -:  159:{
+        -:  160:    fsm_state_e current_state;
+        -:  161:    fsm_state_e desired_state;
+        -:  162:    fsm_state_e new_state;
+     1623:  163:    uint8_t driver_override = 0U;
+     1623:  164:    uint8_t speed_out_of_range = 0U;
+        -:  165:    uint8_t aeb_enabled_norm;
+        -:  166:
+        -:  167:    /* Defensive checks.
+        -:  168:     * Bug #3: reject non-finite delta_t_s. IEEE 754 comparisons with NaN
+        -:  169:     * are always false, so (delta_t_s <= 0.0f) alone lets NaN through.
+        -:  170:     * A NaN delta_t would poison the warn_timer / debounce_timer
+        -:  171:     * accumulators on the first `+= delta_t_s`, silently breaking
+        -:  172:     * debounce, escalation, and POST_BRAKE timeout logic. */
+     1623:  173:    if ((!isfinite(delta_t_s)) || (delta_t_s <= 0.0f) ||
 branch  0 taken 1623 (fallthrough)
 branch  1 taken 0
 branch  2 taken 1621 (fallthrough)
@@ -232,311 +233,346 @@ branch  4 taken 1620 (fallthrough)
 branch  5 taken 1
 condition outcomes covered 11/12
 condition  0 not covered (true)
-     1620:  173:        (perception == NULL) || (driver == NULL) ||
+     1620:  174:        (perception == NULL) || (driver == NULL) ||
 branch  0 taken 1619 (fallthrough)
 branch  1 taken 1
 branch  2 taken 1618 (fallthrough)
 branch  3 taken 1
-     1618:  174:        (ttc_in == NULL) || (fsm_out == NULL))
+     1618:  175:        (ttc_in == NULL) || (fsm_out == NULL))
 branch  0 taken 1 (fallthrough)
 branch  1 taken 1617
-        -:  175:    {
-        6:  176:        return;
-        -:  177:    }
-        -:  178:
-        -:  179:    /* Bug #2 SEU hardening: normalise driver->aeb_enabled to a strict
-        -:  180:     * Boolean at entry. A bit-flip that turns 1U into (say) 0xAA would
-        -:  181:     * otherwise make (aeb_enabled == 0U) false and leave the FSM running
-        -:  182:     * on corrupted state. Strict match: only the canonical 1U bit pattern
-        -:  183:     * counts as enabled. Any other value (0U, SEU-corrupted bit patterns,
-        -:  184:     * garbage from uninitialised memory) falls safe to disabled → FSM_OFF
-        -:  185:     * via the Priority-1 check below. */
-     1617:  186:    aeb_enabled_norm = (driver->aeb_enabled == 1U) ? 1U : 0U;
+        -:  176:    {
+        6:  177:        return;
+        -:  178:    }
+        -:  179:
+        -:  180:    /* Bug #2 SEU hardening: normalise driver->aeb_enabled to a strict
+        -:  181:     * Boolean at entry. A bit-flip that turns 1U into (say) 0xAA would
+        -:  182:     * otherwise make (aeb_enabled == 0U) false and leave the FSM running
+        -:  183:     * on corrupted state. Strict match: only the canonical 1U bit pattern
+        -:  184:     * counts as enabled. Any other value (0U, SEU-corrupted bit patterns,
+        -:  185:     * garbage from uninitialised memory) falls safe to disabled → FSM_OFF
+        -:  186:     * via the Priority-1 check below. */
+     1617:  187:    aeb_enabled_norm = (driver->aeb_enabled == 1U) ? 1U : 0U;
 branch  0 taken 1616 (fallthrough)
 branch  1 taken 1
 condition outcomes covered 2/2
-        -:  187:
-     1617:  188:    current_state = (fsm_state_e)fsm_out->fsm_state;
-        -:  189:
-        -:  190:    /* Bug #4 SEU hardening: normalise out-of-enum fsm_state to the
-        -:  191:     * fail-safe FSM_STANDBY. A bit-flip in RAM could corrupt the
-        -:  192:     * persisted fsm_state byte (e.g. 1 -> 42), which would then be
-        -:  193:     * inherited by new_state at the top of the transition logic and,
-        -:  194:     * on iterations where desired_state resolves to STANDBY, would be
-        -:  195:     * written back unchanged into fsm_out->fsm_state — and broadcast
-        -:  196:     * via CAN/UDS to actuators and displays. STANDBY is the conservative
-        -:  197:     * choice: zero braking demand, no alert. */
-     1617:  198:    if ((uint8_t)current_state > (uint8_t)FSM_POST_BRAKE)
+        -:  188:
+     1617:  189:    current_state = (fsm_state_e)fsm_out->fsm_state;
+        -:  190:
+        -:  191:    /* Bug #4 SEU hardening: normalise out-of-enum fsm_state to the
+        -:  192:     * fail-safe FSM_STANDBY. A bit-flip in RAM could corrupt the
+        -:  193:     * persisted fsm_state byte (e.g. 1 -> 42), which would then be
+        -:  194:     * inherited by new_state at the top of the transition logic and,
+        -:  195:     * on iterations where desired_state resolves to STANDBY, would be
+        -:  196:     * written back unchanged into fsm_out->fsm_state — and broadcast
+        -:  197:     * via CAN/UDS to actuators and displays. STANDBY is the conservative
+        -:  198:     * choice: zero braking demand, no alert. */
+     1617:  199:    if ((uint8_t)current_state > (uint8_t)FSM_POST_BRAKE)
 branch  0 taken 0 (fallthrough)
 branch  1 taken 1617
 condition outcomes covered 1/2
 condition  0 not covered (true)
-        -:  199:    {
-    #####:  200:        current_state = FSM_STANDBY;
-    #####:  201:        fsm_out->fsm_state = (uint8_t)FSM_STANDBY;
-        -:  202:    }
-        -:  203:
-     1617:  204:    desired_state = evaluate_desired_state(perception, ttc_in);
+        -:  200:    {
+    #####:  201:        current_state = FSM_STANDBY;
+    #####:  202:        fsm_out->fsm_state = (uint8_t)FSM_STANDBY;
+        -:  203:    }
+        -:  204:
+     1617:  205:    desired_state = evaluate_desired_state(perception, ttc_in);
 call    0 returned 1617
-        -:  205:
-        -:  206:    /* ===== PRIORITY 1: Fault and Safety ===== */
-     1617:  207:    if ((perception->fault_flag != 0U) || (aeb_enabled_norm == 0U))
+        -:  206:
+        -:  207:    /* ===== PRIORITY 1: Fault and Safety ===== */
+     1617:  208:    if ((perception->fault_flag != 0U) || (aeb_enabled_norm == 0U))
 branch  0 taken 1617 (fallthrough)
 branch  1 taken 0
 branch  2 taken 1 (fallthrough)
 branch  3 taken 1616
 condition outcomes covered 3/4
 condition  0 not covered (true)
-        -:  208:    {
-        1:  209:        fsm_out->fsm_state = (uint8_t)FSM_OFF;
-        1:  210:        fsm_out->brake_active = 0U;
-        1:  211:        fsm_out->alert_level = 0U;
-        1:  212:        fsm_out->decel_target = 0.0f;
-        1:  213:        fsm_out->warn_timer = 0.0f;
-        1:  214:        fsm_out->state_timer = 0.0f;
-        1:  215:        m_fsm_mem.warn_timer_s = 0.0f;
-        1:  216:        m_fsm_mem.debounce_timer_s = 0.0f;
-        1:  217:        m_fsm_mem.post_brake_timer_s = 0.0f;
-        1:  218:        return;
-        -:  219:    }
-        -:  220:
-        -:  221:    /* ===== PRIORITY 2: Driver Override ===== */
-     3231:  222:    driver_override = ((driver->brake_pedal != 0U) ||
+        -:  209:    {
+        1:  210:        fsm_out->fsm_state = (uint8_t)FSM_OFF;
+        1:  211:        fsm_out->brake_active = 0U;
+        1:  212:        fsm_out->alert_level = 0U;
+        1:  213:        fsm_out->decel_target = 0.0f;
+        1:  214:        fsm_out->warn_timer = 0.0f;
+        1:  215:        fsm_out->state_timer = 0.0f;
+        1:  216:        m_fsm_mem.warn_timer_s = 0.0f;
+        1:  217:        m_fsm_mem.debounce_timer_s = 0.0f;
+        1:  218:        m_fsm_mem.post_brake_timer_s = 0.0f;
+        1:  219:        return;
+        -:  220:    }
+        -:  221:
+        -:  222:    /* ===== PRIORITY 2: Driver Override ===== */
+     3231:  223:    driver_override = ((driver->brake_pedal != 0U) ||
 branch  0 taken 1615 (fallthrough)
 branch  1 taken 1
 condition outcomes covered 6/6
-     1615:  223:                       (driver->steering_angle > STEERING_OVERRIDE_DEG) ||
+     1615:  224:                       (driver->steering_angle > STEERING_OVERRIDE_DEG) ||
 branch  0 taken 1613 (fallthrough)
 branch  1 taken 2
-     1613:  224:                       (driver->steering_angle < -STEERING_OVERRIDE_DEG)) ? 1U : 0U;
+     1613:  225:                       (driver->steering_angle < -STEERING_OVERRIDE_DEG)) ? 1U : 0U;
 branch  0 taken 1 (fallthrough)
 branch  1 taken 1612
-        -:  225:
-     1616:  226:    if ((driver_override != 0U) && (current_state != FSM_POST_BRAKE))
+        -:  226:
+     1616:  227:    if ((driver_override != 0U) && (current_state != FSM_POST_BRAKE))
 branch  0 taken 4 (fallthrough)
 branch  1 taken 1612
 branch  2 taken 2 (fallthrough)
 branch  3 taken 2
 condition outcomes covered 4/4
-        -:  227:    {
-        2:  228:        fsm_out->fsm_state = (uint8_t)FSM_STANDBY;
-        2:  229:        fsm_out->brake_active = 0U;
-        2:  230:        fsm_out->alert_level = 0U;
-        2:  231:        fsm_out->decel_target = 0.0f;
-        2:  232:        fsm_out->warn_timer = 0.0f;
-        2:  233:        fsm_out->state_timer = 0.0f;
-        2:  234:        m_fsm_mem.warn_timer_s = 0.0f;
-        2:  235:        m_fsm_mem.debounce_timer_s = 0.0f;
-        2:  236:        return;
-        -:  237:    }
-        -:  238:
-        -:  239:    /* ===== PRIORITY 3: Speed Range Validation ===== */
-     3225:  240:    speed_out_of_range = ((perception->v_ego < V_EGO_MIN) ||
+        -:  228:    {
+        2:  229:        fsm_out->fsm_state = (uint8_t)FSM_STANDBY;
+        2:  230:        fsm_out->brake_active = 0U;
+        2:  231:        fsm_out->alert_level = 0U;
+        2:  232:        fsm_out->decel_target = 0.0f;
+        2:  233:        fsm_out->warn_timer = 0.0f;
+        2:  234:        fsm_out->state_timer = 0.0f;
+        2:  235:        m_fsm_mem.warn_timer_s = 0.0f;
+        2:  236:        m_fsm_mem.debounce_timer_s = 0.0f;
+        2:  237:        return;
+        -:  238:    }
+        -:  239:
+        -:  240:    /* ===== PRIORITY 3: Speed Range Validation ===== */
+     3225:  241:    speed_out_of_range = ((perception->v_ego < V_EGO_MIN) ||
 branch  0 taken 1611 (fallthrough)
 branch  1 taken 3
 condition outcomes covered 4/4
-     1611:  241:                          (perception->v_ego > V_EGO_MAX)) ? 1U : 0U;
+     1611:  242:                          (perception->v_ego > V_EGO_MAX)) ? 1U : 0U;
 branch  0 taken 1 (fallthrough)
 branch  1 taken 1610
-        -:  242:
-     1614:  243:    if (speed_out_of_range != 0U)
+        -:  243:
+     1614:  244:    if (speed_out_of_range != 0U)
 branch  0 taken 4 (fallthrough)
 branch  1 taken 1610
 condition outcomes covered 2/2
-        -:  244:    {
-        4:  245:        if ((perception->v_ego < 0.01f) && (current_state >= FSM_BRAKE_L1))
+        -:  245:    {
+        -:  246:        /* Three sub-cases. Each terminating branch carries its own copy of
+        -:  247:         * the four trailer statements (brake_active = 0, alert_level = 0,
+        -:  248:         * decel_target = 0, state_timer += delta_t_s) and `return`. The
+        -:  249:         * duplication is intentional: the third sub-case must NOT zero
+        -:  250:         * those fields because Priority 4 will set them itself. Keep the
+        -:  251:         * three blocks in lockstep if any of these trailer fields is ever
+        -:  252:         * extended or renamed. */
+        -:  253:
+        4:  254:        if ((perception->v_ego < V_STOP_THRESHOLD) &&
 branch  0 taken 2 (fallthrough)
 branch  1 taken 2
 branch  2 taken 1 (fallthrough)
 branch  3 taken 1
 condition outcomes covered 4/4
-        -:  246:        {
-        1:  247:            fsm_out->fsm_state = (uint8_t)FSM_POST_BRAKE;
-        1:  248:            m_fsm_mem.post_brake_timer_s = 0.0f;
-        -:  249:        }
-        -:  250:        else
-        -:  251:        {
-        3:  252:            fsm_out->fsm_state = (uint8_t)FSM_STANDBY;
-        -:  253:        }
-        4:  254:        fsm_out->brake_active = 0U;
-        4:  255:        fsm_out->alert_level = 0U;
-        4:  256:        fsm_out->decel_target = 0.0f;
-        4:  257:        fsm_out->state_timer += delta_t_s;
-        4:  258:        return;
-        -:  259:    }
-        -:  260:
-        -:  261:    /* ===== PRIORITY 4: State Transition Logic ===== */
-     1610:  262:    new_state = current_state;
-        -:  263:
-     1610:  264:    switch (current_state)
+        -:  255:            (current_state >= FSM_BRAKE_L1))
+        -:  256:        {
+        -:  257:            /* Vehicle has come to a full stop while braking — hand off to
+        -:  258:             * POST_BRAKE for the brake-hold timer (FR-BRK-005). */
+        1:  259:            fsm_out->fsm_state = (uint8_t)FSM_POST_BRAKE;
+        1:  260:            m_fsm_mem.post_brake_timer_s = 0.0f;
+        1:  261:            fsm_out->brake_active = 0U;
+        1:  262:            fsm_out->alert_level = 0U;
+        1:  263:            fsm_out->decel_target = 0.0f;
+        1:  264:            fsm_out->state_timer += delta_t_s;
+        1:  265:            return;
+        -:  266:        }
+       3*:  267:        if ((current_state < FSM_BRAKE_L1) || (current_state > FSM_BRAKE_L3))
+branch  0 taken 0 (fallthrough)
+branch  1 taken 3
+branch  2 never executed (fallthrough)
+branch  3 never executed
+condition outcomes covered 1/4
+condition  0 not covered (false)
+condition  1 not covered (true false)
+        -:  268:        {
+        -:  269:            /* Not in an active braking state (STANDBY / WARNING / OFF /
+        -:  270:             * POST_BRAKE) and out-of-range: drop cleanly to STANDBY. The
+        -:  271:             * POST_BRAKE case is included here on purpose — its hold
+        -:  272:             * timer must not be lengthened by a low-speed dip; if v_ego
+        -:  273:             * has not yet fallen below V_STOP_THRESHOLD we treat it as
+        -:  274:             * an out-of-range exit. */
+        3:  275:            fsm_out->fsm_state = (uint8_t)FSM_STANDBY;
+        3:  276:            fsm_out->brake_active = 0U;
+        3:  277:            fsm_out->alert_level = 0U;
+        3:  278:            fsm_out->decel_target = 0.0f;
+        3:  279:            fsm_out->state_timer += delta_t_s;
+        3:  280:            return;
+        -:  281:        }
+        -:  282:        /* Actively braking (BRAKE_L1/L2/L3) with v_ego in
+        -:  283:         * [V_STOP_THRESHOLD, V_EGO_MIN): fall through to Priority 4. The
+        -:  284:         * distance-floor logic in evaluate_desired_state resolves to
+        -:  285:         * BRAKE_L1/L2/L3 while the ego is still close to the target, so
+        -:  286:         * the brake stays applied until v_ego < V_STOP_THRESHOLD hits
+        -:  287:         * the first branch above and hands off to POST_BRAKE. */
+        -:  288:    }
+        -:  289:
+        -:  290:    /* ===== PRIORITY 4: State Transition Logic ===== */
+     1610:  291:    new_state = current_state;
+        -:  292:
+     1610:  293:    switch (current_state)
 branch  0 taken 304
 branch  1 taken 1252
 branch  2 taken 26
 branch  3 taken 28
-        -:  265:    {
-      304:  266:        case FSM_POST_BRAKE:
-      304:  267:            m_fsm_mem.post_brake_timer_s += delta_t_s;
-      304:  268:            if ((m_fsm_mem.post_brake_timer_s >= 2.0f) ||
+        -:  294:    {
+      304:  295:        case FSM_POST_BRAKE:
+      304:  296:            m_fsm_mem.post_brake_timer_s += delta_t_s;
+      304:  297:            if ((m_fsm_mem.post_brake_timer_s >= 2.0f) ||
 branch  0 taken 303 (fallthrough)
 branch  1 taken 1
 condition outcomes covered 4/4
-      303:  269:                (driver->accel_pedal != 0U))
+      303:  298:                (driver->accel_pedal != 0U))
 branch  0 taken 1 (fallthrough)
 branch  1 taken 302
-        -:  270:            {
-        2:  271:                new_state = FSM_STANDBY;
-        2:  272:                m_fsm_mem.post_brake_timer_s = 0.0f;
-        -:  273:            }
-      304:  274:            break;
-        -:  275:
-     1252:  276:        case FSM_WARNING:
-     1252:  277:            m_fsm_mem.warn_timer_s += delta_t_s;
-     1252:  278:            if (desired_state == FSM_STANDBY)
+        -:  299:            {
+        2:  300:                new_state = FSM_STANDBY;
+        2:  301:                m_fsm_mem.post_brake_timer_s = 0.0f;
+        -:  302:            }
+      304:  303:            break;
+        -:  304:
+     1252:  305:        case FSM_WARNING:
+     1252:  306:            m_fsm_mem.warn_timer_s += delta_t_s;
+     1252:  307:            if (desired_state == FSM_STANDBY)
 branch  0 taken 50 (fallthrough)
 branch  1 taken 1202
 condition outcomes covered 2/2
-        -:  279:            {
-       50:  280:                m_fsm_mem.debounce_timer_s += delta_t_s;
-       50:  281:                if (m_fsm_mem.debounce_timer_s >= 0.2f)
+        -:  308:            {
+       50:  309:                m_fsm_mem.debounce_timer_s += delta_t_s;
+       50:  310:                if (m_fsm_mem.debounce_timer_s >= 0.2f)
 branch  0 taken 2 (fallthrough)
 branch  1 taken 48
 condition outcomes covered 2/2
-        -:  282:                {
-        2:  283:                    new_state = desired_state;
-        2:  284:                    m_fsm_mem.warn_timer_s = 0.0f;
-        2:  285:                    m_fsm_mem.debounce_timer_s = 0.0f;
-        -:  286:                }
-        -:  287:            }
-     1202:  288:            else if ((desired_state == FSM_BRAKE_L1) ||
+        -:  311:                {
+        2:  312:                    new_state = desired_state;
+        2:  313:                    m_fsm_mem.warn_timer_s = 0.0f;
+        2:  314:                    m_fsm_mem.debounce_timer_s = 0.0f;
+        -:  315:                }
+        -:  316:            }
+     1202:  317:            else if ((desired_state == FSM_BRAKE_L1) ||
 branch  0 taken 1200 (fallthrough)
 branch  1 taken 2
 branch  2 taken 1198 (fallthrough)
 branch  3 taken 2
 condition outcomes covered 6/6
-     1198:  289:                     (desired_state == FSM_BRAKE_L2) ||
+     1198:  318:                     (desired_state == FSM_BRAKE_L2) ||
 branch  0 taken 3 (fallthrough)
 branch  1 taken 1195
-        -:  290:                     (desired_state == FSM_BRAKE_L3))
-        -:  291:            {
-        7:  292:                if (m_fsm_mem.warn_timer_s >= 0.8f)
+        -:  319:                     (desired_state == FSM_BRAKE_L3))
+        -:  320:            {
+        7:  321:                if (m_fsm_mem.warn_timer_s >= 0.8f)
 branch  0 taken 7 (fallthrough)
 branch  1 taken 0
 condition outcomes covered 1/2
 condition  0 not covered (false)
-        -:  293:                {
-        7:  294:                    new_state = desired_state;
-        7:  295:                    m_fsm_mem.debounce_timer_s = 0.0f;
-        -:  296:                }
-        -:  297:            }
-        -:  298:            else
-        -:  299:            {
-        -:  300:                /* MISRA C:2012 Rule 15.7: terminal else clause.
-        -:  301:                 * Reached when desired_state is WARNING (same as current)
-        -:  302:                 * — no state change, no timer reset. */
-        -:  303:            }
-     1252:  304:            break;
-        -:  305:
-       26:  306:        case FSM_BRAKE_L1:
-        -:  307:        case FSM_BRAKE_L2:
-        -:  308:        case FSM_BRAKE_L3:
-        -:  309:            /* D3: the former `if (perception->v_ego < 0.01f)` branch
-        -:  310:             * that transitioned to FSM_POST_BRAKE was unreachable — it
-        -:  311:             * is dominated by the Priority-3 speed guard above, which
-        -:  312:             * fires on v_ego < V_EGO_MIN = 2.78 m/s before control
-        -:  313:             * ever reaches this switch. Removed per V&V report Sec. 7.5
-        -:  314:             * desvio D3 (MISRA C:2012 Rule 2.1). Low-speed exit into
-        -:  315:             * POST_BRAKE is now handled exclusively by the speed guard. */
-       26:  316:            if (desired_state > current_state)
+        -:  322:                {
+        7:  323:                    new_state = desired_state;
+        7:  324:                    m_fsm_mem.debounce_timer_s = 0.0f;
+        -:  325:                }
+        -:  326:            }
+        -:  327:            else
+        -:  328:            {
+        -:  329:                /* MISRA C:2012 Rule 15.7: terminal else clause.
+        -:  330:                 * Reached when desired_state is WARNING (same as current)
+        -:  331:                 * — no state change, no timer reset. */
+        -:  332:            }
+     1252:  333:            break;
+        -:  334:
+       26:  335:        case FSM_BRAKE_L1:
+        -:  336:        case FSM_BRAKE_L2:
+        -:  337:        case FSM_BRAKE_L3:
+        -:  338:            /* D3: the former `if (perception->v_ego < 0.01f)` branch
+        -:  339:             * that transitioned to FSM_POST_BRAKE was unreachable — it
+        -:  340:             * is dominated by the Priority-3 speed guard above, which
+        -:  341:             * fires on v_ego < V_EGO_MIN = 2.78 m/s before control
+        -:  342:             * ever reaches this switch. Removed per V&V report Sec. 7.5
+        -:  343:             * desvio D3 (MISRA C:2012 Rule 2.1). Low-speed exit into
+        -:  344:             * POST_BRAKE is now handled exclusively by the speed guard. */
+       26:  345:            if (desired_state > current_state)
 branch  0 taken 1 (fallthrough)
 branch  1 taken 25
 condition outcomes covered 2/2
-        -:  317:            {
-        -:  318:                /* Escalation: immediate */
-        1:  319:                new_state = desired_state;
-        1:  320:                m_fsm_mem.debounce_timer_s = 0.0f;
-        -:  321:            }
-       25:  322:            else if (desired_state < current_state)
+        -:  346:            {
+        -:  347:                /* Escalation: immediate */
+        1:  348:                new_state = desired_state;
+        1:  349:                m_fsm_mem.debounce_timer_s = 0.0f;
+        -:  350:            }
+       25:  351:            else if (desired_state < current_state)
 branch  0 taken 20 (fallthrough)
 branch  1 taken 5
 condition outcomes covered 2/2
-        -:  323:            {
-        -:  324:                /* De-escalation: requires 200ms debounce */
-       20:  325:                m_fsm_mem.debounce_timer_s += delta_t_s;
-       20:  326:                if (m_fsm_mem.debounce_timer_s >= 0.2f)
+        -:  352:            {
+        -:  353:                /* De-escalation: requires 200ms debounce */
+       20:  354:                m_fsm_mem.debounce_timer_s += delta_t_s;
+       20:  355:                if (m_fsm_mem.debounce_timer_s >= 0.2f)
 branch  0 taken 1 (fallthrough)
 branch  1 taken 19
 condition outcomes covered 2/2
-        -:  327:                {
-        1:  328:                    new_state = desired_state;
-        1:  329:                    m_fsm_mem.debounce_timer_s = 0.0f;
-        -:  330:                }
-        -:  331:            }
-        -:  332:            else
-        -:  333:            {
-        5:  334:                m_fsm_mem.debounce_timer_s = 0.0f;
-        -:  335:            }
-       26:  336:            break;
-        -:  337:
-       28:  338:        case FSM_STANDBY:
-        -:  339:        default:
-       28:  340:            m_fsm_mem.warn_timer_s = 0.0f;
-       28:  341:            m_fsm_mem.debounce_timer_s = 0.0f;
-        -:  342:            /* FR-DEC-011: STANDBY must go to WARNING first */
-       28:  343:            if (desired_state == FSM_WARNING)
+        -:  356:                {
+        1:  357:                    new_state = desired_state;
+        1:  358:                    m_fsm_mem.debounce_timer_s = 0.0f;
+        -:  359:                }
+        -:  360:            }
+        -:  361:            else
+        -:  362:            {
+        5:  363:                m_fsm_mem.debounce_timer_s = 0.0f;
+        -:  364:            }
+       26:  365:            break;
+        -:  366:
+       28:  367:        case FSM_STANDBY:
+        -:  368:        default:
+       28:  369:            m_fsm_mem.warn_timer_s = 0.0f;
+       28:  370:            m_fsm_mem.debounce_timer_s = 0.0f;
+        -:  371:            /* FR-DEC-011: STANDBY must go to WARNING first */
+       28:  372:            if (desired_state == FSM_WARNING)
 branch  0 taken 15 (fallthrough)
 branch  1 taken 13
 condition outcomes covered 2/2
-        -:  344:            {
-       15:  345:                new_state = FSM_WARNING;
-        -:  346:            }
-       13:  347:            else if ((desired_state == FSM_BRAKE_L1) ||
+        -:  373:            {
+       15:  374:                new_state = FSM_WARNING;
+        -:  375:            }
+       13:  376:            else if ((desired_state == FSM_BRAKE_L1) ||
 branch  0 taken 12 (fallthrough)
 branch  1 taken 1
 branch  2 taken 12 (fallthrough)
 branch  3 taken 0
 condition outcomes covered 5/6
 condition  1 not covered (true)
-       12:  348:                     (desired_state == FSM_BRAKE_L2) ||
+       12:  377:                     (desired_state == FSM_BRAKE_L2) ||
 branch  0 taken 1 (fallthrough)
 branch  1 taken 11
-        -:  349:                     (desired_state == FSM_BRAKE_L3))
-        -:  350:            {
-        -:  351:                /* Force pass through WARNING (FR-DEC-011) */
-        2:  352:                new_state = FSM_WARNING;
-        -:  353:            }
-        -:  354:            else
-        -:  355:            {
-        -:  356:                /* MISRA C:2012 Rule 15.7: terminal else clause.
-        -:  357:                 * Reached when desired_state is STANDBY or POST_BRAKE
-        -:  358:                 * — no transition, stay in STANDBY. */
-        -:  359:            }
-       28:  360:            break;
-        -:  361:    }
-        -:  362:
-        -:  363:    /* Update timers */
-     1610:  364:    if (new_state != current_state)
+        -:  378:                     (desired_state == FSM_BRAKE_L3))
+        -:  379:            {
+        -:  380:                /* Force pass through WARNING (FR-DEC-011) */
+        2:  381:                new_state = FSM_WARNING;
+        -:  382:            }
+        -:  383:            else
+        -:  384:            {
+        -:  385:                /* MISRA C:2012 Rule 15.7: terminal else clause.
+        -:  386:                 * Reached when desired_state is STANDBY or POST_BRAKE
+        -:  387:                 * — no transition, stay in STANDBY. */
+        -:  388:            }
+       28:  389:            break;
+        -:  390:    }
+        -:  391:
+        -:  392:    /* Update timers */
+     1610:  393:    if (new_state != current_state)
 branch  0 taken 30 (fallthrough)
 branch  1 taken 1580
 condition outcomes covered 2/2
-        -:  365:    {
-       30:  366:        fsm_out->state_timer = 0.0f;
-        -:  367:    }
-        -:  368:    else
-        -:  369:    {
-     1580:  370:        fsm_out->state_timer += delta_t_s;
-        -:  371:    }
-        -:  372:
-        -:  373:    /* Write outputs */
-     1610:  374:    fsm_out->fsm_state = (uint8_t)new_state;
-     1610:  375:    fsm_out->warn_timer = m_fsm_mem.warn_timer_s;
-     1610:  376:    fsm_out->brake_active = ((new_state >= FSM_BRAKE_L1) && (new_state <= FSM_BRAKE_L3)) ? 1U : 0U;
+        -:  394:    {
+       30:  395:        fsm_out->state_timer = 0.0f;
+        -:  396:    }
+        -:  397:    else
+        -:  398:    {
+     1580:  399:        fsm_out->state_timer += delta_t_s;
+        -:  400:    }
+        -:  401:
+        -:  402:    /* Write outputs */
+     1610:  403:    fsm_out->fsm_state = (uint8_t)new_state;
+     1610:  404:    fsm_out->warn_timer = m_fsm_mem.warn_timer_s;
+     1610:  405:    fsm_out->brake_active = ((new_state >= FSM_BRAKE_L1) && (new_state <= FSM_BRAKE_L3)) ? 1U : 0U;
 branch  0 taken 335 (fallthrough)
 branch  1 taken 1275
 branch  2 taken 33 (fallthrough)
 branch  3 taken 302
 condition outcomes covered 4/4
-     1610:  377:    fsm_out->alert_level = state_to_alert_level(new_state);
+     1610:  406:    fsm_out->alert_level = state_to_alert_level(new_state);
 call    0 returned 1610
-     1610:  378:    fsm_out->decel_target = state_to_decel_target(new_state);
+     1610:  407:    fsm_out->decel_target = state_to_decel_target(new_state);
 call    0 returned 1610
-        -:  379:}
+        -:  408:}

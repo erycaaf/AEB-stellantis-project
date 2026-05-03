@@ -9,16 +9,19 @@
             <location file="src/decision/aeb_ttc.c" line="78" column="9"/>
         </error>
         <error id="misra-c2012-15.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
-            <location file="src/decision/aeb_fsm.c" line="176" column="9"/>
+            <location file="src/decision/aeb_fsm.c" line="177" column="9"/>
         </error>
         <error id="misra-c2012-15.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
-            <location file="src/decision/aeb_fsm.c" line="218" column="9"/>
+            <location file="src/decision/aeb_fsm.c" line="219" column="9"/>
         </error>
         <error id="misra-c2012-15.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
-            <location file="src/decision/aeb_fsm.c" line="236" column="9"/>
+            <location file="src/decision/aeb_fsm.c" line="237" column="9"/>
         </error>
         <error id="misra-c2012-15.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
-            <location file="src/decision/aeb_fsm.c" line="258" column="9"/>
+            <location file="src/decision/aeb_fsm.c" line="265" column="13"/>
+        </error>
+        <error id="misra-c2012-15.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" file0="src/decision/aeb_fsm.c">
+            <location file="src/decision/aeb_fsm.c" line="280" column="13"/>
         </error>
         <error id="misra-c2012-2.3" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
             <location file="include/aeb_types.h" line="78" column="1"/>
@@ -61,9 +64,6 @@
         </error>
         <error id="misra-c2012-2.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
             <location file="include/aeb_config.h" line="49" column="0"/>
-        </error>
-        <error id="misra-c2012-2.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
-            <location file="include/aeb_config.h" line="50" column="0"/>
         </error>
         <error id="misra-c2012-2.5" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
             <location file="include/aeb_config.h" line="53" column="0"/>
