@@ -739,6 +739,107 @@ TEST(test_tx_alert_send_failure)
     
     can_hal_test_force_send_fail(0);
 }
+
+/* ================================================================
+ * TEST: All brake_mode switch cases in can_tx_brake_cmd
+ * ================================================================ */
+TEST(test_brake_mode_all_cases)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    pid_output_t pid = { .brake_pct = 50.0F, .brake_bar = 5.0F };
+    fsm_output_t fsm;
+
+    /* Test FSM_OFF */
+    fsm.fsm_state = (uint8_t)FSM_OFF;
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    /* Test FSM_STANDBY */
+    fsm.fsm_state = (uint8_t)FSM_STANDBY;
+    rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    /* Test FSM_WARNING */
+    fsm.fsm_state = (uint8_t)FSM_WARNING;
+    rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    /* Test FSM_BRAKE_L2 */
+    fsm.fsm_state = (uint8_t)FSM_BRAKE_L2;
+    rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    /* Test FSM_POST_BRAKE */
+    fsm.fsm_state = (uint8_t)FSM_POST_BRAKE;
+    rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    /* Test invalid (default case) */
+    fsm.fsm_state = 0xFFU;
+    rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+}
+
+/* ================================================================
+ * TEST: All ttc_thresh switch cases in can_tx_fsm_state
+ * ================================================================ */
+TEST(test_ttc_thresh_all_cases)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    fsm_output_t fsm;
+
+    /* Force send by setting tx_cycle_counter high */
+    state.tx_cycle_counter = 5U;
+
+    /* Test FSM_BRAKE_L1 */
+    fsm.fsm_state = (uint8_t)FSM_BRAKE_L1;
+    int32_t rc = can_tx_fsm_state(&state, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    state.tx_cycle_counter = 5U;
+    /* Test FSM_BRAKE_L2 */
+    fsm.fsm_state = (uint8_t)FSM_BRAKE_L2;
+    rc = can_tx_fsm_state(&state, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    state.tx_cycle_counter = 5U;
+    /* Test FSM_BRAKE_L3 */
+    fsm.fsm_state = (uint8_t)FSM_BRAKE_L3;
+    rc = can_tx_fsm_state(&state, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    state.tx_cycle_counter = 5U;
+    /* Test invalid (default case) */
+    fsm.fsm_state = 0xFFU;
+    rc = can_tx_fsm_state(&state, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+}
+
+/* ================================================================
+ * TEST: can_tx_fsm_state HAL send failure branch 
+ * ================================================================ */
+TEST(test_tx_fsm_state_hal_send_failure_branch)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    can_hal_test_force_send_fail(1);
+    (void)can_init(&state);
+
+    /* Force send by setting tx_cycle_counter high */
+    state.tx_cycle_counter = 5U;
+
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_WARNING };
+    int32_t rc = can_tx_fsm_state(&state, &fsm);
+    ASSERT_EQ(rc, CAN_ERR_TX);
+
+    can_hal_test_force_send_fail(0);
+}
 /* ═══════════════════════════════════════════════════════════════════════
  *  MAIN
  * ═══════════════════════════════════════════════════════════════════════ */
@@ -781,6 +882,9 @@ int main(void)
     RUN(test_tx_uds_response_send_failure);
     RUN(test_clear_uds_request_pending_valid_state);
     RUN(test_tx_alert_send_failure);
+    RUN(test_brake_mode_all_cases);
+    RUN(test_ttc_thresh_all_cases);
+    RUN(test_tx_fsm_state_hal_send_failure_branch);
 
     printf("\n=== Results: %d run, %d passed, %d failed ===\n",
            tests_run, tests_passed, tests_failed);
