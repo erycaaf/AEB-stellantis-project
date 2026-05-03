@@ -608,7 +608,137 @@ TEST(test_check_timeout_null)
     can_check_timeout(NULL);
     ASSERT_EQ(1, 1);
 }
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: Trigger decode_unsigned via can_rx_process
+ *  decode_unsigned is called indirectly when receiving messages
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_decode_unsigned_via_rx)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
 
+    /* EgoVehicle frame - decodes vehicle_speed, etc. */
+    uint8_t frame[8] = {0};
+    can_pack_signal(frame, 0U, 16U, 5000U);
+    can_pack_signal(frame, 16U, 16U, 30000U);
+    
+    can_rx_process(&state, CAN_ID_EGO_VEHICLE, frame, 8U);
+    
+    can_rx_data_t rx;
+    can_get_rx_data(&state, &rx);
+    
+    ASSERT_FLOAT_NEAR(rx.vehicle_speed, 50.0F, 0.1F);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: can_init HAL failure branch
+ *  Force HAL initialization failure
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_init_hal_failure_branch)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    
+    can_hal_test_force_init_fail(1);
+    
+    int32_t rc = can_init(&state);
+    ASSERT_EQ(rc, CAN_ERR_INIT);
+    ASSERT_EQ(state.initialised, 0U);
+    
+    can_hal_test_force_init_fail(0);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: can_tx_brake_cmd alive_counter wrap - verify zero
+ *  Verify that when wrap occurs, the value returns to 0
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_tx_brake_cmd_alive_counter_wrap_to_zero)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    pid_output_t pid = { .brake_pct = 75.0F, .brake_bar = 7.5F };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L3 };
+
+    for (uint8_t i = 0U; i < 16U; i++)
+    {
+        (void)can_tx_brake_cmd(&state, &pid, &fsm);
+    }
+    
+    ASSERT_EQ(state.alive_counter, 0U);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: can_tx_uds_response HAL send failure
+ *  Force UDS response send failure
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_tx_uds_response_send_failure)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+    
+    can_hal_test_force_send_fail(1);
+    
+    uds_response_t resp;
+    resp.response_sid   = 0x62U;
+    resp.did_high_resp  = 0xF1U;
+    resp.did_low_resp   = 0x01U;
+    resp.data1          = 0x00U;
+    resp.data2          = 0x00U;
+    resp.data3          = 0x00U;
+    resp.data4          = 0x00U;
+    resp.data5          = 0x00U;
+
+    int32_t rc = can_tx_uds_response(&resp);
+    ASSERT_EQ(rc, CAN_ERR_TX);
+    
+    can_hal_test_force_send_fail(0);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: can_clear_uds_request_pending with valid state
+ *  Verify that the flag is cleared correctly
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_clear_uds_request_pending_valid_state)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+    
+    uint8_t frame[4] = { 0x22U, 0xF1U, 0x01U, 0x00U };
+    can_rx_process(&state, CAN_ID_UDS_REQUEST, frame, CAN_DLC_UDS_REQUEST);
+    
+    can_rx_data_t rx;
+    can_get_rx_data(&state, &rx);
+    ASSERT_EQ(rx.uds_request_pending, 1U);
+    
+    can_clear_uds_request_pending(&state);
+    
+    can_get_rx_data(&state, &rx);
+    ASSERT_EQ(rx.uds_request_pending, 0U);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TEST: can_tx_alert HAL send failure
+ *  Force alert send failure
+ * ═══════════════════════════════════════════════════════════════════════ */
+TEST(test_tx_alert_send_failure)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+    
+    can_hal_test_force_send_fail(1);
+    
+    alert_output_t alert = { .alert_type = 3U, .alert_active = 1U, .buzzer_cmd = 4U };
+    int32_t rc = can_tx_alert(&alert);
+    ASSERT_EQ(rc, CAN_ERR_TX);
+    
+    can_hal_test_force_send_fail(0);
+}
 /* ═══════════════════════════════════════════════════════════════════════
  *  MAIN
  * ═══════════════════════════════════════════════════════════════════════ */
@@ -637,8 +767,6 @@ int main(void)
     RUN(test_rx_uds_request_short_dlc);
     RUN(test_tx_uds_response);
     RUN(test_uds_request_ack);
-
-    /* NEW TESTS */
     RUN(test_tx_brake_cmd_null_params);
     RUN(test_tx_brake_cmd_alive_counter_wrap);
     RUN(test_tx_fsm_state_null_params);
@@ -647,6 +775,12 @@ int main(void)
     RUN(test_encode_unsigned_saturation);
     RUN(test_tx_alert_null);
     RUN(test_check_timeout_null);
+    RUN(test_decode_unsigned_via_rx);
+    RUN(test_init_hal_failure_branch);
+    RUN(test_tx_brake_cmd_alive_counter_wrap_to_zero);
+    RUN(test_tx_uds_response_send_failure);
+    RUN(test_clear_uds_request_pending_valid_state);
+    RUN(test_tx_alert_send_failure);
 
     printf("\n=== Results: %d run, %d passed, %d failed ===\n",
            tests_run, tests_passed, tests_failed);
