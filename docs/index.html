@@ -147,33 +147,6 @@
 
 </div>
 
-<h2>Perception</h2>
-<p class="module-meta">
-  ASIL-D V&amp;V stack: MC/DC coverage, memory safety (Valgrind + ASan + UBSan),
-  MISRA C:2012 conformance, fault injection. Covers Kalman-filter sensor fusion
-  (LiDAR + radar) and confidence estimation.
-  <a href="https://github.com/erycaaf/AEB-stellantis-project/blob/development/src/perception/aeb_perception.c">source</a>
-</p>
-<div class="grid">
-
-  <div class="card">
-    <h3><span class="branch-tag branch-main">main</span></h3>
-    <a href="vv_perception/main/coverage_mcdc/">MC/DC coverage</a>
-    <a href="vv_perception/main/misra/">MISRA C:2012</a>
-    <a href="vv_perception/main/memory_safety/">Memory safety</a>
-    <a href="vv_perception/main/fault_injection/">Fault injection</a>
-  </div>
-
-  <div class="card">
-    <h3><span class="branch-tag branch-dev">development</span></h3>
-    <a href="vv_perception/development/coverage_mcdc/">MC/DC coverage</a>
-    <a href="vv_perception/development/misra/">MISRA C:2012</a>
-    <a href="vv_perception/development/memory_safety/">Memory safety</a>
-    <a href="vv_perception/development/fault_injection/">Fault injection</a>
-  </div>
-
-</div>
-
 <h2>PID + Alert</h2>
 <p class="module-meta">
   ASIL-D V&amp;V stack: MC/DC coverage, memory safety (Valgrind + ASan + UBSan),
@@ -204,8 +177,8 @@
 
 <h2>Other modules</h2>
 <div class="placeholder">
-  The CAN Interface V&amp;V workflow is in progress. Its reports will appear
-  here once the corresponding <code>vv-can.yml</code> workflow is merged into
+  The Perception and CAN Interface V&amp;V workflows are in progress. Their reports
+  will appear here once the corresponding workflows are merged into
   <code>development</code>.
 </div>
 
