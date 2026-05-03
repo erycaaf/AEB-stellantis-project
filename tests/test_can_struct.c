@@ -74,6 +74,10 @@ static uint32_t emit_brake_mode_for(uint8_t fsm_state)
     return can_unpack_signal(rec->data, 16U, 3U);
 }
 
+#ifndef CAN_TICK_PENDING
+#define CAN_TICK_PENDING 1   /* can_tx_fsm_state: frame queued, not yet flushed */
+#endif
+
 static uint32_t emit_ttc_raw_for(uint8_t fsm_state)
 {
     can_state_t  state;
@@ -85,7 +89,7 @@ static uint32_t emit_ttc_raw_for(uint8_t fsm_state)
     for (uint8_t i = 0U; i < 5U; i++) {
         rc = can_tx_fsm_state(&state, &fsm);
     }
-    if (rc != CAN_OK && rc != 1) { return 0xFFFFU; }
+    if (rc != CAN_OK && rc != CAN_TICK_PENDING) { return 0xFFFFU; }
     const tx_record_t *rec = can_hal_test_get_tx(0);
     if (rec == NULL) { return 0xFFFFU; }
     return can_unpack_signal(rec->data, 24U, 8U);

@@ -10,5 +10,5 @@ NFR-SAF-ROB,fault_initialised,corrupt after init,no functional impact,P,reports/
 NFR-SAF-ROB,fault_payload_null,NULL pointer,returns CAN_ERR_TX,P,reports/vv_can/fault_injection/run.log
 NFR-SAF-ROB,fault_hal_fail,HAL send fail,returns CAN_ERR_TX,P,reports/vv_can/fault_injection/run.log
 NFR-SAF-ROB,encode_unsigned_neg,negative pressure,clamped to 0,P,reports/vv_can/logs/test_can_struct.log
-NFR-MEM-001,valgrind_check,nominal suite,0 leaks / 0 errors,P,reports/vv_can/memory_safety/valgrind_test_can.log
+NFR-MEM-001,valgrind_check,nominal suite,verified by CI (vv-can.yml Gate 2 — Valgrind + ASan + UBSan),CI,https://github.com/erycaaf/AEB-stellantis-project/actions/workflows/vv-can.yml
 NFR-MIS-001,cppcheck_scan,aeb_can.c,linked to Issue #74,P,reports/vv_can/misra/run.log

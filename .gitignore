@@ -64,6 +64,10 @@ reports/vv_can/coverage_mcdc/*.png
 reports/vv_can/coverage_mcdc/html/
 reports/vv_can/coverage_mcdc/report.html
 reports/vv_can/misra/html/
+reports/vv_can/fault_injection/*.log
+reports/vv_can/memory_safety/*.log
+reports/vv_can/misra/cppcheck_can.xml
+reports/vv_can/misra/run.log
 
 # Consolidated V&V reports live in the team docs area, not in the repo
 reports/vv_uds/*.tex

@@ -836,28 +836,15 @@ misra-can:
 		2> $(VV_REPORT_DIR)/misra/cppcheck_can.xml
 	@echo "cppcheck XML -> $(VV_REPORT_DIR)/misra/cppcheck_can.xml"
 
-# ── Navigable HTML reports (lcov genhtml + cppcheck-htmlreport + wrappers) ─
-# Mirrors html-uds: fails loudly rather than publishes an empty bundle.
+# ── Navigable HTML reports (cppcheck-htmlreport + wrappers) ──────────────
+# Coverage HTML comes from gcovr's report.html already produced by mcdc-can.
+# No lcov/genhtml needed — gcovr is the single HTML coverage tool for CAN.
 html-can:
-	@mkdir -p $(VV_REPORT_DIR)/coverage_html $(VV_REPORT_DIR)/misra_html
-	@if [ ! -d $(VV_REPORT_DIR)/coverage_mcdc ]; then \
-		echo "html-can: missing $(VV_REPORT_DIR)/coverage_mcdc — run mcdc-can first"; \
+	@mkdir -p $(VV_REPORT_DIR)/misra_html
+	@if [ ! -f $(VV_REPORT_DIR)/coverage_mcdc/report.html ]; then \
+		echo "html-can: missing $(VV_REPORT_DIR)/coverage_mcdc/report.html — run mcdc-can first"; \
 		exit 1; \
 	fi
-	lcov --capture --directory $(VV_REPORT_DIR)/coverage_mcdc \
-		--gcov-tool $(GCOV) \
-		--rc branch_coverage=1 \
-		--ignore-errors inconsistent \
-		--output-file $(VV_REPORT_DIR)/coverage_html/coverage.info
-	lcov --extract $(VV_REPORT_DIR)/coverage_html/coverage.info '*aeb_can.c' \
-		--rc branch_coverage=1 \
-		--ignore-errors inconsistent \
-		--output-file $(VV_REPORT_DIR)/coverage_html/coverage_can.info
-	genhtml $(VV_REPORT_DIR)/coverage_html/coverage_can.info \
-		--branch-coverage \
-		--title "CAN Coverage" \
-		--legend \
-		--output-directory $(VV_REPORT_DIR)/coverage_html
 	@if [ ! -s $(VV_REPORT_DIR)/misra/cppcheck_can.xml ]; then \
 		echo "html-can: missing cppcheck_can.xml — run misra-can first"; \
 		exit 1; \
@@ -867,10 +854,9 @@ html-can:
 		--report-dir=$(VV_REPORT_DIR)/misra_html \
 		--source-dir=. \
 		--title="CAN MISRA C:2012 Report"
-	# Memory + fault HTML wrappers (shared scripts, agnostic per module).
 	@bash scripts/wrap_memory.sh can $(VV_REPORT_DIR)
 	@python3 scripts/wrap_fault.py can $(VV_REPORT_DIR)
-	@echo "=== HTML reports in $(VV_REPORT_DIR)/{coverage_html,misra_html,memory_html,fault_html}/ ==="
+	@echo "=== HTML reports in $(VV_REPORT_DIR)/{coverage_mcdc,misra_html,memory_html,fault_html}/ ==="
 
 # ── Full V&V bundle — one command reproduces every artefact ──────────────
 vv-can: mcdc-can fault-can memory-can misra-can html-can
@@ -918,8 +904,13 @@ vv-clean:
 	       reports/vv_can/memory_html \
 	       reports/vv_can/fault_html \
 	       reports/vv_can/misra
+	rm -f test_can_exe test_can_exe-* \
+	      test_can_fault_exe test_can_fault_exe-* \
+	      test_can_struct_exe test_can_struct_exe-* \
+	      test_mem
 
 clean: vv-clean
 	rm -f $(TEST_BINS) test_decision_cov test_decision_mcdc test_decision_fault \
+	      test_can_exe test_can_fault_exe test_can_struct_exe test_mem \
 	      *.o *.gcda *.gcno *.gcov
 	rm -rf coverage_mcdc memory_safety
