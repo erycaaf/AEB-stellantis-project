@@ -708,17 +708,24 @@ vv-perception: mcdc-perception fault-perception memory-perception misra-percepti
 
 mcdc-can:
 	@rm -rf $(VV_REPORT_DIR)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR)/coverage_mcdc
+	@echo "=== MC/DC coverage — aeb_can.c (nominal + fault + struct suites) ==="
 	# Compile all 3 test binaries with coverage
 	$(CC) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can $(SRC_CAN_TEST) $(LDFLAGS)
 	$(CC) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_fault $(SRC_CAN_FAULT_TEST) $(LDFLAGS)
 	$(CC) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_struct $(SRC_CAN_STRUCT_TEST) $(LDFLAGS)
-	# Run all 3 tests (accumulate .gcda on the same object)
-	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
-		./test_can > run.log 2>&1 && \
-		./test_can_fault >> run.log 2>&1 && \
-		./test_can_struct >> run.log 2>&1 && \
-		grep "Results:" run.log
-	# Generate combined coverage report (gcov -b -c)
+	@echo ""
+	@echo "--- Running test_can (nominal suite) ---"
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_can
+	@echo ""
+	@echo "--- Running test_can_fault (fault injection suite) ---"
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_can_fault; \
+		rc=$$?; \
+		echo "Exit code: $$rc"
+	@echo ""
+	@echo "--- Running test_can_struct (structural complementary suite) ---"
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_can_struct
+	@echo ""
+	@echo "--- Generating combined coverage report (gcov -b -c) ---"
 	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
 		gcov -b -c test_can-aeb_can.gcno > gcov_summary.txt 2>&1 && \
 		cat gcov_summary.txt
