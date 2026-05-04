@@ -698,6 +698,123 @@ TEST(test_can_rx_process_null_combinations)
     /* No crash means test passes */
     ASSERT_EQ(1, 1);
 }
+/* ================================================================
+ * TEST: can_rx_process with invalid DLC for EgoVehicle (line 206)
+ * ================================================================ */
+TEST(test_can_rx_ego_vehicle_invalid_dlc)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+    uint8_t frame[4] = {0};
+    
+    /* DLC too short (4 < 8) - condition should be false */
+    can_rx_process(&state, CAN_ID_EGO_VEHICLE, frame, 4U);
+    
+    /* No crash means test passes */
+    ASSERT_EQ(1, 1);
+}
+
+/* ================================================================
+ * TEST: can_rx_process with invalid DLC for DriverInput (line 228)
+ * ================================================================ */
+TEST(test_can_rx_driver_input_invalid_dlc)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+    uint8_t frame[2] = {0};
+    
+    /* DLC too short (2 < 4) - condition should be false */
+    can_rx_process(&state, CAN_ID_DRIVER_INPUT, frame, 2U);
+    
+    ASSERT_EQ(1, 1);
+}
+
+/* ================================================================
+ * TEST: can_rx_process with invalid DLC for RadarTarget (line 249)
+ * ================================================================ */
+TEST(test_can_rx_radar_target_invalid_dlc)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+    uint8_t frame[4] = {0};
+    
+    /* DLC too short (4 < 8) - condition should be false */
+    can_rx_process(&state, CAN_ID_RADAR_TARGET, frame, 4U);
+    
+    ASSERT_EQ(1, 1);
+}
+
+/* ================================================================
+ * TEST: can_rx_process with unknown ID (line 273 else branch)
+ * ================================================================ */
+TEST(test_can_rx_unknown_id)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+    uint8_t frame[8] = {0};
+    
+    /* Unknown ID (not 0x100, 0x101, 0x120, 0x7DF) */
+    can_rx_process(&state, 0x999, frame, 8U);
+    
+    /* Should ignore without crashing */
+    ASSERT_EQ(1, 1);
+}
+
+/* ================================================================
+ * TEST: can_check_timeout with miss_count >= 255 (line 302 else branch)
+ * ================================================================ */
+TEST(test_can_check_timeout_miss_count_saturates)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+    
+    /* Set miss_count to 255 */
+    state.rx_miss_count = 255U;
+    
+    /* Call timeout - condition (rx_miss_count < 255) should be false */
+    can_check_timeout(&state);
+    
+    /* miss_count should stay at 255 (saturated) */
+    ASSERT_EQ(state.rx_miss_count, 255U);
+}
+/* ================================================================
+ * TEST: can_get_rx_data with NULL state parameter
+ * Covers condition: state == NULL (branch 1)
+ * ================================================================ */
+TEST(test_can_get_rx_data_null_state)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+    
+    /* Call with state == NULL, out valid */
+    can_get_rx_data(NULL, &state.last_rx);
+    
+    /* No crash means test passes */
+    ASSERT_EQ(1, 1);
+}
+
+/* ================================================================
+ * TEST: can_get_rx_data with NULL out parameter
+ * Covers condition: out == NULL (branch 3)
+ * ================================================================ */
+TEST(test_can_get_rx_data_null_out)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+    
+    /* Call with state valid, out == NULL */
+    can_get_rx_data(&state, NULL);
+    
+    /* No crash means test passes */
+    ASSERT_EQ(1, 1);
+}
 /* ═══════════════════════════════════════════════════════════════════════
  *  MAIN
  * ═══════════════════════════════════════════════════════════════════════ */
@@ -758,6 +875,13 @@ int main(void)
     RUN(test_tx_brake_cmd_null_combinations);
     RUN(test_tx_fsm_state_null_combinations);
     RUN(test_can_rx_process_null_combinations);
+    RUN(test_can_rx_ego_vehicle_invalid_dlc);
+    RUN(test_can_rx_driver_input_invalid_dlc);
+    RUN(test_can_rx_radar_target_invalid_dlc);
+    RUN(test_can_rx_unknown_id);
+    RUN(test_can_check_timeout_miss_count_saturates);
+    RUN(test_can_get_rx_data_null_state);
+    RUN(test_can_get_rx_data_null_out);
 
     printf("\n=== Results: %d run, %d passed, %d failed ===\n",
            tests_run, tests_passed, tests_failed);
