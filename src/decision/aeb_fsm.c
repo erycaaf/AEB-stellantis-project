@@ -2,13 +2,15 @@
  * @file aeb_fsm.c
  * @brief Implementation of 7-state AEB Finite State Machine.
  * @author Lourenço Jamba Mphili
- * @requirements FR-FSM-001 to FR-FSM-006, FR-DEC-004 to FR-DEC-011
+ * @requirements FR-FSM-001 to FR-FSM-006, FR-DEC-004 to FR-DEC-011,
+ *               FR-BRK-001 (low-speed brake hold via Priority-3 fall-through)
  * @misra Fully compliant with MISRA C:2012
  */
 
 #include "aeb_fsm.h"
 #include "aeb_config.h"
 #include "aeb_types.h"
+#include <math.h>    /* isfinite() — Bug #3 guard in fsm_step entry */
 #include <stddef.h>
 
 /* Steering override threshold (degrees) - FR-FSM-006 */
@@ -160,19 +162,50 @@ void fsm_step(float32_t delta_t_s,
     fsm_state_e new_state;
     uint8_t driver_override = 0U;
     uint8_t speed_out_of_range = 0U;
+    uint8_t aeb_enabled_norm;
 
-    /* Defensive checks */
-    if ((delta_t_s <= 0.0f) || (perception == NULL) ||
-        (driver == NULL) || (ttc_in == NULL) || (fsm_out == NULL))
+    /* Defensive checks.
+     * Bug #3: reject non-finite delta_t_s. IEEE 754 comparisons with NaN
+     * are always false, so (delta_t_s <= 0.0f) alone lets NaN through.
+     * A NaN delta_t would poison the warn_timer / debounce_timer
+     * accumulators on the first `+= delta_t_s`, silently breaking
+     * debounce, escalation, and POST_BRAKE timeout logic. */
+    if ((!isfinite(delta_t_s)) || (delta_t_s <= 0.0f) ||
+        (perception == NULL) || (driver == NULL) ||
+        (ttc_in == NULL) || (fsm_out == NULL))
     {
         return;
     }
 
+    /* Bug #2 SEU hardening: normalise driver->aeb_enabled to a strict
+     * Boolean at entry. A bit-flip that turns 1U into (say) 0xAA would
+     * otherwise make (aeb_enabled == 0U) false and leave the FSM running
+     * on corrupted state. Strict match: only the canonical 1U bit pattern
+     * counts as enabled. Any other value (0U, SEU-corrupted bit patterns,
+     * garbage from uninitialised memory) falls safe to disabled → FSM_OFF
+     * via the Priority-1 check below. */
+    aeb_enabled_norm = (driver->aeb_enabled == 1U) ? 1U : 0U;
+
     current_state = (fsm_state_e)fsm_out->fsm_state;
+
+    /* Bug #4 SEU hardening: normalise out-of-enum fsm_state to the
+     * fail-safe FSM_STANDBY. A bit-flip in RAM could corrupt the
+     * persisted fsm_state byte (e.g. 1 -> 42), which would then be
+     * inherited by new_state at the top of the transition logic and,
+     * on iterations where desired_state resolves to STANDBY, would be
+     * written back unchanged into fsm_out->fsm_state — and broadcast
+     * via CAN/UDS to actuators and displays. STANDBY is the conservative
+     * choice: zero braking demand, no alert. */
+    if ((uint8_t)current_state > (uint8_t)FSM_POST_BRAKE)
+    {
+        current_state = FSM_STANDBY;
+        fsm_out->fsm_state = (uint8_t)FSM_STANDBY;
+    }
+
     desired_state = evaluate_desired_state(perception, ttc_in);
 
     /* ===== PRIORITY 1: Fault and Safety ===== */
-    if ((perception->fault_flag != 0U) || (driver->aeb_enabled == 0U))
+    if ((perception->fault_flag != 0U) || (aeb_enabled_norm == 0U))
     {
         fsm_out->fsm_state = (uint8_t)FSM_OFF;
         fsm_out->brake_active = 0U;
@@ -187,9 +220,9 @@ void fsm_step(float32_t delta_t_s,
     }
 
     /* ===== PRIORITY 2: Driver Override ===== */
-    driver_override = (driver->brake_pedal != 0U) ||
-                      (driver->steering_angle > STEERING_OVERRIDE_DEG) ||
-                      (driver->steering_angle < -STEERING_OVERRIDE_DEG);
+    driver_override = ((driver->brake_pedal != 0U) ||
+                       (driver->steering_angle > STEERING_OVERRIDE_DEG) ||
+                       (driver->steering_angle < -STEERING_OVERRIDE_DEG)) ? 1U : 0U;
 
     if ((driver_override != 0U) && (current_state != FSM_POST_BRAKE))
     {
@@ -205,25 +238,53 @@ void fsm_step(float32_t delta_t_s,
     }
 
     /* ===== PRIORITY 3: Speed Range Validation ===== */
-    speed_out_of_range = (perception->v_ego < V_EGO_MIN) ||
-                         (perception->v_ego > V_EGO_MAX);
+    speed_out_of_range = ((perception->v_ego < V_EGO_MIN) ||
+                          (perception->v_ego > V_EGO_MAX)) ? 1U : 0U;
 
     if (speed_out_of_range != 0U)
     {
-        if ((perception->v_ego < 0.01f) && (current_state >= FSM_BRAKE_L1))
+        /* Three sub-cases. Each terminating branch carries its own copy of
+         * the four trailer statements (brake_active = 0, alert_level = 0,
+         * decel_target = 0, state_timer += delta_t_s) and `return`. The
+         * duplication is intentional: the third sub-case must NOT zero
+         * those fields because Priority 4 will set them itself. Keep the
+         * three blocks in lockstep if any of these trailer fields is ever
+         * extended or renamed. */
+
+        if ((perception->v_ego < V_STOP_THRESHOLD) &&
+            (current_state >= FSM_BRAKE_L1))
         {
+            /* Vehicle has come to a full stop while braking — hand off to
+             * POST_BRAKE for the brake-hold timer (FR-BRK-005). */
             fsm_out->fsm_state = (uint8_t)FSM_POST_BRAKE;
             m_fsm_mem.post_brake_timer_s = 0.0f;
+            fsm_out->brake_active = 0U;
+            fsm_out->alert_level = 0U;
+            fsm_out->decel_target = 0.0f;
+            fsm_out->state_timer += delta_t_s;
+            return;
         }
-        else
+        if ((current_state < FSM_BRAKE_L1) || (current_state > FSM_BRAKE_L3))
         {
+            /* Not in an active braking state (STANDBY / WARNING / OFF /
+             * POST_BRAKE) and out-of-range: drop cleanly to STANDBY. The
+             * POST_BRAKE case is included here on purpose — its hold
+             * timer must not be lengthened by a low-speed dip; if v_ego
+             * has not yet fallen below V_STOP_THRESHOLD we treat it as
+             * an out-of-range exit. */
             fsm_out->fsm_state = (uint8_t)FSM_STANDBY;
+            fsm_out->brake_active = 0U;
+            fsm_out->alert_level = 0U;
+            fsm_out->decel_target = 0.0f;
+            fsm_out->state_timer += delta_t_s;
+            return;
         }
-        fsm_out->brake_active = 0U;
-        fsm_out->alert_level = 0U;
-        fsm_out->decel_target = 0.0f;
-        fsm_out->state_timer += delta_t_s;
-        return;
+        /* Actively braking (BRAKE_L1/L2/L3) with v_ego in
+         * [V_STOP_THRESHOLD, V_EGO_MIN): fall through to Priority 4. The
+         * distance-floor logic in evaluate_desired_state resolves to
+         * BRAKE_L1/L2/L3 while the ego is still close to the target, so
+         * the brake stays applied until v_ego < V_STOP_THRESHOLD hits
+         * the first branch above and hands off to POST_BRAKE. */
     }
 
     /* ===== PRIORITY 4: State Transition Logic ===== */
@@ -263,17 +324,25 @@ void fsm_step(float32_t delta_t_s,
                     m_fsm_mem.debounce_timer_s = 0.0f;
                 }
             }
+            else
+            {
+                /* MISRA C:2012 Rule 15.7: terminal else clause.
+                 * Reached when desired_state is WARNING (same as current)
+                 * — no state change, no timer reset. */
+            }
             break;
 
         case FSM_BRAKE_L1:
         case FSM_BRAKE_L2:
         case FSM_BRAKE_L3:
-            if (perception->v_ego < 0.01f)
-            {
-                new_state = FSM_POST_BRAKE;
-                m_fsm_mem.post_brake_timer_s = 0.0f;
-            }
-            else if (desired_state > current_state)
+            /* D3: the former `if (perception->v_ego < 0.01f)` branch
+             * that transitioned to FSM_POST_BRAKE was unreachable — it
+             * is dominated by the Priority-3 speed guard above, which
+             * fires on v_ego < V_EGO_MIN = 2.78 m/s before control
+             * ever reaches this switch. Removed per V&V report Sec. 7.5
+             * desvio D3 (MISRA C:2012 Rule 2.1). Low-speed exit into
+             * POST_BRAKE is now handled exclusively by the speed guard. */
+            if (desired_state > current_state)
             {
                 /* Escalation: immediate */
                 new_state = desired_state;
@@ -310,6 +379,12 @@ void fsm_step(float32_t delta_t_s,
             {
                 /* Force pass through WARNING (FR-DEC-011) */
                 new_state = FSM_WARNING;
+            }
+            else
+            {
+                /* MISRA C:2012 Rule 15.7: terminal else clause.
+                 * Reached when desired_state is STANDBY or POST_BRAKE
+                 * — no transition, stay in STANDBY. */
             }
             break;
     }

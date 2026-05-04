@@ -140,6 +140,66 @@ static void test_mcdc_decel_target_zero_in_brake_state(void)
 }
 
 /* ========================================================================= */
+/*  MC/DC Test 4 — isfinite(decel_target) == false (NaN injection)           */
+/*                                                                           */
+/*  Target: aeb_pid.c:115 -> isfinite(decel_target) != 0                     */
+/*  Atomic condition "isfinite(decel_target)" must evaluate FALSE at least   */
+/*  once. Short-circuit of the && then skips the a_ego finiteness check,    */
+/*  and inputs_finite is set to 0, so the outer guard's "inputs_finite == 0" */
+/*  condition also flips to TRUE here.                                       */
+/*                                                                           */
+/*  Real-world relevance: a corrupted sensor fusion output delivering NaN    */
+/*  as decel_target (e.g., divide-by-zero upstream) must not propagate into  */
+/*  the brake command. The guard must fail safe (brake_pct = 0).             */
+/* ========================================================================= */
+static void test_mcdc_decel_target_nan(void)
+{
+    printf("\n[MC/DC-04] isfinite(decel_target) == false (NaN -> fail-safe)\n");
+
+    pid_init();
+    pid_output_t out = {0};
+
+    /* Valid FSM state + finite a_ego, but NaN decel_target.
+     * Guard must trip on isfinite() and reset the controller.              */
+    pid_brake_step(NAN, 5.0F, (uint8_t)FSM_BRAKE_L2, &out);
+
+    TEST_ASSERT(out.brake_pct == 0.0F,
+        "brake_pct == 0 when decel_target is NaN (fail-safe)");
+    TEST_ASSERT(out.brake_bar == 0.0F,
+        "brake_bar == 0 when decel_target is NaN (fail-safe)");
+}
+
+/* ========================================================================= */
+/*  MC/DC Test 5 — isfinite(a_ego) == false (NaN injection)                  */
+/*                                                                           */
+/*  Target: aeb_pid.c:115 -> isfinite(a_ego) != 0                            */
+/*  Atomic condition "isfinite(a_ego)" must evaluate FALSE at least once     */
+/*  while isfinite(decel_target) evaluates TRUE — proving independent        */
+/*  effect on the outcome of the && (MC/DC requirement, ISO 26262-6 §9.4.2). */
+/*                                                                           */
+/*  Real-world relevance: a corrupted IMU/accel reading producing NaN or     */
+/*  +-Inf for a_ego must not be consumed by the PI error computation, where  */
+/*  it would poison the integrator and bypass clamp_f32 (IEEE 754 compares   */
+/*  return false against NaN).                                               */
+/* ========================================================================= */
+static void test_mcdc_a_ego_nan(void)
+{
+    printf("\n[MC/DC-05] isfinite(a_ego) == false (NaN -> fail-safe)\n");
+
+    pid_init();
+    pid_output_t out = {0};
+
+    /* Valid FSM state + finite positive decel_target (so C5=T, && reaches C6),
+     * but NaN a_ego. Guard must trip on isfinite(a_ego) and reset.          */
+    pid_brake_step(4.0F, NAN, (uint8_t)FSM_BRAKE_L3, &out);
+
+    TEST_ASSERT(out.brake_pct == 0.0F,
+        "brake_pct == 0 when a_ego is NaN (fail-safe)");
+    TEST_ASSERT(out.brake_bar == 0.0F,
+        "brake_bar == 0 when a_ego is NaN (fail-safe)");
+}
+
+/* ========================================================================= */
 /*  Main                                                                     */
 /* ========================================================================= */
 int main(void)
@@ -152,6 +212,8 @@ int main(void)
     test_mcdc_clamp_lower_bound();
     test_mcdc_null_output_pid_step();
     test_mcdc_decel_target_zero_in_brake_state();
+    test_mcdc_decel_target_nan();
+    test_mcdc_a_ego_nan();
 
     printf("\n========================================\n");
     printf("  Results: %d/%d passed, %d failed\n",
