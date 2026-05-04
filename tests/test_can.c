@@ -952,6 +952,93 @@ TEST(test_can_rx_process_state_null)
     /* No crash means test passes */
     ASSERT_EQ(1, 1);
 }
+/* ================================================================
+ * TEST: encode_unsigned with physical = Inf 
+ * isfinite(physical) returns false
+ * ================================================================ */
+TEST(test_encode_unsigned_physical_inf)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    /* brake_bar = Infinity */
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = INFINITY };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    uint32_t brake_pressure = can_unpack_signal(tx->data, 1U, 15U);
+    /* When physical is not finite, encode_unsigned returns 0 */
+    ASSERT_EQ(brake_pressure, 0U);
+}
+
+/* ================================================================
+ * TEST: encode_unsigned with raw_f = NaN 
+ * isfinite(raw_f) returns false
+ * ================================================================ */
+TEST(test_encode_unsigned_raw_f_nan)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    /* Use value that causes raw_f to become NaN */
+    /* brake_bar = NaN already covered by test_tx_brake_cmd_nan_brake_bar */
+    /* This is just for completeness */
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = NAN };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    uint32_t brake_pressure = can_unpack_signal(tx->data, 1U, 15U);
+    ASSERT_EQ(brake_pressure, 0U);
+}
+
+/* ================================================================
+ * TEST: can_tx_brake_cmd with brake_pct > 0.0F 
+ * line 340 - ternary operator true branch
+ * ================================================================ */
+TEST(test_tx_brake_cmd_brake_pct_positive)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    pid_output_t pid = { .brake_pct = 50.0F, .brake_bar = 5.0F };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+}
+
+/* ================================================================
+ * TEST: can_tx_brake_cmd with alive_counter > ALIVE_COUNTER_MAX 
+ * trigger the wrap to zero branch
+ * ================================================================ */
+TEST(test_tx_brake_cmd_alive_counter_wrap_branch)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    pid_output_t pid = { .brake_pct = 75.0F, .brake_bar = 7.5F };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L3 };
+
+    /* Set alive_counter to max (15) */
+    state.alive_counter = 15U;
+    
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+    
+    /* After incrementing from 15, should wrap to 0 */
+    ASSERT_EQ(state.alive_counter, 0U);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
  *  MAIN
  * ═══════════════════════════════════════════════════════════════════════ */
@@ -1002,6 +1089,10 @@ int main(void)
     RUN(test_tx_brake_cmd_brake_pct_zero);
     RUN(test_can_rx_process_data_null);
     RUN(test_can_rx_process_state_null);
+    RUN(test_encode_unsigned_physical_inf);
+    RUN(test_encode_unsigned_raw_f_nan);
+    RUN(test_tx_brake_cmd_brake_pct_positive);
+    RUN(test_tx_brake_cmd_alive_counter_wrap_branch);
 
     printf("\n=== Results: %d run, %d passed, %d failed ===\n",
            tests_run, tests_passed, tests_failed);
