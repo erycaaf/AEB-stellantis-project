@@ -745,8 +745,7 @@ mcdc-can:
 	@echo ""
 	@echo "--- Generating combined coverage report for aeb_can.c only ---"
 	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
-		$(GCOV) -b -c --conditions test_can_cov-aeb_can.gcno test_can_fault_cov-aeb_can.gcno test_can_struct_cov-aeb_can.gcno > gcov_full.txt 2>&1 && \
-		grep -A 20 "File 'src/communication/aeb_can.c'" gcov_full.txt | grep -E "Lines executed|Branches executed|Condition outcomes covered" > gcov_summary.txt && \
+		$(GCOV) -b -c --conditions aeb_can.c > gcov_summary.txt 2>&1 && \
 		cat gcov_summary.txt
 	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
 
