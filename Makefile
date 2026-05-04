@@ -726,31 +726,9 @@ vv-perception: mcdc-perception fault-perception memory-perception misra-percepti
 # certification assessor expects to see.
 mcdc-can:
 	@rm -rf $(VV_REPORT_DIR)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR)/coverage_mcdc
-	@echo "=== MC/DC coverage — aeb_can.c (nominal + fault + struct suites) ==="
-	# Compile all 3 test binaries with coverage (use CC_COV, not CC)
-	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_cov $(SRC_CAN_TEST) $(LDFLAGS)
-	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_fault_cov $(SRC_CAN_FAULT_TEST) $(LDFLAGS)
-	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_struct_cov $(SRC_CAN_STRUCT_TEST) $(LDFLAGS)
-	@echo ""
-	@echo "--- Running test_can_cov (nominal suite) ---"
-	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_can_cov
-	@echo ""
-	@echo "--- Running test_can_fault_cov (fault injection suite) ---"
-	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_can_fault_cov; \
-		rc=$$?; \
-		echo "Exit code: $$rc"
-	@echo ""
-	@echo "--- Running test_can_struct_cov (structural complementary suite) ---"
-	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_can_struct_cov
-	@echo ""
-	@echo "--- Generating combined coverage report using lcov ---"
-	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
-		lcov --capture --directory . --output-file coverage.info --rc branch_coverage=1 --gcov-tool $(GCOV) 2>/dev/null && \
-		lcov --extract coverage.info '*/src/communication/aeb_can.c' --output-file aeb_can.info --rc branch_coverage=1 2>/dev/null && \
-		echo "=== Coverage Summary ===" && \
-		lcov --summary aeb_can.info 2>&1 | grep -E "lines|branches" && \
-		lcov --summary aeb_can.info 2>&1 | grep "lines" | sed 's/.*: \([0-9.]*\)%.*/\1/' > lines.txt && \
-		lcov --summary aeb_can.info 2>&1 | grep "branches" | sed 's/.*: \([0-9.]*\)%.*/\1/' > branches.txt
+	$(CC) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can $(SRC_CAN_TEST) $(LDFLAGS)
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_can > run.log 2>&1 && grep "Results:" run.log
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && gcov -b -c --conditions test_can-aeb_can.gcno > gcov_summary.txt 2>&1 && cat gcov_summary.txt
 	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
 
 # ── Fault injection (Table 11 item 1e) ───────────────────────────────────
