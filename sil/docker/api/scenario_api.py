@@ -20,7 +20,15 @@ from pydantic import BaseModel
 import yaml
 import subprocess
 import threading
+import time
 import os
+
+try:
+    import docker as docker_sdk
+    _docker_client = docker_sdk.from_env()
+except Exception as _e:  # noqa: BLE001 — log but degrade gracefully
+    print(f"[api] docker SDK unavailable ({_e!r}) — ECU restart disabled", flush=True)
+    _docker_client = None
 
 app = FastAPI(title="AEB Scenario Control", version="1.0")
 
@@ -93,6 +101,29 @@ def ros2_pub(topic, msg_type, data_str):
         print(f"[ros2_pub] exception publishing to {topic}: {e!r}", flush=True)
 
 
+def restart_aeb_ecu():
+    """Restart the aeb-ecu container to clear latched perception state.
+
+    The Zephyr ECU's `prev_d` / `prev_vr` ROC baselines are static state
+    that only `perception_init()` clears, and that runs once at process
+    startup. After a scenario teleport jumps the target distance by > 10 m
+    (DIST_ROC_LIMIT), every subsequent radar/lidar frame is rejected as
+    a ROC violation, fault_flag latches, and the FSM is stuck in OFF.
+    Restarting the container is the cleanest way to get a fresh ECU.
+    """
+    if _docker_client is None:
+        return
+    try:
+        ecu = _docker_client.containers.get("aeb-ecu")
+        ecu.restart(timeout=2)
+        # Give the new process ~1.5 s to come up and reconnect to canbus
+        # before perception starts pumping CAN frames at it.
+        time.sleep(1.5)
+        print("[api] aeb-ecu container restarted", flush=True)
+    except Exception as e:  # noqa: BLE001
+        print(f"[api] failed to restart aeb-ecu: {e!r}", flush=True)
+
+
 def ros2_service_call(service, srv_type, data_str="{}"):
     """Call a ROS 2 service synchronously (e.g. /reset_world)."""
     cmd = ["ros2", "service", "call", service, srv_type, data_str]
@@ -144,8 +175,10 @@ def start_scenario(req: StartRequest):
         current_scenario["name"] = req.scenario
         current_scenario["status"] = "starting"
 
-    # Reset Gazebo first (synchronous) so the controller's teleport
-    # doesn't race with the world reset.
+    # Restart the Zephyr ECU first — its perception fault watchdog latches
+    # across runs (see restart_aeb_ecu docstring). Then reset Gazebo so the
+    # controller's teleport doesn't race with the world reset.
+    restart_aeb_ecu()
     ros2_service_call("/reset_world", "std_srvs/srv/Empty")
 
     # Then tell the controller which scenario to load and reset its state.
@@ -193,6 +226,7 @@ def restart_scenario():
 
     Empty data field tells the controller to keep its existing preset.
     """
+    restart_aeb_ecu()
     ros2_service_call("/reset_world", "std_srvs/srv/Empty")
     ros2_pub("/aeb/restart", "std_msgs/msg/String", '{data: ""}')
 

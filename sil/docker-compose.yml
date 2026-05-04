@@ -123,6 +123,15 @@ services:
       - ./aeb_gazebo:/workspace/aeb_gazebo
       - ./docker/api:/workspace/api
       - live-data:/tmp
+      # Read-write socket mount so /scenarios/start can restart aeb-ecu —
+      # the Zephyr perception module's ROC-fault watchdog otherwise latches
+      # forever once a scenario teleport jumps the target distance > 10 m
+      # (DIST_ROC_LIMIT). Restarting the ECU container is the only way to
+      # clear `prev_d` / `prev_vr` since perception_init() runs only at
+      # power-on. Trade-off: the api container has docker-daemon access,
+      # which is fine on a dev SIL host but should NOT be replicated in
+      # any deployed environment.
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8000:8000"
     depends_on:
