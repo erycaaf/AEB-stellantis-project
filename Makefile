@@ -745,7 +745,7 @@ mcdc-can:
 	@echo ""
 	@echo "--- Generating combined coverage report (gcov -b -c --conditions) ---"
 	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
-		$(GCOV) -b -c --conditions test_can_cov-aeb_can.gcno > gcov_summary.txt 2>&1 && \
+		$(GCOV) -b -c --conditions test_can_cov-aeb_can.gcno test_can_fault_cov-aeb_can.gcno test_can_struct_cov-aeb_can.gcno > gcov_summary.txt 2>&1 && \
 		cat gcov_summary.txt
 	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
 

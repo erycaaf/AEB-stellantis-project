@@ -505,7 +505,7 @@ TEST(test_uds_request_ack)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
- *  NOVOS TESTES PARA COBERTURA 100%
+ *  ADDITIONAL TESTS FOR 100% COVERAGE
  * ═══════════════════════════════════════════════════════════════════════ */
 
 /* TEST: can_tx_brake_cmd with NULL parameters (line 332) */

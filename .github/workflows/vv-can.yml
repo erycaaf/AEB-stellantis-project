@@ -50,7 +50,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
   group: vv-can-${{ github.ref }}
@@ -94,7 +93,7 @@ jobs:
           SUM="reports/vv_can/coverage_mcdc/gcov_summary.txt"
           STMT=$(grep '^Lines executed:'             "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
           BRCH=$(grep '^Taken at least once:'        "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
-          MCDC=$(grep '^Condition outcomes covered:' "$SUM"          | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          MCDC=$(grep '^Condition outcomes covered:' "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
           echo "CAN coverage — stmt=${STMT}% branch=${BRCH}% mcdc=${MCDC}%"
           for metric in "Statement:$STMT" "Branch:$BRCH" "MC/DC:$MCDC"; do
             name="${metric%%:*}"; value="${metric##*:}"
@@ -109,12 +108,14 @@ jobs:
         run: |
           make memory-can
           MS="reports/vv_can/memory_safety"
-          # Valgrind/ASan on the *nominal* suite must be silent.
-          # Logs from the *fault* suite can contain expected UBSan reports
-          # until patches land — those are evidence, not a regression.
+          # Valgrind/ASan/UBSan on the *nominal* suite must be silent.
           if [ -s "$MS/valgrind_test_can.log" ]; then
             echo "::error title=Valgrind regression::Errors on nominal CAN suite"
             cat "$MS/valgrind_test_can.log"; exit 1
+          fi
+          if [ -s "$MS/asan_test_can.log" ]; then
+            echo "::error title=ASan regression::Errors on nominal CAN suite"
+            cat "$MS/asan_test_can.log"; exit 1
           fi
           if [ -s "$MS/ubsan_test_can.log" ]; then
             echo "::error title=UBSan regression::Errors on nominal CAN suite"
@@ -131,18 +132,16 @@ jobs:
           make misra-can
           CAN_ISSUES=$(python3 - <<'PY'
           import xml.etree.ElementTree as ET
-          import os
-          t = ET.parse("reports/vv_can/misra/cppcheck_can.xml")
+          tree = ET.parse("reports/vv_can/misra/cppcheck_can.xml")
           target = ("src/communication/aeb_can.c", "include/aeb_can.h")
           n = 0
-          for e in t.findall(".//error"):
+          for e in tree.findall(".//error"):
               if not e.get("id", "").startswith("misra-c2012"):
                   continue
               loc = e.find("location")
               if loc is not None:
                   file_path = loc.get("file", "")
-                  # Check if path ends with any of the target files (handles absolute paths)
-                  if any(file_path.endswith(t) for t in target):
+                  if any(file_path.endswith(f) for f in target):
                       n += 1
           print(n)
           PY
