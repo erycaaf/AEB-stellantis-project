@@ -6,7 +6,7 @@
  * -----
  * The nominal suite (test_perception.c) achieves 100% statement coverage
  * but only 88.04% branch / MC/DC (81 of 92 condition outcomes), leaving
- * 11 outcomes uncovered. This suite targets the 5 gap groups (G1..G5)
+ * 11 outcomes uncovered. This suite targets the 8 gap groups (G1..G8)
  * identified in Relatorio_Consolidado_VV_Perception.pdf §3.3 and raises
  * MC/DC to its structural maximum.
  *
@@ -21,6 +21,12 @@
  *        (aeb_perception.c:211)
  *   G5 — confidence quality clamp: (quality < 0.0f) true branch
  *        (aeb_perception.c:261)
+ *   G6 — Kalman init guard: isfinite(d_r) && isfinite(vr_r)
+ *        (aeb_perception.c:157, deferred initialization seed)
+ *   G7 — LiDAR isfinite check: !isfinite(d_l) in lidar_fault_detect
+ *        (aeb_perception.c:42, first clause of the bad-frame OR)
+ *   G8 — Radar isfinite checks: !isfinite(d_r) || !isfinite(vr_r) in
+ *        radar_fault_detect (aeb_perception.c:89, first two OR clauses)
  *
  * Rationale
  * ---------
@@ -345,13 +351,178 @@ static void test_G5_confidence_quality_clamp(void)
 }
 
 /* =========================================================================
+ * G6 — Kalman init guard: isfinite(d_r) && isfinite(vr_r)
+ * -------------------------------------------------------------------------
+ * Target branch:
+ *   kalman_fusion : aeb_perception.c:157
+ *     if ((s_kalman.initialized == 0U) && isfinite(d_r) && isfinite(vr_r))
+ *
+ * MC/DC requires isfinite(d_r) and isfinite(vr_r) to each independently
+ * prevent initialization. Observable proxy: when the init guard is not
+ * taken, r_ok=0 (same isfinite conditions gate r_ok), so confidence base
+ * stays at 0.5 (lidar-only); when taken, r_ok=1 and base=1.0.
+ *
+ *   G6a: d_r = NaN  → isfinite(d_r) false → init skipped, radar not used
+ *   G6b: vr_r = NaN → isfinite(vr_r) false → init skipped, radar not used
+ *   G6c: both finite → init taken, both sensors contributing
+ * ====================================================================== */
+static void test_G6a_kalman_init_nan_d_r(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.radar_d = (float)NAN; /* isfinite(d_r) = false → init guard skipped */
+    perception_step(&in, &out);
+
+    CHECK(isfinite(out.distance),
+          "G6a kalman init: NaN d_r → distance remains finite (no NaN propagation)");
+    CHECK(out.confidence < 0.7f,
+          "G6a kalman init: NaN d_r → init skipped, radar not contributing (conf < 0.7)");
+}
+
+static void test_G6b_kalman_init_nan_vr_r(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.radar_vr = (float)NAN; /* isfinite(vr_r) = false → init guard skipped */
+    perception_step(&in, &out);
+
+    CHECK(isfinite(out.distance),
+          "G6b kalman init: NaN vr_r → distance remains finite (no NaN propagation)");
+    CHECK(out.confidence < 0.7f,
+          "G6b kalman init: NaN vr_r → init skipped, radar not contributing (conf < 0.7)");
+}
+
+static void test_G6c_kalman_init_both_valid(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    /* Both d_r and vr_r finite → init guard taken, r_ok=1, l_ok=1 */
+    perception_step(&in, &out);
+
+    CHECK(isfinite(out.distance),
+          "G6c kalman init: both valid → distance output finite");
+    CHECK(out.confidence >= 0.8f,
+          "G6c kalman init: both valid → init taken, both sensors contributing (conf >= 0.8)");
+}
+
+/* =========================================================================
+ * G7 — !isfinite(d_l) in lidar_fault_detect, independent of radar clauses
+ * -------------------------------------------------------------------------
+ * Target branch:
+ *   lidar_fault_detect : aeb_perception.c:42
+ *     bad = (!isfinite(d_l) || (d_l < LIDAR_DIST_MIN) || ...) ? 1U : 0U;
+ *
+ * MC/DC requires !isfinite(d_l) to independently set bad=1 while radar
+ * input stays valid, so only the lidar fault flag is raised:
+ *   G7a: d_l = NaN  → !isfinite true → only lidar faults, radar does not
+ *   G7b: d_l = +inf → !isfinite true → only lidar faults, radar does not
+ * ====================================================================== */
+static void test_G7a_lidar_nan(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.lidar_d = (float)NAN;
+
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES + 1U; ++i) {
+        perception_step(&in, &out);
+    }
+
+    CHECK((out.fault_flag & AEB_FAULT_LIDAR) != 0U,
+          "G7a lidar NaN: !isfinite(d_l) alone latches lidar fault");
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) == 0U,
+          "G7a lidar NaN: radar fault not raised when only d_l is NaN");
+}
+
+static void test_G7b_lidar_inf(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.lidar_d = (float)INFINITY;
+
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES + 1U; ++i) {
+        perception_step(&in, &out);
+    }
+
+    CHECK((out.fault_flag & AEB_FAULT_LIDAR) != 0U,
+          "G7b lidar +inf: !isfinite(d_l) alone latches lidar fault");
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) == 0U,
+          "G7b lidar +inf: radar fault not raised when only d_l is +inf");
+}
+
+/* =========================================================================
+ * G8 — !isfinite(d_r) and !isfinite(vr_r) in radar_fault_detect,
+ *      each independently setting bad=1
+ * -------------------------------------------------------------------------
+ * Target branches:
+ *   radar_fault_detect : aeb_perception.c:89
+ *     bad = (!isfinite(d_r) || !isfinite(vr_r) || ...) ? 1U : 0U;
+ *
+ * MC/DC requires each isfinite clause to independently flip bad while the
+ * other radar clause and lidar stay valid, so only the radar fault is raised:
+ *   G8a: d_r = NaN,   vr_r valid → !isfinite(d_r) alone, radar faults
+ *   G8b: d_r valid,   vr_r = -inf → !isfinite(vr_r) alone, radar faults
+ * ====================================================================== */
+static void test_G8a_radar_nan_d_r(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.radar_d = (float)NAN;
+
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES + 1U; ++i) {
+        perception_step(&in, &out);
+    }
+
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) != 0U,
+          "G8a radar NaN d_r: !isfinite(d_r) alone latches radar fault");
+    CHECK((out.fault_flag & AEB_FAULT_LIDAR) == 0U,
+          "G8a radar NaN d_r: lidar fault not raised when only d_r is NaN");
+}
+
+static void test_G8b_radar_neg_inf_vr_r(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.radar_vr = -(float)INFINITY;
+
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES + 1U; ++i) {
+        perception_step(&in, &out);
+    }
+
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) != 0U,
+          "G8b radar -inf vr_r: !isfinite(vr_r) alone latches radar fault");
+    CHECK((out.fault_flag & AEB_FAULT_LIDAR) == 0U,
+          "G8b radar -inf vr_r: lidar fault not raised when only vr_r is -inf");
+}
+
+/* =========================================================================
  * Main
  * ====================================================================== */
 int main(void)
 {
     printf("======================================================\n");
     printf("  Perception complementary MC/DC suite\n");
-    printf("  Targets gap groups G1..G5 (report section 3.3)\n");
+    printf("  Targets gap groups G1..G8 (report section 3.3)\n");
     printf("======================================================\n\n");
 
     printf("--- G1: counter saturation (uint8_t ceiling) ---\n");
@@ -374,6 +545,22 @@ int main(void)
 
     printf("--- G5: confidence quality clamp ---\n");
     test_G5_confidence_quality_clamp();
+    printf("\n");
+
+    printf("--- G6: Kalman init guard (isfinite(d_r) && isfinite(vr_r)) ---\n");
+    test_G6a_kalman_init_nan_d_r();
+    test_G6b_kalman_init_nan_vr_r();
+    test_G6c_kalman_init_both_valid();
+    printf("\n");
+
+    printf("--- G7: lidar_fault_detect !isfinite(d_l) clause ---\n");
+    test_G7a_lidar_nan();
+    test_G7b_lidar_inf();
+    printf("\n");
+
+    printf("--- G8: radar_fault_detect !isfinite(d_r) and !isfinite(vr_r) clauses ---\n");
+    test_G8a_radar_nan_d_r();
+    test_G8b_radar_neg_inf_vr_r();
     printf("\n");
 
     printf("======================================================\n");
