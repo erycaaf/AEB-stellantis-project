@@ -4,8 +4,7 @@ name: CAN V&V
 #
 # Triggers only on paths that can affect CAN behaviour. On PRs to
 # development/main, the blocking gates (MC/DC, memory safety, MISRA) must
-# pass; fault-can is intentionally non-blocking until the robustness bugs
-# documented in reports/vv_can/fault_injection/run.log are patched.
+# pass; fault-can is blocking (ISO 26262-6 Table 11).
 #
 # Reports are published in two layers:
 #   1. Workflow Artifacts on every run (PR or push), retention 30 days.
@@ -94,13 +93,13 @@ jobs:
           make mcdc-can
           SUM="reports/vv_can/coverage_mcdc/gcov_summary.txt"
           STMT=$(grep '^Lines executed:'             "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
-          BRCH=$(grep '^Branches executed:'          "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          BRCH=$(grep '^Taken at least once:'        "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
           MCDC=$(grep '^Condition outcomes covered:' "$SUM"          | sed 's/.*:\([0-9.]*\)%.*/\1/')
           echo "CAN coverage — stmt=${STMT}% branch=${BRCH}% mcdc=${MCDC}%"
           for metric in "Statement:$STMT" "Branch:$BRCH" "MC/DC:$MCDC"; do
             name="${metric%%:*}"; value="${metric##*:}"
-            if [ "$(echo "$value < 94.0" | bc -l)" = "1" ]; then
-              echo "::error title=CAN coverage regression::${name} dropped to ${value}% (required ≥94%)"
+            if [ "$(echo "$value < 95.0" | bc -l)" = "1" ]; then
+              echo "::error title=CAN coverage regression::${name} dropped to ${value}% (required ≥95%)"
               exit 1
             fi
           done
@@ -122,14 +121,17 @@ jobs:
             cat "$MS/ubsan_test_can.log"; exit 1
           fi
 
-      # ─── Non-blocking gate 3: MISRA C:2012 (CAN scope only) ───────────────
-      # TODO: Make blocking after fixing 3 MISRA violations in aeb_can.{c,h}
+      # ─── Blocking gate 3: MISRA C:2012 (CAN scope only) ───────────────────
+      # Counts only findings emitted by the MISRA addon (id prefix
+      # "misra-c2012"), not cppcheck-native style/portability/unused
+      # warnings. Those are still generated into the XML for context but
+      # don't fail the gate.
       - name: MISRA (0 issues in aeb_can.{c,h})
-        continue-on-error: true
         run: |
           make misra-can
           CAN_ISSUES=$(python3 - <<'PY'
           import xml.etree.ElementTree as ET
+          import os
           t = ET.parse("reports/vv_can/misra/cppcheck_can.xml")
           target = ("src/communication/aeb_can.c", "include/aeb_can.h")
           n = 0
@@ -137,8 +139,11 @@ jobs:
               if not e.get("id", "").startswith("misra-c2012"):
                   continue
               loc = e.find("location")
-              if loc is not None and loc.get("file", "") in target:
-                  n += 1
+              if loc is not None:
+                  file_path = loc.get("file", "")
+                  # Check if path ends with any of the target files (handles absolute paths)
+                  if any(file_path.endswith(t) for t in target):
+                      n += 1
           print(n)
           PY
           )
@@ -148,10 +153,8 @@ jobs:
             exit 1
           fi
 
-      # ─── Non-blocking (reports-only) until robustness patches land ────────
-      # Flip `continue-on-error` to `false` after all robustness bugs are fixed.
-      - name: Fault injection (non-blocking until bugs patched)
-        continue-on-error: true
+      # ─── Blocking gate 4: fault injection ─────────────────────────────────
+      - name: Fault injection
         run: make fault-can
 
       # ─── Generate navigable HTML reports ──────────────────────────────────
@@ -236,3 +239,4 @@ jobs:
           user_name: 'github-actions[bot]'
           user_email: '41898282+github-actions[bot]@users.noreply.github.com'
           commit_message: 'docs(vv-can): publish reports from run #${{ github.run_number }} (${{ github.ref_name }})'
+          
