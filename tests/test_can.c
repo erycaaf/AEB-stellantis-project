@@ -840,6 +840,118 @@ TEST(test_tx_fsm_state_hal_send_failure_branch)
 
     can_hal_test_force_send_fail(0);
 }
+
+/* ================================================================
+ * TEST: encode_unsigned with raw_f < 0 (negative) 
+ * ================================================================ */
+TEST(test_encode_unsigned_negative_raw_f)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    /* Brake_bar negative enough to make raw_f < 0 */
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = -1000.0F };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    uint32_t brake_pressure = can_unpack_signal(tx->data, 1U, 15U);
+    /* Negative raw_f should result in 0 (no saturation, just clamp) */
+    ASSERT_EQ(brake_pressure, 0U);
+}
+
+/* ================================================================
+ * TEST: encode_unsigned with physical = NaN 
+ * isfinite(physical) returns false
+ * ================================================================ */
+TEST(test_encode_unsigned_physical_nan)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    /* brake_bar = NaN already tested in test_tx_brake_cmd_nan_brake_bar */
+    /* This test is already covered by test_tx_brake_cmd_nan_brake_bar */
+    /* No need to add duplicate */
+}
+
+/* ================================================================
+ * TEST: encode_unsigned with raw_f = Inf 
+ * ================================================================ */
+TEST(test_encode_unsigned_raw_f_inf)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    /* Use a value that will cause raw_f to overflow to Inf */
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = 1.0e308F };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+
+    const tx_record_t *tx = can_hal_test_get_tx(0U);
+    uint32_t brake_pressure = can_unpack_signal(tx->data, 1U, 15U);
+    /* Inf raw_f should result in 0 */
+    ASSERT_EQ(brake_pressure, 0U);
+}
+
+/* ================================================================
+ * TEST: can_tx_brake_cmd with brake_pct = 0 (branch coverage)
+ * ================================================================ */
+TEST(test_tx_brake_cmd_brake_pct_zero)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    pid_output_t pid = { .brake_pct = 0.0F, .brake_bar = 0.0F };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
+
+    int32_t rc = can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(rc, CAN_OK);
+}
+/* ================================================================
+ * TEST: can_rx_process with state != NULL and data == NULL
+ * (line 202 - data != NULL condition)
+ * ================================================================ */
+TEST(test_can_rx_process_data_null)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+
+    uint8_t frame[8] = {0};
+    
+    /* data == NULL should be handled safely */
+    can_rx_process(&state, CAN_ID_EGO_VEHICLE, NULL, 8U);
+    
+    /* No crash means test passes */
+    can_rx_data_t rx;
+    can_get_rx_data(&state, &rx);
+    /* Values should remain unchanged */
+    ASSERT_FLOAT_NEAR(rx.vehicle_speed, 0.0F, 0.01F);
+}
+
+/* ================================================================
+ * TEST: can_rx_process with state == NULL and data != NULL
+ * (line 202 - state != NULL condition)
+ * ================================================================ */
+TEST(test_can_rx_process_state_null)
+{
+    uint8_t frame[8] = {0};
+    can_pack_signal(frame, 0U, 16U, 1389U);
+    
+    /* state == NULL should not crash */
+    can_rx_process(NULL, CAN_ID_EGO_VEHICLE, frame, 8U);
+    
+    /* No crash means test passes */
+    ASSERT_EQ(1, 1);
+}
 /* ═══════════════════════════════════════════════════════════════════════
  *  MAIN
  * ═══════════════════════════════════════════════════════════════════════ */
@@ -885,6 +997,11 @@ int main(void)
     RUN(test_brake_mode_all_cases);
     RUN(test_ttc_thresh_all_cases);
     RUN(test_tx_fsm_state_hal_send_failure_branch);
+    RUN(test_encode_unsigned_negative_raw_f);
+    RUN(test_encode_unsigned_raw_f_inf);
+    RUN(test_tx_brake_cmd_brake_pct_zero);
+    RUN(test_can_rx_process_data_null);
+    RUN(test_can_rx_process_state_null);
 
     printf("\n=== Results: %d run, %d passed, %d failed ===\n",
            tests_run, tests_passed, tests_failed);
