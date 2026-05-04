@@ -166,7 +166,7 @@ jobs:
             echo ""
             echo "### Fault injection"
             echo '```'
-            tail -5 reports/vv_can/fault_injection/run.log
+            tail -5 reports/vv_can/fault_injection/run.log 2>/dev/null || echo "(fault-can did not run)"
             echo '```'
             echo ""
             echo "### Memory safety"
