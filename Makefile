@@ -37,7 +37,7 @@
 #   make vv-perception     — full V&V stack
 #
 # Targets (ASIL-D V&V — CAN module, cross-validation):
-#   make mcdc-can          — MC/DC coverage (gcc-14 + gcov-14 + gcovr)
+#   make mcdc-can          — MC/DC coverage (gcc-14 + gcov-14)
 #   make fault-can         — systematic fault-injection suite
 #   make memory-can        — Valgrind + ASan + UBSan on CAN suites
 #   make misra-can         — cppcheck MISRA scoped to aeb_can.{c,h}
@@ -743,9 +743,10 @@ mcdc-can:
 	@echo "--- Running test_can_struct_cov (structural complementary suite) ---"
 	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_can_struct_cov
 	@echo ""
-	@echo "--- Generating combined coverage report (gcov -b -c --conditions) ---"
+	@echo "--- Generating combined coverage report for aeb_can.c only ---"
 	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
-		$(GCOV) -b -c --conditions test_can_cov-aeb_can.gcno test_can_fault_cov-aeb_can.gcno test_can_struct_cov-aeb_can.gcno > gcov_summary.txt 2>&1 && \
+		$(GCOV) -b -c --conditions test_can_cov-aeb_can.gcno test_can_fault_cov-aeb_can.gcno test_can_struct_cov-aeb_can.gcno > gcov_full.txt 2>&1 && \
+		grep -A 20 "File 'src/communication/aeb_can.c'" gcov_full.txt | grep -E "Lines executed|Branches executed|Condition outcomes covered" > gcov_summary.txt && \
 		cat gcov_summary.txt
 	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
 
