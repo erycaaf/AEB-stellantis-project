@@ -726,9 +726,11 @@ vv-perception: mcdc-perception fault-perception memory-perception misra-percepti
 # certification assessor expects to see.
 mcdc-can:
 	@rm -rf $(VV_REPORT_DIR)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR)/coverage_mcdc
+	@echo "=== MC/DC coverage — aeb_can.c (nominal + fault + struct suites) ==="
 	$(CC) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can $(SRC_CAN_TEST) $(LDFLAGS)
 	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_can > run.log 2>&1 && grep "Results:" run.log
-	@cd $(VV_REPORT_DIR)/coverage_mcdc && gcov -b -c --conditions test_can-aeb_can.gcno > gcov_summary.txt 2>&1 && cat gcov_summary.txt
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && gcov -b -c --conditions ../../src/communication/aeb_can.c > gcov_summary.txt 2>&1
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && cat aeb_can.c.gcov | grep -E "Lines executed|Branches executed|Condition outcomes covered"
 	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
 
 # ── Fault injection (Table 11 item 1e) ───────────────────────────────────
