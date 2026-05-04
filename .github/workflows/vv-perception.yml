@@ -99,7 +99,7 @@ jobs:
       # on lidar_d, radar_d/vr, and v_ego) plus FABSF sign-branch and
       # ROC-direction extensions of G2/G3.
       # Branch threshold is temporarily 80% — see below.
-      - name: MC/DC coverage (gate ≥ 95% stmt, ≥ 80% branch/MC/DC)
+      - name: MC/DC coverage (gate ≥ 95% stmt/MC/DC, ≥ 80% branch)
         run: |
           make mcdc-perception
           SUM="reports/vv_perception/coverage_mcdc/gcov_summary_combined.txt"
@@ -107,18 +107,16 @@ jobs:
           BRCH=$(grep '^Taken at least once:'        "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
           MCDC=$(grep '^Condition outcomes covered:' "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
           echo "Perception coverage — stmt=${STMT}% branch=${BRCH}% mcdc=${MCDC}%"
-          if [ "$(echo "$STMT < 95.0" | bc -l)" = "1" ]; then
-            echo "::error title=Perception coverage regression::Statement dropped to ${STMT}% (required ≥95%)"
-            exit 1
-          fi
+          for metric in "Statement:$STMT" "MC/DC:$MCDC"; do
+            name="${metric%%:*}"; value="${metric##*:}"
+            if [ "$(echo "$value < 95.0" | bc -l)" = "1" ]; then
+              echo "::error title=Perception coverage regression::${name} dropped to ${value}% (required ≥95%)"
+              exit 1
+            fi
+          done
           # threshold 80% — G6/G7/G8 MC/DC tests for isfinite guards pending, tracked as follow-up
           if [ "$(echo "$BRCH < 80.0" | bc -l)" = "1" ]; then
             echo "::error title=Perception coverage regression::Branch dropped to ${BRCH}% (required ≥80%)"
-            exit 1
-          fi
-          # threshold 80% — G6/G7/G8 MC/DC tests for isfinite guards pending, tracked as follow-up
-          if [ "$(echo "$MCDC < 80.0" | bc -l)" = "1" ]; then
-            echo "::error title=Perception coverage regression::MC/DC dropped to ${MCDC}% (required ≥80%)"
             exit 1
           fi
 
