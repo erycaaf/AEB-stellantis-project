@@ -1038,7 +1038,153 @@ TEST(test_tx_brake_cmd_alive_counter_wrap_branch)
     /* After incrementing from 15, should wrap to 0 */
     ASSERT_EQ(state.alive_counter, 0U);
 }
+#define ASSERT_EQ(a, b) do { \
+    if ((a) == (b)) { tests_passed++; } \
+    else { printf("  FAIL: %s:%d  %s != %s\n", __FILE__, __LINE__, #a, #b); tests_failed++; } \
+    tests_run++; \
+} while (0)
 
+#define ASSERT_FLOAT_NEAR(a, b, tol) do { \
+    if (fabsf((float)(a) - (float)(b)) <= (float)(tol)) { tests_passed++; } \
+    else { printf("  FAIL: %s:%d  %s=%.4f != %s=%.4f (tol=%.4f)\n", \
+           __FILE__, __LINE__, #a, (double)(a), #b, (double)(b), (double)(tol)); tests_failed++; } \
+    tests_run++; \
+} while (0)
+
+#define TEST(name) static void name(void)
+#define RUN(name) do { printf("  [TEST] %s\n", #name); name(); } while (0)
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  TESTES DE RASTREABILIDADE
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+/** @req FR-CAN-003: Verificação de Empacotamento de Sinais */
+TEST(test_signal_roundtrip) {
+    uint8_t buf[8] = {0};
+    can_pack_signal(buf, 4U, 16U, 0xABCDU);
+    ASSERT_EQ(can_unpack_signal(buf, 4U, 16U), 0xABCDU);
+    (void)memset(buf, 0, sizeof(buf));
+    can_pack_signal(buf, 0U, 1U, 1U);
+    ASSERT_EQ(can_unpack_signal(buf, 0U, 1U), 1U);
+}
+
+/** @req FR-CAN-004: Inicialização do Driver e Filtros RX */
+TEST(test_init_scenarios) {
+    can_state_t state;
+    can_hal_test_reset();
+    ASSERT_EQ(can_init(&state), CAN_OK);
+    ASSERT_EQ(state.initialised, 1U);
+
+    can_hal_test_force_init_fail(1);
+    ASSERT_EQ(can_init(&state), CAN_ERR_INIT);
+    can_hal_test_force_init_fail(0);
+}
+
+/** @req FR-CAN-002: Processamento de Mensagens EgoVehicle e Radar */
+TEST(test_rx_decode_logic) {
+    can_state_t state;
+    can_init(&state);
+    uint8_t frame[8] = {0};
+
+    /* EgoVehicle (0x100) */
+    can_pack_signal(frame, 0U, 16U, 1389U); 
+    can_rx_process(&state, CAN_ID_EGO_VEHICLE, frame, 8U);
+    ASSERT_FLOAT_NEAR(state.last_rx.vehicle_speed, 13.89F, 0.02F);
+
+    /* RadarTarget (0x120) - Reset miss_count */
+    state.rx_miss_count = 5U;
+    can_rx_process(&state, CAN_ID_RADAR_TARGET, frame, 8U);
+    ASSERT_EQ(state.rx_miss_count, 0U);
+}
+
+/** @req FR-CAN-003: Transmissão AEB_BrakeCmd com CRC e Alive Counter */
+TEST(test_tx_brake_cmd_complete) {
+    can_state_t state;
+    can_init(&state);
+    pid_output_t pid = { .brake_pct = 75.0F, .brake_bar = 7.5F };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L3 };
+
+    ASSERT_EQ(can_tx_brake_cmd(&state, &pid, &fsm), CAN_OK);
+    ASSERT_EQ(state.alive_counter, 1U);
+
+    /* Teste de saturação e robustez (MC/DC em encode_unsigned) */
+    pid.brake_bar = 1e20F; /* Finite > ceiling */
+    ASSERT_EQ(can_tx_brake_cmd(&state, &pid, &fsm), CAN_OK);
+    pid.brake_bar = -10.0F; /* Negative raw_f */
+    ASSERT_EQ(can_tx_brake_cmd(&state, &pid, &fsm), CAN_OK);
+    pid.brake_bar = NAN;
+    ASSERT_EQ(can_tx_brake_cmd(&state, &pid, &fsm), CAN_OK);
+}
+
+/** @req FR-CAN-001: Periodicidade de AEB_FSMState (50ms) */
+TEST(test_tx_fsm_periodicity) {
+    can_state_t state;
+    can_init(&state);
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_WARNING };
+    for (int i = 0; i < 4; i++) ASSERT_EQ(can_tx_fsm_state(&state, &fsm), 1);
+    ASSERT_EQ(can_tx_fsm_state(&state, &fsm), CAN_OK);
+}
+
+/** @req FR-UDS-005: Resposta UDS e Gerenciamento de Flag */
+TEST(test_uds_logic) {
+    can_state_t state;
+    can_init(&state);
+    uint8_t frame[4] = { 0x22, 0xF1, 0x01, 0x00 };
+    
+    can_rx_process(&state, CAN_ID_UDS_REQUEST, frame, 4);
+    ASSERT_EQ(state.last_rx.uds_request_pending, 1U);
+    
+    can_clear_uds_request_pending(&state);
+    ASSERT_EQ(state.last_rx.uds_request_pending, 0U);
+
+    uds_response_t resp = { .response_sid = 0x62 };
+    ASSERT_EQ(can_tx_uds_response(&resp), CAN_OK);
+}
+
+/** Cobertura de Segurança: Null Guards e Timeouts */
+TEST(test_safety_guards) {
+    can_state_t state;
+    can_init(&state);
+
+    /* MC/DC: if ((state != NULL) && (data != NULL)) */
+    can_rx_process(NULL, 0x100, NULL, 0);
+    can_rx_process(&state, 0x100, NULL, 0);
+    can_check_timeout(NULL);
+    can_clear_uds_request_pending(NULL);
+    can_get_rx_data(NULL, NULL);
+
+    /* Timeout logic (FR-CAN-002) */
+    for (int i = 0; i < 7; i++) can_check_timeout(&state);
+    ASSERT_EQ(state.last_rx.rx_timeout_flag, 1U);
+}
+
+/** Cobertura de Ramificação: Switches e Falhas de HAL */
+TEST(test_branches_and_failures) {
+    can_state_t state;
+    can_init(&state);
+    pid_output_t pid = { .brake_pct = 0.0F };
+    fsm_output_t fsm;
+
+    /* Todos os cases de BrakeMode e TTCThreshold */
+    uint8_t modes[] = {FSM_OFF, FSM_STANDBY, FSM_WARNING, FSM_BRAKE_L1, FSM_BRAKE_L2, FSM_BRAKE_L3, FSM_POST_BRAKE, 0xFF};
+    for(int i=0; i<8; i++) {
+        fsm.fsm_state = modes[i];
+        (void)can_tx_brake_cmd(&state, &pid, &fsm);
+        state.tx_cycle_counter = 5;
+        (void)can_tx_fsm_state(&state, &fsm);
+    }
+
+    /* Wrap do Alive Counter */
+    state.alive_counter = ALIVE_COUNTER_MAX;
+    (void)can_tx_brake_cmd(&state, &pid, &fsm);
+    ASSERT_EQ(state.alive_counter, 0U);
+
+    /* Falhas de HAL */
+    can_hal_test_force_send_fail(1);
+    ASSERT_EQ(can_tx_alert(&fsm), CAN_ERR_TX); /* Usando fsm como dummy alert */
+    ASSERT_EQ(can_tx_uds_response(NULL), CAN_ERR_TX);
+    can_hal_test_force_send_fail(0);
+}
 /* ═══════════════════════════════════════════════════════════════════════
  *  MAIN
  * ═══════════════════════════════════════════════════════════════════════ */
@@ -1093,6 +1239,14 @@ int main(void)
     RUN(test_encode_unsigned_raw_f_nan);
     RUN(test_tx_brake_cmd_brake_pct_positive);
     RUN(test_tx_brake_cmd_alive_counter_wrap_branch);
+    RUN(test_signal_roundtrip);
+    RUN(test_init_scenarios);
+    RUN(test_rx_decode_logic);
+    RUN(test_tx_brake_cmd_complete);
+    RUN(test_tx_fsm_periodicity);
+    RUN(test_uds_logic);
+    RUN(test_safety_guards);
+    RUN(test_branches_and_failures);
 
     printf("\n=== Results: %d run, %d passed, %d failed ===\n",
            tests_run, tests_passed, tests_failed);
