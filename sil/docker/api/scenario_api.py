@@ -175,20 +175,20 @@ def start_scenario(req: StartRequest):
         current_scenario["name"] = req.scenario
         current_scenario["status"] = "starting"
 
-    # Restart the Zephyr ECU first — its perception fault watchdog latches
-    # across runs (see restart_aeb_ecu docstring). Then reset Gazebo so the
-    # controller's teleport doesn't race with the world reset.
-    restart_aeb_ecu()
+    # Order matters: reset Gazebo + tell the controller to teleport + load
+    # the new scenario FIRST, give perception ~0.5 s to publish CAN frames
+    # at the new vehicle positions, and only THEN restart the ECU. If we
+    # restart the ECU first, it boots while perception is still publishing
+    # the OLD scenario's positions, latches `prev_d` to that, and then
+    # treats the post-/aeb/restart teleport as a > 10 m jump → fault.
     ros2_service_call("/reset_world", "std_srvs/srv/Empty")
-
-    # Then tell the controller which scenario to load and reset its state.
-    # YAML flow style with unquoted key — the form `ros2 topic pub` parses
-    # most reliably in our testing.
     ros2_pub(
         "/aeb/restart",
         "std_msgs/msg/String",
         f'{{data: "{req.scenario}"}}',
     )
+    time.sleep(0.5)
+    restart_aeb_ecu()
 
     with lock:
         current_scenario["status"] = "running"
@@ -226,9 +226,10 @@ def restart_scenario():
 
     Empty data field tells the controller to keep its existing preset.
     """
-    restart_aeb_ecu()
     ros2_service_call("/reset_world", "std_srvs/srv/Empty")
     ros2_pub("/aeb/restart", "std_msgs/msg/String", '{data: ""}')
+    time.sleep(0.5)
+    restart_aeb_ecu()
 
     with lock:
         current_scenario["status"] = "running"
