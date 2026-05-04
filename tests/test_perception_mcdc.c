@@ -6,7 +6,7 @@
  * -----
  * The nominal suite (test_perception.c) achieves 100% statement coverage
  * but only 88.04% branch / MC/DC (81 of 92 condition outcomes), leaving
- * 11 outcomes uncovered. This suite targets the 8 gap groups (G1..G8)
+ * 11 outcomes uncovered. This suite targets the 11 gap groups (G1..G11)
  * identified in Relatorio_Consolidado_VV_Perception.pdf §3.3 and raises
  * MC/DC to its structural maximum.
  *
@@ -27,6 +27,12 @@
  *        (aeb_perception.c:42, first clause of the bad-frame OR)
  *   G8 — Radar isfinite checks: !isfinite(d_r) || !isfinite(vr_r) in
  *        radar_fault_detect (aeb_perception.c:89, first two OR clauses)
+ *   G9 — perception_step v_ego isfinite false branch
+ *        (aeb_perception.c:295, else: out_v_ego=0, AEB_FAULT_CAN_TO raised)
+ *   G10 — clampf v > hi for distance output (Kalman dead-reckoning > 300 m)
+ *        (aeb_perception.c:272, DIST_MAX_OUTPUT clamp upper branch)
+ *   G11 — clampf v > hi for v_rel output (fused velocity exceeds MAX_REL_VEL)
+ *        (aeb_perception.c:273, MAX_REL_VEL clamp upper branch)
  *
  * Rationale
  * ---------
@@ -516,13 +522,111 @@ static void test_G8b_radar_neg_inf_vr_r(void)
 }
 
 /* =========================================================================
+ * G9 — perception_step isfinite(v_ego) false branch
+ * -------------------------------------------------------------------------
+ * Target branch:
+ *   perception_step : aeb_perception.c:295
+ *     if (isfinite(in->v_ego) != 0) { ... } else { out->v_ego = 0.0f;
+ *                                               out->fault_flag |= CAN_TO; }
+ *
+ * No test in either suite uses a non-finite v_ego value, leaving the else
+ * body unreachable. A single cycle with v_ego = NAN triggers the branch.
+ * ====================================================================== */
+static void test_G9_vego_nan(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.v_ego = (float)NAN; /* isfinite = false -> else branch taken */
+    perception_step(&in, &out);
+
+    CHECK(out.v_ego == 0.0f,
+          "G9 v_ego NaN: non-finite v_ego -> out.v_ego set to 0.0f");
+    CHECK((out.fault_flag & AEB_FAULT_CAN_TO) != 0U,
+          "G9 v_ego NaN: non-finite v_ego -> AEB_FAULT_CAN_TO raised");
+}
+
+/* =========================================================================
+ * G10 — clampf v > hi for distance output (DIST_MAX_OUTPUT = 300 m)
+ * -------------------------------------------------------------------------
+ * Target branch:
+ *   clampf : aeb_perception.c:16
+ *     if (v > hi) { return hi; }
+ *
+ * Strategy: seed Kalman with d_r = 200 m, vr_r = -49 m/s (target receding;
+ * valid since |49| < MAX_REL_VEL). d_l = NaN keeps l_ok = 0 so lidar does
+ * not pull the state toward 100 m. Then set both sensors to NaN: isfinite
+ * checks force r_ok = l_ok = 0, so Kalman dead-reckons without updates.
+ * Each cycle: x[0] += dt * 49 = 0.49 m. After 220 cycles:
+ * x[0] ~= 200 + 220*0.49 ~= 308 m > 300 m. clampf(308, 0.5, 300) takes
+ * v > hi and returns DIST_MAX_OUTPUT.
+ * ====================================================================== */
+static void test_G10_clamp_distance_max(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    /* Seed: initialise Kalman with x[0]~=200 m, x[1]~=-49 m/s.
+     * d_l = NaN keeps l_ok = 0 so lidar does not override the seed. */
+    in.radar_d  = 200.0f;
+    in.radar_vr = -49.0f;   /* |49| < MAX_REL_VEL=50 -> valid */
+    in.lidar_d  = (float)NAN;
+    perception_step(&in, &out);
+
+    /* Switch radar to NaN: isfinite(NaN)=false -> r_ok=0 every cycle.
+     * Kalman dead-reckons: x[0] grows by ~0.49 m per cycle. */
+    in.radar_d = (float)NAN;
+    for (int i = 0; i < 220; ++i) {
+        perception_step(&in, &out);
+    }
+
+    /* x[0] ~= 308 m -> clampf v > hi -> out.distance = DIST_MAX_OUTPUT */
+    CHECK(out.distance == DIST_MAX_OUTPUT,
+          "G10 clampf: dead-reckoned distance > 300 m -> clamped to DIST_MAX_OUTPUT");
+}
+
+/* =========================================================================
+ * G11 — clampf v > hi for v_rel output (MAX_REL_VEL = 50 m/s)
+ * -------------------------------------------------------------------------
+ * Target branch:
+ *   clampf : aeb_perception.c:16
+ *     if (v > hi) { return hi; }
+ *
+ * Strategy: on the first cycle vr_r = 60 m/s > MAX_REL_VEL but isfinite.
+ * radar_fault_detect sees FABSF(60) > MAX_REL_VEL -> bad=1, ctr=1, not yet
+ * latched (needs SENSOR_FAULT_CYCLES=3). So r_fault=0 and r_ok=1 in
+ * kalman_fusion: Kalman initialises with x[1]=60 and the radar update
+ * keeps x[1]~=60. clampf(60, -50, 50) -> v > hi -> returns MAX_REL_VEL.
+ * ====================================================================== */
+static void test_G11_clamp_vrel_max(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    /* vr_r > MAX_REL_VEL but finite: fault counter increments (ctr=1),
+     * r_fault stays 0 -> r_ok=1 -> Kalman accepts vr_r=60 m/s. */
+    in.radar_vr = 60.0f;
+    perception_step(&in, &out);
+
+    /* Fused v_rel ~= 60 m/s -> clampf v > hi -> out.v_rel = MAX_REL_VEL */
+    CHECK(out.v_rel == (float)MAX_REL_VEL,
+          "G11 clampf: fused v_rel > MAX_REL_VEL -> v_rel clamped to MAX_REL_VEL");
+}
+
+/* =========================================================================
  * Main
  * ====================================================================== */
 int main(void)
 {
     printf("======================================================\n");
     printf("  Perception complementary MC/DC suite\n");
-    printf("  Targets gap groups G1..G8 (report section 3.3)\n");
+    printf("  Targets gap groups G1..G11 (report section 3.3)\n");
     printf("======================================================\n\n");
 
     printf("--- G1: counter saturation (uint8_t ceiling) ---\n");
@@ -561,6 +665,18 @@ int main(void)
     printf("--- G8: radar_fault_detect !isfinite(d_r) and !isfinite(vr_r) clauses ---\n");
     test_G8a_radar_nan_d_r();
     test_G8b_radar_neg_inf_vr_r();
+    printf("\n");
+
+    printf("--- G9: perception_step isfinite(v_ego) false branch ---\n");
+    test_G9_vego_nan();
+    printf("\n");
+
+    printf("--- G10: clampf upper bound -- Kalman distance > DIST_MAX_OUTPUT ---\n");
+    test_G10_clamp_distance_max();
+    printf("\n");
+
+    printf("--- G11: clampf upper bound -- fused v_rel > MAX_REL_VEL ---\n");
+    test_G11_clamp_vrel_max();
     printf("\n");
 
     printf("======================================================\n");
