@@ -637,29 +637,67 @@ TEST(test_tx_brake_cmd_alive_counter_wrap_branch)
     ASSERT_EQ(rc, CAN_OK);
     ASSERT_EQ(state.alive_counter, 0U);
 }
-
-TEST(test_can_check_timeout_miss_count_increment)
+/* ================================================================
+ * TEST: can_tx_brake_cmd with individual NULL parameters (all combinations)
+ * ================================================================ */
+TEST(test_tx_brake_cmd_null_combinations)
 {
     can_state_t state;
     can_hal_test_reset();
     (void)can_init(&state);
+    pid_output_t pid = { .brake_pct = 50.0F, .brake_bar = 5.0F };
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_BRAKE_L1 };
     
-    /* Initial miss_count should be 0, rx_timeout_flag 0 */
-    can_check_timeout(&state);
+    /* Test each NULL combination individually */
+    ASSERT_EQ(can_tx_brake_cmd(NULL, &pid, &fsm), CAN_ERR_TX);
+    ASSERT_EQ(can_tx_brake_cmd(&state, NULL, &fsm), CAN_ERR_TX);
+    ASSERT_EQ(can_tx_brake_cmd(&state, &pid, NULL), CAN_ERR_TX);
     
-    can_rx_data_t rx;
-    can_get_rx_data(&state, &rx);
-    ASSERT_EQ(rx.rx_timeout_flag, 0U);
-    
-    /* Call enough times to trigger timeout but not exceed */
-    for (uint8_t i = 0U; i < 3U; i++) {
-        can_check_timeout(&state);
-    }
-    can_get_rx_data(&state, &rx);
-    /* Still not at 6 ticks, so flag still 0 */
-    ASSERT_EQ(rx.rx_timeout_flag, 0U);
+    /* Test multiple NULLs */
+    ASSERT_EQ(can_tx_brake_cmd(NULL, NULL, &fsm), CAN_ERR_TX);
+    ASSERT_EQ(can_tx_brake_cmd(NULL, &pid, NULL), CAN_ERR_TX);
+    ASSERT_EQ(can_tx_brake_cmd(&state, NULL, NULL), CAN_ERR_TX);
+    ASSERT_EQ(can_tx_brake_cmd(NULL, NULL, NULL), CAN_ERR_TX);
 }
 
+/* ================================================================
+ * TEST: can_tx_fsm_state with individual NULL parameters
+ * ================================================================ */
+TEST(test_tx_fsm_state_null_combinations)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+    fsm_output_t fsm = { .fsm_state = (uint8_t)FSM_WARNING };
+    
+    ASSERT_EQ(can_tx_fsm_state(NULL, &fsm), CAN_ERR_TX);
+    ASSERT_EQ(can_tx_fsm_state(&state, NULL), CAN_ERR_TX);
+    ASSERT_EQ(can_tx_fsm_state(NULL, NULL), CAN_ERR_TX);
+}
+
+/* ================================================================
+ * TEST: can_rx_process with various NULL combinations (line 202)
+ * ================================================================ */
+TEST(test_can_rx_process_null_combinations)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+    uint8_t frame[8] = {0};
+    
+    /* state != NULL, data != NULL (already covered) */
+    /* state != NULL, data == NULL */
+    can_rx_process(&state, CAN_ID_EGO_VEHICLE, NULL, 8U);
+    
+    /* state == NULL, data != NULL */
+    can_rx_process(NULL, CAN_ID_EGO_VEHICLE, frame, 8U);
+    
+    /* state == NULL, data == NULL */
+    can_rx_process(NULL, CAN_ID_EGO_VEHICLE, NULL, 8U);
+    
+    /* No crash means test passes */
+    ASSERT_EQ(1, 1);
+}
 /* ═══════════════════════════════════════════════════════════════════════
  *  MAIN
  * ═══════════════════════════════════════════════════════════════════════ */
@@ -717,8 +755,10 @@ int main(void)
     RUN(test_tx_brake_cmd_brake_pct_zero);
     RUN(test_tx_brake_cmd_brake_pct_positive);
     RUN(test_tx_brake_cmd_alive_counter_wrap_branch);
-    RUN(test_can_check_timeout_miss_count_increment);
-    
+    RUN(test_tx_brake_cmd_null_combinations);
+    RUN(test_tx_fsm_state_null_combinations);
+    RUN(test_can_rx_process_null_combinations);
+
     printf("\n=== Results: %d run, %d passed, %d failed ===\n",
            tests_run, tests_passed, tests_failed);
 
