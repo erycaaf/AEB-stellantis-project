@@ -743,10 +743,10 @@ mcdc-can:
 	@echo "--- Running test_can_struct_cov (structural complementary suite) ---"
 	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_can_struct_cov
 	@echo ""
-	@echo "--- Generating combined coverage report (gcov -b -c --conditions) ---"
+	@echo "--- Generating combined coverage report for aeb_can.c only ---"
 	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
-		$(GCOV) -b -c --conditions test_can_cov-aeb_can.gcno test_can_fault_cov-aeb_can.gcno test_can_struct_cov-aeb_can.gcno > gcov_summary.txt 2>&1 && \
-		cat gcov_summary.txt
+		$(GCOV) -b -c --conditions ../../src/communication/aeb_can.c > gcov_summary.txt 2>&1 && \
+		grep -E "Lines executed:|Branches executed:|Condition outcomes covered:" gcov_summary.txt
 	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
 
 # ── Fault injection (Table 11 item 1e) ───────────────────────────────────
