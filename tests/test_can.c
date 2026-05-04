@@ -638,6 +638,28 @@ TEST(test_tx_brake_cmd_alive_counter_wrap_branch)
     ASSERT_EQ(state.alive_counter, 0U);
 }
 
+TEST(test_can_check_timeout_miss_count_increment)
+{
+    can_state_t state;
+    can_hal_test_reset();
+    (void)can_init(&state);
+    
+    /* Initial miss_count should be 0, rx_timeout_flag 0 */
+    can_check_timeout(&state);
+    
+    can_rx_data_t rx;
+    can_get_rx_data(&state, &rx);
+    ASSERT_EQ(rx.rx_timeout_flag, 0U);
+    
+    /* Call enough times to trigger timeout but not exceed */
+    for (uint8_t i = 0U; i < 3U; i++) {
+        can_check_timeout(&state);
+    }
+    can_get_rx_data(&state, &rx);
+    /* Still not at 6 ticks, so flag still 0 */
+    ASSERT_EQ(rx.rx_timeout_flag, 0U);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════
  *  MAIN
  * ═══════════════════════════════════════════════════════════════════════ */
@@ -695,7 +717,8 @@ int main(void)
     RUN(test_tx_brake_cmd_brake_pct_zero);
     RUN(test_tx_brake_cmd_brake_pct_positive);
     RUN(test_tx_brake_cmd_alive_counter_wrap_branch);
-
+    RUN(test_can_check_timeout_miss_count_increment);
+    
     printf("\n=== Results: %d run, %d passed, %d failed ===\n",
            tests_run, tests_passed, tests_failed);
 
