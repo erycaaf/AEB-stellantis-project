@@ -90,8 +90,8 @@ jobs:
           make mcdc-can
           SUM="reports/vv_can/coverage_mcdc/gcov_summary.txt"
           STMT=$(grep '^Lines executed:'             "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
-          BRCH=$(grep '^Branches executed:'          "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
-          MCDC=$(grep '^Condition outcomes covered:' "$SUM"          | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          BRCH=$(grep '^Taken at least once:'        "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          MCDC=$(grep '^Condition outcomes covered:' "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
           echo "CAN coverage — stmt=${STMT}% branch=${BRCH}% mcdc=${MCDC}%"
           for metric in "Statement:$STMT" "Branch:$BRCH" "MC/DC:$MCDC"; do
             name="${metric%%:*}"; value="${metric##*:}"
@@ -128,7 +128,7 @@ jobs:
               if not e.get("id", "").startswith("misra-c2012"):
                   continue
               loc = e.find("location")
-              if loc is not None and loc.get("file", "") in target:
+              if loc is not None and any(loc.get("file", "").endswith(f) for f in target):
                   n += 1
           print(n)
           PY
@@ -139,9 +139,8 @@ jobs:
             exit 1
           fi
 
-      # ─── Non-blocking (reports-only) until robustness patches land ────────
-      - name: Fault injection (non-blocking until bugs patched)
-        continue-on-error: true
+      # ─── Blocking gate 4: fault injection ─────────────────────────────────
+      - name: Fault injection
         run: make fault-can
 
       # ─── Generate navigable HTML reports ──────────────────────────────────
