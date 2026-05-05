@@ -221,7 +221,7 @@ sil/
 ├── start_sil.sh               ◀── WSL2 quickstart (Docker Desktop friendly)
 ├── docker/                    ◀── per-service Dockerfiles + helpers
 │   ├── Dockerfile.gazebo      Gazebo + ROS 2 + aeb_gazebo + gazebo_models bundle
-│   ├── Dockerfile.zephyr      Zephyr SDK + native_sim AEB build (applies patch_fsm.py)
+│   ├── Dockerfile.zephyr      Zephyr SDK + native_sim AEB build (multi-stage)
 │   ├── Dockerfile.api         FastAPI scenario controller
 │   ├── Dockerfile.canbridge   (unused) SocketCAN ↔ ROS 2 bridge
 │   ├── api/                   scenario_api.py (REST endpoints)
@@ -247,7 +247,6 @@ sil/
     ├── CMakeLists.txt
     ├── prj.conf
     ├── boards/native_sim.overlay
-    ├── patch_fsm.py           ◀── (workaround) early POST_BRAKE entry below V_EGO_MIN
     └── src/
         ├── main.c             10 ms tick → aeb_core_step()
         ├── can_hal.h
