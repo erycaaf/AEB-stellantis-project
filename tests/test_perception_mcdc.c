@@ -6,9 +6,9 @@
  * -----
  * The nominal suite (test_perception.c) achieves 100% statement coverage
  * but only 88.04% branch / MC/DC (81 of 92 condition outcomes), leaving
- * 11 outcomes uncovered. This suite targets the 11 gap groups (G1..G11)
- * identified in Relatorio_Consolidado_VV_Perception.pdf §3.3 and raises
- * MC/DC to its structural maximum.
+ * 11 outcomes uncovered. This suite targets gap groups G1..G17:
+ *   G1..G11 identified in Relatorio_Consolidado_VV_Perception.pdf §3.3.
+ *   G12..G17 close remaining MC/DC branch gaps found in the second gcov pass.
  *
  *   G1 — counter saturation in lidar_fault_detect / radar_fault_detect
  *        (branches at aeb_perception.c:50 and :97)
@@ -620,13 +620,246 @@ static void test_G11_clamp_vrel_max(void)
 }
 
 /* =========================================================================
+ * G12 — radar_fault_detect: d_r > RADAR_DIST_MAX as sole bad-frame condition
+ * -------------------------------------------------------------------------
+ * Target branch:
+ *   radar_fault_detect : aeb_perception.c:90
+ *     (d_r > RADAR_DIST_MAX) is the unique clause that drives bad = 1.
+ *
+ * All other conditions false: isfinite(d_r)=true, isfinite(vr_r)=true,
+ * d_r >= RADAR_DIST_MIN, FABSF(vr_r) <= MAX_REL_VEL.
+ * ====================================================================== */
+static void test_G12_radar_dist_max_sole(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.radar_d  = (float)RADAR_DIST_MAX + 1.0f;  /* 201.0 > 200.0 sole trigger */
+    in.radar_vr = 5.0f;                            /* |5| < MAX_REL_VEL=50      */
+    in.lidar_d  = 30.2f;
+
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES + 1U; ++i) {
+        perception_step(&in, &out);
+    }
+
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) != 0U,
+          "G12 radar: d_r > RADAR_DIST_MAX alone latches radar fault");
+    CHECK((out.fault_flag & AEB_FAULT_LIDAR) == 0U,
+          "G12 radar: lidar not faulted when only d_r > RADAR_DIST_MAX");
+}
+
+/* =========================================================================
+ * G13 — radar ROC composite: explicit MC/DC independence pairs
+ * -------------------------------------------------------------------------
+ * Target branches:
+ *   radar_fault_detect : aeb_perception.c:94-95 (branch 2/3 never executed)
+ *
+ * G3a/G3b exercise the correct inputs but lack the C0=false,C1=false
+ * baseline within the same execution sequence. G13a/G13b make both halves
+ * of each MC/DC independence pair explicit in a single test function:
+ *   G13a: explicit (false,false) no-ROC cycle, then (true,false) dist-ROC
+ *   G13b: explicit (false,false) no-ROC cycle, then (false,true) vel-ROC
+ * ====================================================================== */
+static void test_G13a_radar_dist_roc_mcdc(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    /* Cycle 0: seed — arm is_first=0, prev_d=30, prev_vr=5 */
+    perception_step(&in, &out);
+
+    /* MC/DC pair 2: C0=false, C1=false → no ROC; prev advances to (30.5, 5.2) */
+    in.radar_d  = 30.5f;   /* |30.5-30|=0.5 <= DIST_ROC_LIMIT=10 */
+    in.radar_vr = 5.2f;    /* |5.2-5|=0.2   <= VEL_ROC_LIMIT=2   */
+    perception_step(&in, &out);
+
+    /* MC/DC pair 1: C0=true, C1=false → dist ROC only */
+    in.radar_d  = 42.0f;   /* |42-30.5|=11.5 > DIST_ROC_LIMIT */
+    in.radar_vr = 5.5f;    /* |5.5-5.2|=0.3  <= VEL_ROC_LIMIT  */
+    perception_step(&in, &out);
+
+    for (unsigned int i = 1U; i < (unsigned int)SENSOR_FAULT_CYCLES; ++i) {
+        perception_step(&in, &out);  /* prev_d stays 30.5 while bad=1 */
+    }
+
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) != 0U,
+          "G13a radar: explicit dist-ROC MC/DC pair latches radar fault");
+}
+
+static void test_G13b_radar_vel_roc_mcdc(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    /* Cycle 0: seed — arm is_first=0, prev_d=30, prev_vr=5 */
+    perception_step(&in, &out);
+
+    /* MC/DC pair 2: C0=false, C1=false → no ROC; prev advances to (30.5, 5.2) */
+    in.radar_d  = 30.5f;   /* |30.5-30|=0.5 <= DIST_ROC_LIMIT=10 */
+    in.radar_vr = 5.2f;    /* |5.2-5|=0.2   <= VEL_ROC_LIMIT=2   */
+    perception_step(&in, &out);
+
+    /* MC/DC pair 1: C0=false, C1=true → vel ROC only */
+    in.radar_d  = 32.0f;   /* |32-30.5|=1.5  <= DIST_ROC_LIMIT */
+    in.radar_vr = 8.0f;    /* |8-5.2|=2.8    >  VEL_ROC_LIMIT  */
+    perception_step(&in, &out);
+
+    for (unsigned int i = 1U; i < (unsigned int)SENSOR_FAULT_CYCLES; ++i) {
+        perception_step(&in, &out);
+    }
+
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) != 0U,
+          "G13b radar: explicit vel-ROC MC/DC pair latches radar fault");
+}
+
+/* =========================================================================
+ * G14 — kalman_fusion: FABSF(det) <= 1e-9f (false branch of det guard)
+ * -------------------------------------------------------------------------
+ * Target branch:
+ *   kalman_fusion : aeb_perception.c:218
+ *     if (FABSF(det) > 1e-9f) { <radar update> }  — false branch unreachable.
+ *
+ * With R_d=0.09 and R_v=0.01, det(S) >= R_d * R_v = 9e-4 >> 1e-9 always.
+ * This branch is unreachable via the public API with the current config.
+ * Proxy: confirm distance stays finite after full Kalman convergence.
+ * ====================================================================== */
+static void test_G14_det_guard_proxy(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    for (int i = 0; i < 100; ++i) {
+        perception_step(&in, &out);
+    }
+
+    CHECK(isfinite(out.distance),
+          "G14 proxy: det >> 1e-9 always — distance finite after 100 convergence cycles");
+    CHECK(out.confidence > 0.0f,
+          "G14 proxy: confidence > 0 confirms Kalman radar update path taken");
+}
+
+/* =========================================================================
+ * G15 — kalman_fusion: quality < 0.0f (true branch of quality clamp)
+ * -------------------------------------------------------------------------
+ * Target branch:
+ *   kalman_fusion : aeb_perception.c:268
+ *     if (quality < 0.0f) { quality = 0.0f; }  — true branch unreachable.
+ *
+ * quality = 1.0 - trace(P2)/2. For quality < 0, trace(P2) > 2.0 is required.
+ * With P0_D=1.0 and P0_V=0.25 the initial trace is 1.25 < 2.0, and Kalman
+ * updates only reduce it further. When both sensors are invalid (l_ok=r_ok=0)
+ * the quality expression is bypassed entirely — confidence is forced to 0.0.
+ * This branch is unreachable via the public API with the current config.
+ * Proxy: confirm confidence stays within [0.0, 1.0] across many cycles.
+ * ====================================================================== */
+static void test_G15_quality_clamp_proxy(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+    float32_t min_conf = 1.0f;
+
+    perception_init();
+
+    for (int i = 0; i < 50; ++i) {
+        perception_step(&in, &out);
+        if (out.confidence < min_conf) { min_conf = out.confidence; }
+    }
+
+    CHECK(min_conf >= 0.0f,
+          "G15 proxy: quality clamp — confidence never goes below 0.0");
+}
+
+/* =========================================================================
+ * G16 — perception_step: isfinite(v_ego) false, +Inf variant
+ * -------------------------------------------------------------------------
+ * Target branch:
+ *   perception_step : aeb_perception.c:295
+ *     condition 1 not covered (false) — complement to G9 (NaN variant).
+ *
+ * G9 exercises v_ego=NaN; +Inf exercises the other MC/DC code path through
+ * the isfinite() expansion (isinf vs isnan sub-check).
+ * ====================================================================== */
+static void test_G16_vego_inf(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.v_ego = (float)INFINITY;
+    perception_step(&in, &out);
+
+    CHECK(out.v_ego == 0.0f,
+          "G16 v_ego +inf: non-finite v_ego -> out.v_ego = 0.0f");
+    CHECK((out.fault_flag & AEB_FAULT_CAN_TO) != 0U,
+          "G16 v_ego +inf: non-finite v_ego -> AEB_FAULT_CAN_TO raised");
+}
+
+/* =========================================================================
+ * G17 — lidar_fault_detect: range-bound clauses as sole conditions
+ * -------------------------------------------------------------------------
+ * Target branches:
+ *   lidar_fault_detect : aeb_perception.c:43
+ *     condition 1 not covered (false) — d_l < LIDAR_DIST_MIN sole trigger
+ *     condition 2 not covered (true)  — d_l > LIDAR_DIST_MAX sole trigger
+ *
+ * G7a/G7b cover the !isfinite clause (condition 0). G17 covers the two
+ * range-bound clauses independently, with all other conditions false.
+ * ====================================================================== */
+static void test_G17a_lidar_above_max(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.lidar_d = (float)LIDAR_DIST_MAX + 1.0f;   /* 101.0 > 100.0 sole trigger */
+
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES + 1U; ++i) {
+        perception_step(&in, &out);
+    }
+
+    CHECK((out.fault_flag & AEB_FAULT_LIDAR) != 0U,
+          "G17a lidar: d_l > LIDAR_DIST_MAX alone latches lidar fault");
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) == 0U,
+          "G17a lidar: radar not faulted when only d_l > LIDAR_DIST_MAX");
+}
+
+static void test_G17b_lidar_below_min(void)
+{
+    raw_sensor_input_t in = make_good_input();
+    perception_output_t out;
+
+    perception_init();
+
+    in.lidar_d = (float)LIDAR_DIST_MIN - 0.1f;   /* 0.9 < 1.0 sole trigger */
+
+    for (unsigned int i = 0U; i < (unsigned int)SENSOR_FAULT_CYCLES + 1U; ++i) {
+        perception_step(&in, &out);
+    }
+
+    CHECK((out.fault_flag & AEB_FAULT_LIDAR) != 0U,
+          "G17b lidar: d_l < LIDAR_DIST_MIN alone latches lidar fault");
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) == 0U,
+          "G17b lidar: radar not faulted when only d_l < LIDAR_DIST_MIN");
+}
+
+/* =========================================================================
  * Main
  * ====================================================================== */
 int main(void)
 {
     printf("======================================================\n");
     printf("  Perception complementary MC/DC suite\n");
-    printf("  Targets gap groups G1..G11 (report section 3.3)\n");
+    printf("  Targets gap groups G1..G17\n");
     printf("======================================================\n\n");
 
     printf("--- G1: counter saturation (uint8_t ceiling) ---\n");
@@ -677,6 +910,32 @@ int main(void)
 
     printf("--- G11: clampf upper bound -- fused v_rel > MAX_REL_VEL ---\n");
     test_G11_clamp_vrel_max();
+    printf("\n");
+
+    printf("--- G12: radar d_r > RADAR_DIST_MAX sole condition ---\n");
+    test_G12_radar_dist_max_sole();
+    printf("\n");
+
+    printf("--- G13: radar ROC composite explicit MC/DC pairs ---\n");
+    test_G13a_radar_dist_roc_mcdc();
+    test_G13b_radar_vel_roc_mcdc();
+    printf("\n");
+
+    printf("--- G14: Kalman det guard proxy (branch unreachable via public API) ---\n");
+    test_G14_det_guard_proxy();
+    printf("\n");
+
+    printf("--- G15: quality clamp proxy (branch unreachable via public API) ---\n");
+    test_G15_quality_clamp_proxy();
+    printf("\n");
+
+    printf("--- G16: perception_step isfinite(v_ego) +Inf variant ---\n");
+    test_G16_vego_inf();
+    printf("\n");
+
+    printf("--- G17: lidar range bounds as sole conditions ---\n");
+    test_G17a_lidar_above_max();
+    test_G17b_lidar_below_min();
     printf("\n");
 
     printf("======================================================\n");

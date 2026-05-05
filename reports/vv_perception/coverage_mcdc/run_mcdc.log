@@ -1,6 +1,6 @@
 ======================================================
   Perception complementary MC/DC suite
-  Targets gap groups G1..G5 (report section 3.3)
+  Targets gap groups G1..G17
 ======================================================
 
 --- G1: counter saturation (uint8_t ceiling) ---
@@ -24,6 +24,61 @@
 [PASS] G5 confidence: quality clamp keeps confidence >= 0.0
 [PASS] G5 confidence: confidence never exceeds 1.0
 
+--- G6: Kalman init guard (isfinite(d_r) && isfinite(vr_r)) ---
+[PASS] G6a kalman init: NaN d_r → distance remains finite (no NaN propagation)
+[PASS] G6a kalman init: NaN d_r → init skipped, radar not contributing (conf < 0.7)
+[PASS] G6b kalman init: NaN vr_r → distance remains finite (no NaN propagation)
+[PASS] G6b kalman init: NaN vr_r → init skipped, radar not contributing (conf < 0.7)
+[PASS] G6c kalman init: both valid → distance output finite
+[PASS] G6c kalman init: both valid → init taken, both sensors contributing (conf >= 0.8)
+
+--- G7: lidar_fault_detect !isfinite(d_l) clause ---
+[PASS] G7a lidar NaN: !isfinite(d_l) alone latches lidar fault
+[PASS] G7a lidar NaN: radar fault not raised when only d_l is NaN
+[PASS] G7b lidar +inf: !isfinite(d_l) alone latches lidar fault
+[PASS] G7b lidar +inf: radar fault not raised when only d_l is +inf
+
+--- G8: radar_fault_detect !isfinite(d_r) and !isfinite(vr_r) clauses ---
+[PASS] G8a radar NaN d_r: !isfinite(d_r) alone latches radar fault
+[PASS] G8a radar NaN d_r: lidar fault not raised when only d_r is NaN
+[PASS] G8b radar -inf vr_r: !isfinite(vr_r) alone latches radar fault
+[PASS] G8b radar -inf vr_r: lidar fault not raised when only vr_r is -inf
+
+--- G9: perception_step isfinite(v_ego) false branch ---
+[PASS] G9 v_ego NaN: non-finite v_ego -> out.v_ego set to 0.0f
+[PASS] G9 v_ego NaN: non-finite v_ego -> AEB_FAULT_CAN_TO raised
+
+--- G10: clampf upper bound -- Kalman distance > DIST_MAX_OUTPUT ---
+[PASS] G10 clampf: dead-reckoned distance > 300 m -> clamped to DIST_MAX_OUTPUT
+
+--- G11: clampf upper bound -- fused v_rel > MAX_REL_VEL ---
+[PASS] G11 clampf: fused v_rel > MAX_REL_VEL -> v_rel clamped to MAX_REL_VEL
+
+--- G12: radar d_r > RADAR_DIST_MAX sole condition ---
+[PASS] G12 radar: d_r > RADAR_DIST_MAX alone latches radar fault
+[PASS] G12 radar: lidar not faulted when only d_r > RADAR_DIST_MAX
+
+--- G13: radar ROC composite explicit MC/DC pairs ---
+[PASS] G13a radar: explicit dist-ROC MC/DC pair latches radar fault
+[PASS] G13b radar: explicit vel-ROC MC/DC pair latches radar fault
+
+--- G14: Kalman det guard proxy (branch unreachable via public API) ---
+[PASS] G14 proxy: det >> 1e-9 always — distance finite after 100 convergence cycles
+[PASS] G14 proxy: confidence > 0 confirms Kalman radar update path taken
+
+--- G15: quality clamp proxy (branch unreachable via public API) ---
+[PASS] G15 proxy: quality clamp — confidence never goes below 0.0
+
+--- G16: perception_step isfinite(v_ego) +Inf variant ---
+[PASS] G16 v_ego +inf: non-finite v_ego -> out.v_ego = 0.0f
+[PASS] G16 v_ego +inf: non-finite v_ego -> AEB_FAULT_CAN_TO raised
+
+--- G17: lidar range bounds as sole conditions ---
+[PASS] G17a lidar: d_l > LIDAR_DIST_MAX alone latches lidar fault
+[PASS] G17a lidar: radar not faulted when only d_l > LIDAR_DIST_MAX
+[PASS] G17b lidar: d_l < LIDAR_DIST_MIN alone latches lidar fault
+[PASS] G17b lidar: radar not faulted when only d_l < LIDAR_DIST_MIN
+
 ======================================================
-  Results: 11 passed, 0 failed
+  Results: 42 passed, 0 failed
 ======================================================
