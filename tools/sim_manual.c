@@ -464,21 +464,21 @@ static void run_ramp(aeb_core_state_t *st,
     int32_t            n_cycles;
     int32_t            i;
     uint8_t            last_state;
+    char               prompt[64U];
 
     printf("\n=== %s ramp ===\n", var_name);
-    printf("  %s start: ", var_name);
-    if (scanf("%f", &v_start) != 1) { return; }
-    printf("  %s end  : ", var_name);
-    if (scanf("%f", &v_end) != 1) { return; }
-    printf("  Duration [s]: ");
-    if (scanf("%f", &duration_s) != 1) { return; }
+    (void)snprintf(prompt, sizeof(prompt), "  %s start: ", var_name);
+    if (!read_float(prompt, &v_start)) { return; }
+    (void)snprintf(prompt, sizeof(prompt), "  %s end  : ", var_name);
+    if (!read_float(prompt, &v_end))   { return; }
+    if (!read_float("  Duration [s]: ", &duration_s)) { return; }
 
     if (target == RAMP_V_EGO)
     {
-        printf("  Track v_rel = v_ego (target stopped)? "
-               "[1=yes / 0=keep v_rel=%.2f]: ",
-               (double)(*p_v_rel));
-        if (scanf("%d", &track_vrel) != 1) { track_vrel = 0; }
+        (void)snprintf(prompt, sizeof(prompt),
+                       "  Track v_rel = v_ego? [1=yes / 0=keep v_rel=%.2f]: ",
+                       (double)(*p_v_rel));
+        (void)read_int(prompt, &track_vrel);
     }
 
     n_cycles = (int32_t)(duration_s / 0.01F + 0.5F);
