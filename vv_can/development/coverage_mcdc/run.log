@@ -1,0 +1,138 @@
+=== AEB CAN Module — Unit Tests ===
+
+  [TEST] test_signal_roundtrip
+  [TEST] test_init_success
+  [TEST] test_init_failure
+  [TEST] test_rx_ego_vehicle
+  [TEST] test_rx_yaw_rate
+  [TEST] test_rx_radar_target
+  [TEST] test_rx_driver_input
+  [TEST] test_tx_alert
+  [TEST] test_rx_timeout
+  [TEST] test_rx_timeout_reset_on_valid_frame
+  [TEST] test_tx_brake_cmd
+  [TEST] test_tx_fsm_period
+  [TEST] test_tx_brake_cmd_nan_brake_bar
+  [TEST] test_tx_brake_cmd_pos_inf_brake_bar
+  [TEST] test_tx_brake_cmd_neg_inf_brake_bar
+  [TEST] test_tx_brake_cmd_overflow_brake_bar
+  [TEST] test_tx_send_failure
+  [TEST] test_rx_uds_request
+  [TEST] test_tx_uds_response
+  [TEST] test_rx_uds_request_short_dlc
+  [TEST] test_uds_request_ack
+  [TEST] test_tx_brake_cmd_null_params
+  [TEST] test_tx_brake_cmd_alive_counter_wrap
+  [TEST] test_tx_fsm_state_null_params
+  [TEST] test_tx_uds_response_null
+  [TEST] test_clear_uds_request_pending_null
+  [TEST] test_encode_unsigned_saturation
+  [TEST] test_tx_alert_null
+  [TEST] test_check_timeout_null
+  [TEST] test_decode_unsigned_via_rx
+  [TEST] test_init_hal_failure_branch
+  [TEST] test_tx_brake_cmd_alive_counter_wrap_to_zero
+  [TEST] test_tx_uds_response_send_failure
+  [TEST] test_clear_uds_request_pending_valid_state
+  [TEST] test_tx_alert_send_failure
+  [TEST] test_brake_mode_all_cases
+  [TEST] test_ttc_thresh_all_cases
+  [TEST] test_tx_fsm_state_hal_send_failure_branch
+  [TEST] test_encode_unsigned_negative_raw_f
+  [TEST] test_encode_unsigned_raw_f_inf
+  [TEST] test_can_rx_process_data_null
+  [TEST] test_can_rx_process_state_null
+  [TEST] test_encode_unsigned_physical_inf
+  [TEST] test_encode_unsigned_raw_f_nan
+  [TEST] test_tx_brake_cmd_brake_pct_zero
+  [TEST] test_tx_brake_cmd_brake_pct_positive
+  [TEST] test_tx_brake_cmd_alive_counter_wrap_branch
+  [TEST] test_tx_brake_cmd_null_combinations
+  [TEST] test_tx_fsm_state_null_combinations
+  [TEST] test_can_rx_process_null_combinations
+  [TEST] test_can_rx_ego_vehicle_invalid_dlc
+  [TEST] test_can_rx_driver_input_invalid_dlc
+  [TEST] test_can_rx_radar_target_invalid_dlc
+  [TEST] test_can_rx_unknown_id
+  [TEST] test_can_check_timeout_miss_count_saturates
+  [TEST] test_can_get_rx_data_null_state
+  [TEST] test_can_get_rx_data_null_out
+
+=== Results: 133 run, 133 passed, 0 failed ===
+=== AEB CAN Module — Fault Injection (ISO 26262-6 Tab.11) ===
+
+--- Category A: Invalid values (NULL pointers, bad DLC, unknown ID, HAL fault) ---
+  PASS  A1  brake_cmd(NULL,pid,fsm) -> CAN_ERR_TX
+  PASS  A2  brake_cmd(state,NULL,fsm) -> CAN_ERR_TX
+  PASS  A3  brake_cmd(state,pid,NULL) -> CAN_ERR_TX
+  PASS  A4  fsm_state(NULL,fsm) -> CAN_ERR_TX
+  PASS  A5  fsm_state(state,NULL) -> CAN_ERR_TX
+  PASS  A6  alert(NULL) -> CAN_ERR_TX
+  PASS  A7  rx_process(NULL,id,data,dlc) -> no crash
+  PASS  A8  rx_process(state,id,NULL,dlc) -> no crash
+  PASS  A9  check_timeout(NULL) -> no crash
+  PASS  A10 get_rx_data(NULL,dst) -> no crash
+  PASS  A11 get_rx_data(state,NULL) -> no crash
+  PASS  A12 rx(EgoVehicle, dlc=4<8) -> no decode
+  PASS  A13 rx(RadarTarget, dlc=0) -> no decode
+  PASS  A14 rx(unknown ID) -> no TX side-effect
+  PASS  A15 init with forced HAL failure -> CAN_ERR_INIT, initialised=0
+
+--- Category B: Numeric extremes (NaN, Inf, encode overflow, pack overflow) ---
+  PASS  B1  brake_bar=NaN -> returns, does not abort
+  PASS  B2  brake_bar=+Inf -> returns, does not abort
+  PASS  B3  brake_bar=-Inf -> returns, does not abort
+  PASS  B3b packed BrakePressure after -Inf == 0 (clamped)
+  PASS  B4  brake_bar=1e5 -> adjacent signals intact
+  PASS  B5  brake_bar=FLT_MAX -> does not abort
+  PASS  B6  pack(0xFFFFFFFF, len=4) -> masked, no bleed
+
+--- Category C: State corruption (SEU on alive_counter, rx_miss, cycle_counter) ---
+  PASS  C1  alive_counter=0xAA -> bounded after next TX
+  PASS  C2  rx_miss_count=0xFF -> saturates at 0xFF (no wrap)
+  PASS  C2b rx_miss_count=0xFF -> timeout_flag=1
+  PASS  C3  tx_cycle_counter=UINT32_MAX -> wraps safely, no TX
+  PASS  C4  initialised=0x55 -> no observable effect (informational)
+
+--- Category D: Persistence (timeout recovery, 100 toggles, TX burst) ---
+  PASS  D1a 10 ticks no RX -> timeout_flag=1
+  PASS  D1b valid radar frame -> miss_count=0, flag cleared
+  PASS  D2  100 send_fail toggles -> rc matches toggle state
+  PASS  D3  TX burst > buffer -> CAN_ERR_TX surfaces (expected ~32)
+
+=== Fault injection summary: 31 asserts, 31 passed, 0 failed ===
+=== AEB CAN Module — Structural Tests ===
+
+--- BrakeMode switch (can_tx_brake_cmd) ---
+   PASS   brake_mode(FSM_OFF)=0
+   PASS   brake_mode(FSM_STANDBY)=0
+   PASS   brake_mode(FSM_WARNING)=1
+   PASS   brake_mode(FSM_BRAKE_L1)=2
+   PASS   brake_mode(FSM_BRAKE_L2)=3
+   PASS   brake_mode(FSM_BRAKE_L3)=4
+   PASS   brake_mode(FSM_POST_BRAKE)=5
+   PASS   brake_mode(invalid)=0 (default)
+
+--- TTC threshold switch (can_tx_fsm_state) ---
+   PASS   ttc_raw(FSM_BRAKE_L1)=30
+   PASS   ttc_raw(FSM_BRAKE_L2)=22
+   PASS   ttc_raw(FSM_BRAKE_L3)=18
+   PASS   ttc_raw(FSM_WARNING)=40
+   PASS   ttc_raw(FSM_OFF)=0 (default)
+
+--- Coverage Gap Fillers (Defensive Logic) ---
+   PASS   E1 encode_unsigned negative input handled
+   PASS   E2 uds_response(NULL) -> CAN_ERR_TX
+   PASS   E3 uds_response HAL fail -> CAN_ERR_TX
+   PASS   E4 clear_pending(NULL) handled safely
+
+--- HAL failure branch in can_tx_fsm_state ---
+   PASS   can_tx_fsm_state: HAL fail handling
+
+--- DLC-too-short branch for DriverInput (0x101) ---
+   PASS   rx(DriverInput, dlc=2<4) -> no decode
+
+--- brake_pct == 0 branch in can_tx_brake_cmd ---
+   PASS   tx_brake_cmd(brake_pct=0) handled
+
+=== Results: 20 run, 20 passed ===

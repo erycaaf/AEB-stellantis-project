@@ -1,0 +1,731 @@
+        -:    0:Source:/home/runner/work/AEB-stellantis-project/AEB-stellantis-project/src/communication/aeb_can.c
+        -:    0:Graph:aeb_can.gcno
+        -:    0:Data:aeb_can.gcda
+        -:    0:Runs:3
+        -:    1:/**
+        -:    2: * @file  aeb_can.c
+        -:    3: * @brief CAN Bus Communication module — implementation.
+        -:    4: *
+        -:    5: * Covers FR-CAN-001..004 from SRS v2.0.
+        -:    6: * All signal layouts match aeb_system.dbc.
+        -:    7: * MISRA C:2012 compliant: no malloc, no recursion, fixed-width types,
+        -:    8: * all variables initialised, single return per function (preferred),
+        -:    9: * bounded loops, default in every switch.
+        -:   10: *
+        -:   11: * @author  Renato Fagundes
+        -:   12: * @date    2026-04-07
+        -:   13: */
+        -:   14:
+        -:   15:#include "aeb_can.h"
+        -:   16:#include "can_hal.h"   /* Zephyr CAN HAL stub / real driver */
+        -:   17:#include <math.h>      /* isfinite() — NaN / ±Inf guard on encode_unsigned */
+        -:   18:#include <string.h>
+        -:   19:
+        -:   20:/* ═══════════════════════════════════════════════════════════════════════
+        -:   21: *  PRIVATE HELPERS — Signal pack / unpack  (FR-CAN-003)
+        -:   22: * ═══════════════════════════════════════════════════════════════════════ */
+        -:   23:
+        -:   24:/**
+        -:   25: * @brief Pack an unsigned raw value into a little-endian CAN payload.
+        -:   26: */
+function can_pack_signal called 1060 returned 100% blocks executed 100%
+     1060:   27:void can_pack_signal(uint8_t *data,
+        -:   28:                     uint8_t  start_bit,
+        -:   29:                     uint8_t  length,
+        -:   30:                     uint32_t raw_value)
+        -:   31:{
+     1060:   32:    uint8_t bit_idx = 0U;
+        -:   33:
+     6862:   34:    for (bit_idx = 0U; bit_idx < length; bit_idx++)
+branch  0 taken 5802
+branch  1 taken 1060 (fallthrough)
+condition outcomes covered 2/2
+        -:   35:    {
+     5802:   36:        uint8_t  abs_bit  = start_bit + bit_idx;
+     5802:   37:        uint8_t  byte_pos = abs_bit / 8U;
+     5802:   38:        uint8_t  bit_pos  = abs_bit % 8U;
+     5802:   39:        uint8_t  bit_val  = (uint8_t)((raw_value >> bit_idx) & 1U);
+        -:   40:
+        -:   41:        /* Clear then set the target bit */
+     5802:   42:        data[byte_pos] = (uint8_t)(data[byte_pos] & (uint8_t)(~(1U << bit_pos)));
+     5802:   43:        data[byte_pos] = (uint8_t)(data[byte_pos] | (uint8_t)(bit_val << bit_pos));
+        -:   44:    }
+     1060:   45:}
+        -:   46:
+        -:   47:/**
+        -:   48: * @brief Unpack an unsigned raw value from a little-endian CAN payload.
+        -:   49: */
+function can_unpack_signal called 56 returned 100% blocks executed 100%
+       56:   50:uint32_t can_unpack_signal(const uint8_t *data,
+        -:   51:                           uint8_t        start_bit,
+        -:   52:                           uint8_t        length)
+        -:   53:{
+       56:   54:    uint32_t result  = 0U;
+       56:   55:    uint8_t  bit_idx = 0U;
+        -:   56:
+      673:   57:    for (bit_idx = 0U; bit_idx < length; bit_idx++)
+branch  0 taken 617
+branch  1 taken 56 (fallthrough)
+condition outcomes covered 2/2
+        -:   58:    {
+      617:   59:        uint8_t  abs_bit  = start_bit + bit_idx;
+      617:   60:        uint8_t  byte_pos = abs_bit / 8U;
+      617:   61:        uint8_t  bit_pos  = abs_bit % 8U;
+      617:   62:        uint8_t  bit_val  = (uint8_t)((data[byte_pos] >> bit_pos) & 1U);
+        -:   63:
+      617:   64:        result |= ((uint32_t)bit_val << bit_idx);
+        -:   65:    }
+        -:   66:
+       56:   67:    return result;
+        -:   68:}
+        -:   69:
+        -:   70:/* ═══════════════════════════════════════════════════════════════════════
+        -:   71: *  PRIVATE — Physical-to-raw / raw-to-physical conversions
+        -:   72: *
+        -:   73: *  DBC formula: physical = raw * factor + offset
+        -:   74: *  Encode:      raw = (physical - offset) / factor
+        -:   75: * ═══════════════════════════════════════════════════════════════════════ */
+        -:   76:
+function encode_unsigned called 185 returned 100% blocks executed 100%
+      185:   77:static uint32_t encode_unsigned(float32_t physical,
+        -:   78:                                float32_t factor,
+        -:   79:                                float32_t offset)
+        -:   80:{
+        -:   81:    /* NaN / ±Inf / overflow on the float→uint32 cast is UB per C11
+        -:   82:     * §6.3.1.4; saturate at 4294967040.0F (UINT32_MAX − 255, largest
+        -:   83:     * float32 that rounds cleanly into range). See commit body for
+        -:   84:     * full rationale. */
+      185:   85:    uint32_t raw = 0U;
+        -:   86:
+      185:   87:    if (isfinite(physical))
+branch  0 taken 177 (fallthrough)
+branch  1 taken 8
+condition outcomes covered 2/2
+        -:   88:    {
+      177:   89:        const float32_t raw_f = (physical - offset) / factor;
+        -:   90:
+      177:   91:        if (isfinite(raw_f) && (raw_f >= 0.0F))
+branch  0 taken 175 (fallthrough)
+branch  1 taken 2
+branch  2 taken 173 (fallthrough)
+branch  3 taken 2
+condition outcomes covered 4/4
+        -:   92:        {
+      173:   93:            if (raw_f > 4294967040.0F)
+branch  0 taken 2 (fallthrough)
+branch  1 taken 171
+condition outcomes covered 2/2
+        -:   94:            {
+        2:   95:                raw = UINT32_MAX;           /* saturate at cast ceiling */
+        -:   96:            }
+        -:   97:            else
+        -:   98:            {
+      171:   99:                raw = (uint32_t)(raw_f + 0.5F);  /* round to nearest */
+        -:  100:            }
+        -:  101:        }
+        -:  102:    }
+        -:  103:
+      185:  104:    return raw;
+        -:  105:}
+        -:  106:
+function decode_unsigned called 21 returned 100% blocks executed 100%
+       21:  107:static float32_t decode_unsigned(uint32_t  raw,
+        -:  108:                                 float32_t factor,
+        -:  109:                                 float32_t offset)
+        -:  110:{
+       21:  111:    return ((float32_t)raw * factor) + offset;
+        -:  112:}
+        -:  113:
+        -:  114:/* ═══════════════════════════════════════════════════════════════════════
+        -:  115: *  PRIVATE — CRC-4 computation for BrakeCmd alive monitoring
+        -:  116: * ═══════════════════════════════════════════════════════════════════════ */
+        -:  117:
+function compute_crc4 called 173 returned 100% blocks executed 100%
+      173:  118:static uint8_t compute_crc4(const uint8_t *data, uint8_t len)
+        -:  119:{
+      173:  120:    uint8_t crc = 0x0FU;   /* Initial value, all ones for 4-bit CRC */
+      173:  121:    uint8_t i   = 0U;
+        -:  122:
+      692:  123:    for (i = 0U; i < len; i++)
+branch  0 taken 519
+branch  1 taken 173 (fallthrough)
+condition outcomes covered 2/2
+        -:  124:    {
+      519:  125:        uint8_t j = 0U;
+        -:  126:
+      519:  127:        crc ^= (data[i] & 0x0FU);
+     2595:  128:        for (j = 0U; j < 4U; j++)
+branch  0 taken 2076
+branch  1 taken 519 (fallthrough)
+condition outcomes covered 2/2
+        -:  129:        {
+     2076:  130:            if ((crc & 0x08U) != 0U)
+branch  0 taken 1152 (fallthrough)
+branch  1 taken 924
+condition outcomes covered 2/2
+        -:  131:            {
+     1152:  132:                crc = (uint8_t)((crc << 1U) ^ 0x03U);  /* Poly x^4+x+1 */
+        -:  133:            }
+        -:  134:            else
+        -:  135:            {
+      924:  136:                crc = (uint8_t)(crc << 1U);
+        -:  137:            }
+     2076:  138:            crc &= 0x0FU;
+        -:  139:        }
+        -:  140:
+      519:  141:        crc ^= ((data[i] >> 4U) & 0x0FU);
+     2595:  142:        for (j = 0U; j < 4U; j++)
+branch  0 taken 2076
+branch  1 taken 519 (fallthrough)
+condition outcomes covered 2/2
+        -:  143:        {
+     2076:  144:            if ((crc & 0x08U) != 0U)
+branch  0 taken 1024 (fallthrough)
+branch  1 taken 1052
+condition outcomes covered 2/2
+        -:  145:            {
+     1024:  146:                crc = (uint8_t)((crc << 1U) ^ 0x03U);
+        -:  147:            }
+        -:  148:            else
+        -:  149:            {
+     1052:  150:                crc = (uint8_t)(crc << 1U);
+        -:  151:            }
+     2076:  152:            crc &= 0x0FU;
+        -:  153:        }
+        -:  154:    }
+        -:  155:
+      173:  156:    return crc;
+        -:  157:}
+        -:  158:
+        -:  159:/* ═══════════════════════════════════════════════════════════════════════
+        -:  160: *  PUBLIC API
+        -:  161: * ═══════════════════════════════════════════════════════════════════════ */
+        -:  162:
+        -:  163:/**
+        -:  164: * @brief Initialise CAN driver at 500 kbit/s, register RX filters.
+        -:  165: * @req FR-CAN-004
+        -:  166: */
+function can_init called 83 returned 100% blocks executed 100%
+       83:  167:int32_t can_init(can_state_t *state)
+        -:  168:{
+       83:  169:    int32_t result = CAN_OK;
+        -:  170:
+        -:  171:    /* Zero the entire state */
+       83:  172:    (void)memset(state, 0, sizeof(can_state_t));
+        -:  173:
+        -:  174:    /* Initialise CAN peripheral via HAL */
+       83:  175:    if (can_hal_init(CAN_BAUD_500K) != 0)
+call    0 returned 83
+branch  1 taken 3 (fallthrough)
+branch  2 taken 80
+condition outcomes covered 2/2
+        -:  176:    {
+        3:  177:        result = CAN_ERR_INIT;
+        -:  178:    }
+        -:  179:    else
+        -:  180:    {
+        -:  181:        /* Register RX filters for the messages we receive */
+       80:  182:        (void)can_hal_add_rx_filter(CAN_ID_EGO_VEHICLE);
+call    0 returned 80
+       80:  183:        (void)can_hal_add_rx_filter(CAN_ID_DRIVER_INPUT);
+call    0 returned 80
+       80:  184:        (void)can_hal_add_rx_filter(CAN_ID_RADAR_TARGET);
+call    0 returned 80
+       80:  185:        (void)can_hal_add_rx_filter(CAN_ID_UDS_REQUEST);
+call    0 returned 80
+        -:  186:
+       80:  187:        state->initialised = 1U;
+        -:  188:    }
+        -:  189:
+       83:  190:    return result;
+        -:  191:}
+        -:  192:
+        -:  193:/**
+        -:  194: * @brief Decode a received CAN frame into the internal RX struct.
+        -:  195: * @req FR-CAN-002, FR-CAN-003
+        -:  196: */
+function can_rx_process called 26 returned 100% blocks executed 100%
+       26:  197:void can_rx_process(can_state_t   *state,
+        -:  198:                    uint32_t       id,
+        -:  199:                    const uint8_t *data,
+        -:  200:                    uint8_t        dlc)
+        -:  201:{
+       26:  202:    if ((state != NULL) && (data != NULL))
+branch  0 taken 22 (fallthrough)
+branch  1 taken 4
+branch  2 taken 19 (fallthrough)
+branch  3 taken 3
+condition outcomes covered 4/4
+        -:  203:    {
+       19:  204:    if (id == CAN_ID_EGO_VEHICLE)
+branch  0 taken 5 (fallthrough)
+branch  1 taken 14
+condition outcomes covered 2/2
+        -:  205:    {
+        5:  206:        if (dlc >= CAN_DLC_EGO_VEHICLE)
+branch  0 taken 3 (fallthrough)
+branch  1 taken 2
+condition outcomes covered 2/2
+        -:  207:        {
+        -:  208:            /* VehicleSpeed:  bits 0..15, factor 0.01, offset 0 */
+        3:  209:            uint32_t raw_spd = can_unpack_signal(data, 0U, 16U);
+call    0 returned 3
+        3:  210:            state->last_rx.vehicle_speed = decode_unsigned(raw_spd, 0.01F, 0.0F);
+call    0 returned 3
+        -:  211:
+        -:  212:            /* LongAccel:  bits 16..31, factor 0.001, offset -32
+        -:  213:             * DBC @1+ = unsigned raw with offset */
+        3:  214:            uint32_t raw_acc = can_unpack_signal(data, 16U, 16U);
+call    0 returned 3
+        3:  215:            state->last_rx.long_accel = decode_unsigned(raw_acc, 0.001F, -32.0F);
+call    0 returned 3
+        -:  216:
+        -:  217:            /* YawRate:  bits 32..47, factor 0.01, offset -327.68 */
+        3:  218:            uint32_t raw_yaw = can_unpack_signal(data, 32U, 16U);
+call    0 returned 3
+        3:  219:            state->last_rx.yaw_rate = decode_unsigned(raw_yaw, 0.01F, -327.68F);
+call    0 returned 3
+        -:  220:
+        -:  221:            /* SteeringAngle:  bits 48..63, factor 0.1, offset -3276.8 */
+        3:  222:            uint32_t raw_str = can_unpack_signal(data, 48U, 16U);
+call    0 returned 3
+        3:  223:            state->last_rx.steering_angle = decode_unsigned(raw_str, 0.1F, -3276.8F);
+call    0 returned 3
+        -:  224:        }
+        -:  225:    }
+       14:  226:    else if (id == CAN_ID_DRIVER_INPUT)
+branch  0 taken 3 (fallthrough)
+branch  1 taken 11
+condition outcomes covered 2/2
+        -:  227:    {
+        3:  228:        if (dlc >= CAN_DLC_DRIVER_INPUT)
+branch  0 taken 1 (fallthrough)
+branch  1 taken 2
+condition outcomes covered 2/2
+        -:  229:        {
+        -:  230:            /* BrakePedal:  bits 0..7, factor 1, offset 0 */
+        1:  231:            uint32_t raw_bp = can_unpack_signal(data, 0U, 8U);
+call    0 returned 1
+        1:  232:            state->last_rx.brake_pedal = (uint8_t)raw_bp;
+        -:  233:
+        -:  234:            /* AccelPedal:  bits 8..15, factor 1, offset 0 */
+        1:  235:            uint32_t raw_ap = can_unpack_signal(data, 8U, 8U);
+call    0 returned 1
+        1:  236:            state->last_rx.accel_pedal = (uint8_t)raw_ap;
+        -:  237:
+        -:  238:            /* AEB_Enable:  bit 16, 1 bit */
+        1:  239:            uint32_t raw_en = can_unpack_signal(data, 16U, 1U);
+call    0 returned 1
+        1:  240:            state->last_rx.aeb_enable = (uint8_t)raw_en;
+        -:  241:
+        -:  242:            /* DriverOverride:  bit 17, 1 bit */
+        1:  243:            uint32_t raw_ov = can_unpack_signal(data, 17U, 1U);
+call    0 returned 1
+        1:  244:            state->last_rx.driver_override = (uint8_t)raw_ov;
+        -:  245:        }
+        -:  246:    }
+       11:  247:    else if (id == CAN_ID_RADAR_TARGET)
+branch  0 taken 5 (fallthrough)
+branch  1 taken 6
+condition outcomes covered 2/2
+        -:  248:    {
+        5:  249:        if (dlc >= CAN_DLC_RADAR_TARGET)
+branch  0 taken 3 (fallthrough)
+branch  1 taken 2
+condition outcomes covered 2/2
+        -:  250:        {
+        -:  251:            /* TargetDistance:  bits 0..15, factor 0.01, offset 0 */
+        3:  252:            uint32_t raw_dist = can_unpack_signal(data, 0U, 16U);
+call    0 returned 3
+        3:  253:            state->last_rx.target_distance = decode_unsigned(raw_dist, 0.01F, 0.0F);
+call    0 returned 3
+        -:  254:
+        -:  255:            /* RelativeSpeed:  bits 16..31, factor 0.01, offset -327.68
+        -:  256:             * DBC @1+ = unsigned raw with offset */
+        3:  257:            uint32_t raw_vrel = can_unpack_signal(data, 16U, 16U);
+call    0 returned 3
+        3:  258:            state->last_rx.relative_speed = decode_unsigned(raw_vrel, 0.01F, -327.68F);
+call    0 returned 3
+        -:  259:
+        -:  260:            /* TTC:  bits 32..47, factor 0.001, offset 0 */
+        3:  261:            uint32_t raw_ttc = can_unpack_signal(data, 32U, 16U);
+call    0 returned 3
+        3:  262:            state->last_rx.ttc_radar = decode_unsigned(raw_ttc, 0.001F, 0.0F);
+call    0 returned 3
+        -:  263:
+        -:  264:            /* Confidence:  bits 48..55, factor 1, offset 0 */
+        3:  265:            uint32_t raw_conf = can_unpack_signal(data, 48U, 8U);
+call    0 returned 3
+        3:  266:            state->last_rx.confidence_raw = (uint8_t)raw_conf;
+        -:  267:
+        -:  268:            /* Valid frame received — reset miss counter */
+        3:  269:            state->rx_miss_count = 0U;
+        3:  270:            state->last_rx.rx_timeout_flag = 0U;
+        -:  271:        }
+        -:  272:    }
+        6:  273:    else if (id == CAN_ID_UDS_REQUEST)
+branch  0 taken 4 (fallthrough)
+branch  1 taken 2
+condition outcomes covered 2/2
+        -:  274:    {
+        -:  275:        /* UDS_Request (0x7DF) — ISO 14229 functional broadcast.
+        -:  276:         * 4-byte payload mapped directly to uds_request_t.
+        -:  277:         * FR-UDS-005: request serviced within same 10 ms cycle. */
+        4:  278:        if (dlc >= CAN_DLC_UDS_REQUEST)
+branch  0 taken 3 (fallthrough)
+branch  1 taken 1
+condition outcomes covered 2/2
+        -:  279:        {
+        3:  280:            state->last_rx.uds_request.sid      = data[0];
+        3:  281:            state->last_rx.uds_request.did_high = data[1];
+        3:  282:            state->last_rx.uds_request.did_low  = data[2];
+        3:  283:            state->last_rx.uds_request.value    = data[3];
+        3:  284:            state->last_rx.uds_request_pending  = 1U;
+        -:  285:        }
+        -:  286:    }
+        -:  287:    else
+        -:  288:    {
+        -:  289:        /* Unknown ID — ignore (MISRA: all paths handled) */
+        -:  290:    }
+        -:  291:    } /* end null guard */
+       26:  292:}
+        -:  293:
+        -:  294:/**
+        -:  295: * @brief Check for RX timeout.  Call once per 10 ms tick.
+        -:  296: * @req FR-CAN-002 (timeout: 3 × 20 ms = 60 ms)
+        -:  297: */
+function can_check_timeout called 26 returned 100% blocks executed 100%
+       26:  298:void can_check_timeout(can_state_t *state)
+        -:  299:{
+       26:  300:    if (state != NULL)
+branch  0 taken 24 (fallthrough)
+branch  1 taken 2
+condition outcomes covered 2/2
+        -:  301:    {
+       24:  302:    if (state->rx_miss_count < 255U)
+branch  0 taken 22 (fallthrough)
+branch  1 taken 2
+condition outcomes covered 2/2
+        -:  303:    {
+       22:  304:        state->rx_miss_count++;
+        -:  305:    }
+        -:  306:
+        -:  307:    /*
+        -:  308:     * Radar period = 20 ms, our tick = 10 ms.
+        -:  309:     * 3 missed frames ≈ 6 ticks of 10 ms = 60 ms.
+        -:  310:     * We use CAN_RX_TIMEOUT_CYCLES (3) as a count of our 20-ms-equivalent
+        -:  311:     * intervals, so threshold = 3 * 2 = 6 ticks.
+        -:  312:     */
+       24:  313:    if (state->rx_miss_count >= (CAN_RX_TIMEOUT_CYCLES * 2U))
+branch  0 taken 8 (fallthrough)
+branch  1 taken 16
+condition outcomes covered 2/2
+        -:  314:    {
+        8:  315:        state->last_rx.rx_timeout_flag = 1U;
+        -:  316:    }
+        -:  317:    } /* end null guard */
+       26:  318:}
+        -:  319:
+        -:  320:/**
+        -:  321: * @brief Transmit AEB_BrakeCmd (0x080) with alive counter and CRC.
+        -:  322: * @req FR-CAN-003
+        -:  323: */
+function can_tx_brake_cmd called 186 returned 100% blocks executed 100%
+      186:  324:int32_t can_tx_brake_cmd(can_state_t       *state,
+        -:  325:                         const pid_output_t *pid_out,
+        -:  326:                         const fsm_output_t *fsm_out)
+        -:  327:{
+      186:  328:    int32_t result = CAN_OK;
+        -:  329:
+      186:  330:    if ((state == NULL) || (pid_out == NULL) || (fsm_out == NULL))
+branch  0 taken 180 (fallthrough)
+branch  1 taken 6
+branch  2 taken 176 (fallthrough)
+branch  3 taken 4
+branch  4 taken 3 (fallthrough)
+branch  5 taken 173
+condition outcomes covered 6/6
+        -:  331:    {
+       13:  332:        result = CAN_ERR_TX;
+        -:  333:    }
+        -:  334:    else
+        -:  335:    {
+      173:  336:        uint8_t frame[8]   = {0U, 0U, 0U, 0U, 0U, 0U, 0U, 0U};
+      173:  337:        uint8_t brake_mode = 0U;
+        -:  338:
+        -:  339:        /* BrakeRequest: bit 0, 1 bit */
+      173:  340:        uint32_t brake_req = (pid_out->brake_pct > 0.0F) ? 1U : 0U;
+branch  0 taken 162 (fallthrough)
+branch  1 taken 11
+condition outcomes covered 2/2
+      173:  341:        can_pack_signal(frame, 0U, 1U, brake_req);
+call    0 returned 173
+        -:  342:
+        -:  343:        /* BrakePressure: bits 1..15, factor 0.1, offset 0 */
+      173:  344:        uint32_t raw_press = encode_unsigned(pid_out->brake_bar, 0.1F, 0.0F);
+call    0 returned 173
+      173:  345:        can_pack_signal(frame, 1U, 15U, raw_press);
+call    0 returned 173
+        -:  346:
+        -:  347:        /* BrakeMode: bits 16..18, 3 bits — map FSM state to brake mode */
+      173:  348:        switch (fsm_out->fsm_state)
+branch  0 taken 2
+branch  1 taken 5
+branch  2 taken 2
+branch  3 taken 119
+branch  4 taken 2
+branch  5 taken 39
+branch  6 taken 2
+branch  7 taken 2
+        -:  349:        {
+        2:  350:            case (uint8_t)FSM_OFF:        brake_mode = 0U; break;
+        5:  351:            case (uint8_t)FSM_STANDBY:    brake_mode = 0U; break;
+        2:  352:            case (uint8_t)FSM_WARNING:    brake_mode = 1U; break;
+      119:  353:            case (uint8_t)FSM_BRAKE_L1:   brake_mode = 2U; break;
+        2:  354:            case (uint8_t)FSM_BRAKE_L2:   brake_mode = 3U; break;
+       39:  355:            case (uint8_t)FSM_BRAKE_L3:   brake_mode = 4U; break;
+        2:  356:            case (uint8_t)FSM_POST_BRAKE: brake_mode = 5U; break;
+        2:  357:            default:                      brake_mode = 0U; break;
+        -:  358:        }
+      173:  359:        can_pack_signal(frame, 16U, 3U, (uint32_t)brake_mode);
+call    0 returned 173
+        -:  360:
+        -:  361:        /* AliveCounter: bits 24..27, 4 bits */
+      173:  362:        can_pack_signal(frame, 24U, 4U, (uint32_t)state->alive_counter);
+call    0 returned 173
+        -:  363:
+        -:  364:        /* CRC: bits 28..31, 4 bits — computed over bytes 0..2 */
+      173:  365:        uint8_t crc = compute_crc4(frame, 3U);
+call    0 returned 173
+      173:  366:        can_pack_signal(frame, 28U, 4U, (uint32_t)crc);
+call    0 returned 173
+        -:  367:
+        -:  368:        /* Increment alive counter (wraps at 15) */
+      173:  369:        state->alive_counter++;
+      173:  370:        if (state->alive_counter > ALIVE_COUNTER_MAX)
+branch  0 taken 10 (fallthrough)
+branch  1 taken 163
+condition outcomes covered 2/2
+        -:  371:        {
+       10:  372:            state->alive_counter = 0U;
+        -:  373:        }
+        -:  374:
+        -:  375:        /* Send via HAL */
+      173:  376:        if (can_hal_send(CAN_ID_BRAKE_CMD, frame, CAN_DLC_BRAKE_CMD) != 0)
+call    0 returned 173
+branch  1 taken 51 (fallthrough)
+branch  2 taken 122
+condition outcomes covered 2/2
+        -:  377:        {
+       51:  378:            result = CAN_ERR_TX;
+        -:  379:        }
+        -:  380:    }
+        -:  381:
+      186:  382:    return result;
+        -:  383:}
+        -:  384:
+        -:  385:/**
+        -:  386: * @brief Transmit AEB_FSMState (0x200) every 50 ms.
+        -:  387: * @req FR-CAN-001
+        -:  388: */
+function can_tx_fsm_state called 48 returned 100% blocks executed 100%
+       48:  389:int32_t can_tx_fsm_state(can_state_t       *state,
+        -:  390:                         const fsm_output_t *fsm_out)
+        -:  391:{
+       48:  392:    int32_t result = 1;   /* 1 = not yet due */
+        -:  393:
+       48:  394:    if ((state == NULL) || (fsm_out == NULL))
+branch  0 taken 44 (fallthrough)
+branch  1 taken 4
+branch  2 taken 3 (fallthrough)
+branch  3 taken 41
+condition outcomes covered 4/4
+        -:  395:    {
+        7:  396:        result = CAN_ERR_TX;
+        -:  397:    }
+        -:  398:    else
+        -:  399:    {
+       41:  400:        state->tx_cycle_counter++;
+        -:  401:
+        -:  402:        /* 50 ms / 10 ms = every 5 ticks */
+       41:  403:        if (state->tx_cycle_counter >= 5U)
+branch  0 taken 12 (fallthrough)
+branch  1 taken 29
+condition outcomes covered 2/2
+        -:  404:        {
+       12:  405:            uint8_t frame[4] = {0U, 0U, 0U, 0U};
+        -:  406:
+       12:  407:            state->tx_cycle_counter = 0U;
+        -:  408:
+        -:  409:            /* FSMState: bits 0..7 */
+       12:  410:            can_pack_signal(frame, 0U, 8U, (uint32_t)fsm_out->fsm_state);
+call    0 returned 12
+        -:  411:
+        -:  412:            /* AlertLevel: bits 8..15 */
+       12:  413:            can_pack_signal(frame, 8U, 8U, (uint32_t)fsm_out->alert_level);
+call    0 returned 12
+        -:  414:
+        -:  415:            /* BrakeActive: bits 16..23 */
+       12:  416:            can_pack_signal(frame, 16U, 8U, (uint32_t)fsm_out->brake_active);
+call    0 returned 12
+        -:  417:
+        -:  418:            /* TTCThreshold: bits 24..31, factor 0.1, offset 0 */
+       12:  419:            float32_t ttc_thresh = 0.0F;
+       12:  420:            switch (fsm_out->fsm_state)
+branch  0 taken 3
+branch  1 taken 3
+branch  2 taken 2
+branch  3 taken 2
+branch  4 taken 2
+        -:  421:            {
+        3:  422:                case (uint8_t)FSM_WARNING:    ttc_thresh = TTC_WARNING;  break;
+        3:  423:                case (uint8_t)FSM_BRAKE_L1:   ttc_thresh = TTC_BRAKE_L1; break;
+        2:  424:                case (uint8_t)FSM_BRAKE_L2:   ttc_thresh = TTC_BRAKE_L2; break;
+        2:  425:                case (uint8_t)FSM_BRAKE_L3:   ttc_thresh = TTC_BRAKE_L3; break;
+        2:  426:                default:                      ttc_thresh = 0.0F;         break;
+        -:  427:            }
+       12:  428:            uint32_t raw_ttc = encode_unsigned(ttc_thresh, 0.1F, 0.0F);
+call    0 returned 12
+       12:  429:            can_pack_signal(frame, 24U, 8U, raw_ttc);
+call    0 returned 12
+        -:  430:
+       12:  431:            if (can_hal_send(CAN_ID_FSM_STATE, frame, CAN_DLC_FSM_STATE) != 0)
+call    0 returned 12
+branch  1 taken 2 (fallthrough)
+branch  2 taken 10
+condition outcomes covered 2/2
+        -:  432:            {
+        2:  433:                result = CAN_ERR_TX;
+        -:  434:            }
+        -:  435:            else
+        -:  436:            {
+       10:  437:                result = CAN_OK;
+        -:  438:            }
+        -:  439:        }
+        -:  440:    }
+        -:  441:
+       48:  442:    return result;
+        -:  443:}
+        -:  444:
+        -:  445:/**
+        -:  446: * @brief Transmit AEB_Alert (0x300).
+        -:  447: * @req FR-CAN-003
+        -:  448: */
+function can_tx_alert called 44 returned 100% blocks executed 100%
+       44:  449:int32_t can_tx_alert(const alert_output_t *alert_out)
+        -:  450:{
+       44:  451:    int32_t result = CAN_OK;
+        -:  452:
+       44:  453:    if (alert_out == NULL)
+branch  0 taken 2 (fallthrough)
+branch  1 taken 42
+condition outcomes covered 2/2
+        -:  454:    {
+        2:  455:        result = CAN_ERR_TX;
+        -:  456:    }
+        -:  457:    else
+        -:  458:    {
+       42:  459:        uint8_t frame[2] = {0U, 0U};
+        -:  460:        /* AlertType: bits 0..7, 8 bits, factor 1, offset 0 */
+       42:  461:        can_pack_signal(frame, 0U, 8U, (uint32_t)alert_out->alert_type);
+call    0 returned 42
+        -:  462:
+        -:  463:        /* AlertActive: bit 8, 1 bit */
+       42:  464:        can_pack_signal(frame, 8U, 1U, (uint32_t)alert_out->alert_active);
+call    0 returned 42
+        -:  465:
+        -:  466:        /* BuzzerCmd: bits 9..11, 3 bits */
+       42:  467:        can_pack_signal(frame, 9U, 3U, (uint32_t)alert_out->buzzer_cmd);
+call    0 returned 42
+        -:  468:
+       42:  469:        if (can_hal_send(CAN_ID_ALERT, frame, CAN_DLC_ALERT) != 0)
+call    0 returned 42
+branch  1 taken 9 (fallthrough)
+branch  2 taken 33
+condition outcomes covered 2/2
+        -:  470:        {
+        9:  471:            result = CAN_ERR_TX;
+        -:  472:        }
+        -:  473:    }
+        -:  474:
+       44:  475:    return result;
+        -:  476:}
+        -:  477:
+        -:  478:/**
+        -:  479: * @brief Copy latest RX data to caller's struct.
+        -:  480: */
+function can_get_rx_data called 18 returned 100% blocks executed 100%
+       18:  481:void can_get_rx_data(const can_state_t *state,
+        -:  482:                     can_rx_data_t     *out)
+        -:  483:{
+       18:  484:    if ((state != NULL) && (out != NULL))
+branch  0 taken 16 (fallthrough)
+branch  1 taken 2
+branch  2 taken 14 (fallthrough)
+branch  3 taken 2
+condition outcomes covered 4/4
+        -:  485:    {
+       14:  486:        (void)memcpy(out, &state->last_rx, sizeof(can_rx_data_t));
+        -:  487:    }
+       18:  488:}
+        -:  489:
+        -:  490:/**
+        -:  491: * @brief Transmit UDS_Response (0x7E8).
+        -:  492: * @req FR-UDS-005
+        -:  493: */
+function can_tx_uds_response called 5 returned 100% blocks executed 100%
+        5:  494:int32_t can_tx_uds_response(const uds_response_t *resp)
+        -:  495:{
+        5:  496:    int32_t result = CAN_OK;
+        -:  497:
+        5:  498:    if (resp == NULL)
+branch  0 taken 2 (fallthrough)
+branch  1 taken 3
+condition outcomes covered 2/2
+        -:  499:    {
+        2:  500:        result = CAN_ERR_TX;
+        -:  501:    }
+        -:  502:    else
+        -:  503:    {
+        -:  504:        uint8_t frame[8];
+        -:  505:
+        -:  506:        /* uds_response_t is an 8-byte wire-format struct — map 1:1. */
+        3:  507:        frame[0] = resp->response_sid;
+        3:  508:        frame[1] = resp->did_high_resp;
+        3:  509:        frame[2] = resp->did_low_resp;
+        3:  510:        frame[3] = resp->data1;
+        3:  511:        frame[4] = resp->data2;
+        3:  512:        frame[5] = resp->data3;
+        3:  513:        frame[6] = resp->data4;
+        3:  514:        frame[7] = resp->data5;
+        -:  515:
+        3:  516:        if (can_hal_send(CAN_ID_UDS_RESPONSE, frame, CAN_DLC_UDS_RESPONSE) != 0)
+call    0 returned 3
+branch  1 taken 2 (fallthrough)
+branch  2 taken 1
+condition outcomes covered 2/2
+        -:  517:        {
+        2:  518:            result = CAN_ERR_TX;
+        -:  519:        }
+        -:  520:    }
+        -:  521:
+        5:  522:    return result;
+        -:  523:}
+        -:  524:
+        -:  525:/**
+        -:  526: * @brief Clear the pending UDS request flag after it has been serviced.
+        -:  527: *
+        -:  528: * Must only be called after can_tx_uds_response() reported CAN_OK.
+        -:  529: * See aeb_can.h for the retry semantics rationale.
+        -:  530: */
+function can_clear_uds_request_pending called 4 returned 100% blocks executed 100%
+        4:  531:void can_clear_uds_request_pending(can_state_t *state)
+        -:  532:{
+        4:  533:    if (state != NULL)
+branch  0 taken 2 (fallthrough)
+branch  1 taken 2
+condition outcomes covered 2/2
+        -:  534:    {
+        2:  535:        state->last_rx.uds_request_pending = 0U;
+        -:  536:    }
+        4:  537:}

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<results version="2">
+    <cppcheck version="2.13.0"/>
+    <errors>
+        <error id="misra-c2012-2.3" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
+            <location file="include/aeb_types.h" line="89" column="1"/>
+        </error>
+        <error id="misra-c2012-2.3" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
+            <location file="include/aeb_types.h" line="101" column="1"/>
+        </error>
+        <error id="misra-c2012-2.3" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
+            <location file="include/aeb_types.h" line="30" column="1"/>
+        </error>
+        <error id="misra-c2012-2.3" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
+            <location file="include/aeb_types.h" line="122" column="1"/>
+        </error>
+        <error id="misra-c2012-2.4" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
+            <location file="include/aeb_types.h" line="31" column="1"/>
+        </error>
+        <error id="misra-c2012-2.4" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
+            <location file="include/aeb_types.h" line="90" column="1"/>
+        </error>
+        <error id="misra-c2012-2.4" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
+            <location file="include/aeb_types.h" line="102" column="1"/>
+        </error>
+        <error id="misra-c2012-2.4" severity="style" msg="misra violation (use --rule-texts=&lt;file&gt; to get proper output)" verbose="misra violation (use --rule-texts=&lt;file&gt; to get proper output)">
+            <location file="include/aeb_types.h" line="123" column="1"/>
+        </error>
+        <error id="checkersReport" severity="information" msg="Active checkers: 305/792 (use --checkers-report=&lt;filename&gt; to see details)" verbose="Active checkers: 305/792 (use --checkers-report=&lt;filename&gt; to see details)"/>
+    </errors>
+</results>
