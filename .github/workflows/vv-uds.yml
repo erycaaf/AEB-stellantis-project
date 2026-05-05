@@ -90,8 +90,8 @@ jobs:
           make mcdc-uds
           SUM="reports/vv_uds/coverage_mcdc/gcov_summary.txt"
           STMT=$(grep '^Lines executed:'             "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
-          BRCH=$(grep '^Branches executed:'          "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
-          MCDC=$(grep '^Condition outcomes covered:' "$SUM"          | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          BRCH=$(grep '^Taken at least once:'        "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          MCDC=$(grep '^Condition outcomes covered:' "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
           echo "UDS coverage — stmt=${STMT}% branch=${BRCH}% mcdc=${MCDC}%"
           for metric in "Statement:$STMT" "Branch:$BRCH" "MC/DC:$MCDC"; do
             name="${metric%%:*}"; value="${metric##*:}"
@@ -136,7 +136,7 @@ jobs:
               if not e.get("id", "").startswith("misra-c2012"):
                   continue
               loc = e.find("location")
-              if loc is not None and loc.get("file", "") in target:
+              if loc is not None and any(loc.get("file", "").endswith(f) for f in target):
                   n += 1
           print(n)
           PY
@@ -178,7 +178,7 @@ jobs:
             echo ""
             echo "### Fault injection"
             echo '```'
-            tail -5 reports/vv_uds/fault_injection/run.log
+            tail -5 reports/vv_uds/fault_injection/run.log 2>/dev/null || echo "(fault-uds did not run)"
             echo '```'
             echo ""
             echo "### Memory safety"

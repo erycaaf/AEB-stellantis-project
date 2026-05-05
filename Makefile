@@ -188,15 +188,25 @@ misra:
 
 mcdc-uds:
 	@rm -rf $(VV_REPORT_DIR)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR)/coverage_mcdc
-	$(CC) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_uds $(SRC_UDS_TEST) $(LDFLAGS)
-	$(CC) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_uds_fault $(SRC_UDS_FAULT_TEST) $(LDFLAGS)
+	cd $(VV_REPORT_DIR)/coverage_mcdc && \
+	  $(CC_COV) -Wall -Wextra -Wpedantic -std=c99 -O0 -g \
+	    -I$(CURDIR)/include -I$(CURDIR)/stubs --coverage -fcondition-coverage \
+	    -c $(CURDIR)/src/communication/aeb_uds.c && \
+	  $(CC_COV) -Wall -Wextra -Wpedantic -std=c99 -O0 -g \
+	    -I$(CURDIR)/include -I$(CURDIR)/stubs --coverage -fcondition-coverage \
+	    aeb_uds.o $(CURDIR)/tests/test_uds.c \
+	    -lm -o test_uds_cov && \
+	  $(CC_COV) -Wall -Wextra -Wpedantic -std=c99 -O0 -g \
+	    -I$(CURDIR)/include -I$(CURDIR)/stubs --coverage -fcondition-coverage \
+	    aeb_uds.o $(CURDIR)/tests/test_uds_fault.c \
+	    -lm -o test_uds_fault_cov && \
+	  ./test_uds_cov > run.log 2>&1 && \
+	  ./test_uds_fault_cov >> run.log 2>&1 && \
+	  grep -E "Results:|Assertions:" run.log
 	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
-		./test_uds > run.log 2>&1 && \
-		./test_uds_fault >> run.log 2>&1 && \
-		grep "Results:" run.log
+	  $(GCOV) -b -c --conditions aeb_uds.gcno > gcov_summary.txt 2>&1 || true
 	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
-		$(GCOV) -b -c --conditions test_uds-aeb_uds.gcno > gcov_summary.txt 2>&1 && \
-		cat gcov_summary.txt
+	  grep -E "Lines executed|Taken at least once|Condition outcomes covered" gcov_summary.txt || true
 	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
 
 fault-uds:
@@ -727,10 +737,30 @@ vv-perception: mcdc-perception fault-perception memory-perception misra-percepti
 mcdc-can:
 	@rm -rf $(VV_REPORT_DIR)/coverage_mcdc && mkdir -p $(VV_REPORT_DIR)/coverage_mcdc
 	@echo "=== MC/DC coverage — aeb_can.c (nominal + fault + struct suites) ==="
-	$(CC_COV) $(CFLAGS_COV) -o $(VV_REPORT_DIR)/coverage_mcdc/test_can_cov $(SRC_CAN_TEST) $(LDFLAGS)
-	@cd $(VV_REPORT_DIR)/coverage_mcdc && ./test_can_cov > run.log 2>&1 && grep "Results:" run.log
-	@cd $(VV_REPORT_DIR)/coverage_mcdc && $(GCOV) -b -c --conditions test_can_cov-aeb_can.gcno > gcov_summary.txt 2>&1 || true
-	@cd $(VV_REPORT_DIR)/coverage_mcdc && grep -E "Lines executed|Taken at least once|Condition outcomes covered" gcov_summary.txt || true
+	cd $(VV_REPORT_DIR)/coverage_mcdc && \
+	  $(CC_COV) -Wall -Wextra -Wpedantic -std=c99 -O0 -g \
+	    -I$(CURDIR)/include -I$(CURDIR)/stubs --coverage -fcondition-coverage \
+	    -c $(CURDIR)/src/communication/aeb_can.c && \
+	  $(CC_COV) -Wall -Wextra -Wpedantic -std=c99 -O0 -g \
+	    -I$(CURDIR)/include -I$(CURDIR)/stubs --coverage -fcondition-coverage \
+	    aeb_can.o $(CURDIR)/stubs/can_hal.c $(CURDIR)/tests/test_can.c \
+	    -lm -o test_can_cov && \
+	  $(CC_COV) -Wall -Wextra -Wpedantic -std=c99 -O0 -g \
+	    -I$(CURDIR)/include -I$(CURDIR)/stubs --coverage -fcondition-coverage \
+	    aeb_can.o $(CURDIR)/stubs/can_hal.c $(CURDIR)/tests/test_can_fault.c \
+	    -lm -o test_can_fault_cov && \
+	  $(CC_COV) -Wall -Wextra -Wpedantic -std=c99 -O0 -g \
+	    -I$(CURDIR)/include -I$(CURDIR)/stubs --coverage -fcondition-coverage \
+	    aeb_can.o $(CURDIR)/stubs/can_hal.c $(CURDIR)/tests/test_can_struct.c \
+	    -lm -o test_can_struct_cov && \
+	  ./test_can_cov > run.log 2>&1 && \
+	  ./test_can_fault_cov >> run.log 2>&1 && \
+	  ./test_can_struct_cov >> run.log 2>&1 && \
+	  grep -E "Results:|summary:" run.log
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
+	  $(GCOV) -b -c --conditions aeb_can.gcno > gcov_summary.txt 2>&1 || true
+	@cd $(VV_REPORT_DIR)/coverage_mcdc && \
+	  grep -E "Lines executed|Taken at least once|Condition outcomes covered" gcov_summary.txt || true
 	@echo "Artefacts in $(VV_REPORT_DIR)/coverage_mcdc/"
 
 # ── Fault injection (Table 11 item 1e) ───────────────────────────────────
