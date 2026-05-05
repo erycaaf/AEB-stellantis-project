@@ -167,9 +167,8 @@
     <include><name>pine_a2</name><pose>23   15 0  0 0 1.5</pose><uri>model://pine_tree</uri></include>
     <include><name>pine_a3</name><pose>36   13 0  0 0 -0.4</pose><uri>model://pine_tree</uri></include>
     <include><name>pine_a4</name><pose>49   14 0  0 0 0.7</pose><uri>model://pine_tree</uri></include>
-    <include><name>pine_a5</name><pose>62   13 0  0 0 -1.2</pose><uri>model://pine_tree</uri></include>
-    <include><name>pine_a6</name><pose>75   15 0  0 0 0.3</pose><uri>model://pine_tree</uri></include>
-    <!-- (no pine at ~88–101 m — keep target visible from camera + lidar) -->
+    <!-- (no pine across the gas-station forecourt at x≈55–81, and none at
+         ~88–101 m to keep the target visible from camera + lidar) -->
     <!-- Sparse continuation past the action zone -->
     <include><name>pine_b1</name><pose>150  14 0  0 0 0</pose><uri>model://pine_tree</uri></include>
     <include><name>pine_b2</name><pose>200  15 0  0 0 0.6</pose><uri>model://pine_tree</uri></include>
@@ -216,15 +215,18 @@
       </link>
     </model>
 
-    <!-- Asphalt apron under the gas station canopy. Centred slightly west
-         and north of the building origin so the pavement sits under the
-         pumps and connects cleanly to the dirt shoulder at y=5.7. -->
+    <!-- Asphalt apron under the gas station canopy. Sized to cover the
+         canopy that now extends east (+X) of the building origin (x=65)
+         after the gas station yaw was changed from π to π/2. South edge
+         lands on the road's north edge (y=3.7) so cars pull straight off
+         the highway onto the apron — no grass strip between road and
+         pavement. North edge stops at the building (y≈23). -->
     <model name="gas_station_apron">
       <static>true</static>
       <link name="link">
-        <pose>60 16 0.014 0 0 0</pose>
+        <pose>68 13.35 0.014 0 0 0</pose>
         <visual name="v">
-          <geometry><box><size>20 14 0.02</size></box></geometry>
+          <geometry><box><size>26 19.3 0.02</size></box></geometry>
           <material>
             <ambient>0.18 0.18 0.20 1</ambient>
             <diffuse>0.25 0.25 0.27 1</diffuse>
@@ -234,10 +236,10 @@
     </model>
 
     <!-- Painted lane stripes on the apron (purely visual) -->
-    <model name="apron_stripe_a"><static>true</static><link name="link"><pose>57 16 0.016 0 0 0</pose>
+    <model name="apron_stripe_a"><static>true</static><link name="link"><pose>65 16 0.016 0 0 0</pose>
       <visual name="v"><geometry><box><size>0.15 12 0.02</size></box></geometry>
       <material><ambient>0.95 0.95 0.95 1</ambient><diffuse>1 1 1 1</diffuse></material></visual></link></model>
-    <model name="apron_stripe_b"><static>true</static><link name="link"><pose>63 16 0.016 0 0 0</pose>
+    <model name="apron_stripe_b"><static>true</static><link name="link"><pose>71 16 0.016 0 0 0</pose>
       <visual name="v"><geometry><box><size>0.15 12 0.02</size></box></geometry>
       <material><ambient>0.95 0.95 0.95 1</ambient><diffuse>1 1 1 1</diffuse></material></visual></link></model>
 
@@ -291,11 +293,11 @@
       <uri>model://house_1</uri>
     </include>
     <include><name>house_north_1</name>
-      <pose>40   24 0  0 0 3.14159</pose>
+      <pose>38   22 0  0 0 3.14159</pose>
       <uri>model://house_3</uri>
     </include>
     <include><name>gas_station</name>
-      <pose>65   22 0  0 0 3.14159</pose>
+      <pose>65   22 0  0 0 1.5708</pose>
       <uri>model://gas_station</uri>
     </include>
     <include><name>house_north_2</name>
