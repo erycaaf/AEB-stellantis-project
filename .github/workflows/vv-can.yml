@@ -3,8 +3,8 @@ name: CAN V&V
 # Runs the ASIL-D V&V stack scoped to the CAN module.
 #
 # Triggers only on paths that can affect CAN behaviour. On PRs to
-# development/main, the blocking gates (MC/DC, memory safety, MISRA) must
-# pass; fault-can is intentionally non-blocking until robustness bugs are patched.
+# development/main, all four blocking gates must pass: MC/DC coverage,
+# dynamic memory safety, MISRA C:2012 conformance, and fault injection.
 #
 # Reports are published in two layers:
 #   1. Workflow Artifacts on every run (PR or push), retention 30 days.
