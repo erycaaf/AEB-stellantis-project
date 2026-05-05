@@ -31,13 +31,13 @@
             <td class="headerValue">UDS Coverage</td>
             <td></td>
             <td class="headerItem">Lines:</td>
-            <td class="headerCovTableEntryHi">96.7&nbsp;%</td>
+            <td class="headerCovTableEntryHi">100.0&nbsp;%</td>
             <td class="headerCovTableEntry">121</td>
-            <td class="headerCovTableEntry">117</td>
+            <td class="headerCovTableEntry">121</td>
           </tr>
           <tr>
             <td class="headerItem">Test Date:</td>
-            <td class="headerValue">2026-04-30 19:01:39</td>
+            <td class="headerValue">2026-05-05 18:17:37</td>
             <td></td>
             <td class="headerItem">Functions:</td>
             <td class="headerCovTableEntryHi">100.0&nbsp;%</td>
@@ -56,9 +56,9 @@
 </td>
             <td></td>
             <td class="headerItem">Branches:</td>
-            <td class="headerCovTableEntryMed">86.4&nbsp;%</td>
+            <td class="headerCovTableEntryHi">100.0&nbsp;%</td>
             <td class="headerCovTableEntry">44</td>
-            <td class="headerCovTableEntry">38</td>
+            <td class="headerCovTableEntry">44</td>
           </tr>
                   <tr><td><img src="../glass.png" width=3 height=3 alt=""></td></tr>
                 </table>
@@ -104,29 +104,29 @@
 <span id="L26"><span class="lineNum">      26</span>                 :             : /**</span>
 <span id="L27"><span class="lineNum">      27</span>                 :             :  * @brief Zero-initialise a UDS response.</span>
 <span id="L28"><span class="lineNum">      28</span>                 :             :  */</span>
-<span id="L29"><span class="lineNum">      29</span>                 :<span class="tlaGNC tlaBgGNC">          19 : static void uds_clear_response(uds_response_t *response)</span></span>
+<span id="L29"><span class="lineNum">      29</span>                 :<span class="tlaGNC tlaBgGNC">         139 : static void uds_clear_response(uds_response_t *response)</span></span>
 <span id="L30"><span class="lineNum">      30</span>                 :             : {</span>
-<span id="L31"><span class="lineNum">      31</span>                 :<span class="tlaGNC">          19 :     response-&gt;response_sid  = 0U;</span></span>
-<span id="L32"><span class="lineNum">      32</span>                 :<span class="tlaGNC">          19 :     response-&gt;did_high_resp = 0U;</span></span>
-<span id="L33"><span class="lineNum">      33</span>                 :<span class="tlaGNC">          19 :     response-&gt;did_low_resp  = 0U;</span></span>
-<span id="L34"><span class="lineNum">      34</span>                 :<span class="tlaGNC">          19 :     response-&gt;data1         = 0U;</span></span>
-<span id="L35"><span class="lineNum">      35</span>                 :<span class="tlaGNC">          19 :     response-&gt;data2         = 0U;</span></span>
-<span id="L36"><span class="lineNum">      36</span>                 :<span class="tlaGNC">          19 :     response-&gt;data3         = 0U;</span></span>
-<span id="L37"><span class="lineNum">      37</span>                 :<span class="tlaGNC">          19 :     response-&gt;data4         = 0U;</span></span>
-<span id="L38"><span class="lineNum">      38</span>                 :<span class="tlaGNC">          19 :     response-&gt;data5         = 0U;</span></span>
-<span id="L39"><span class="lineNum">      39</span>                 :<span class="tlaGNC">          19 : }</span></span>
+<span id="L31"><span class="lineNum">      31</span>                 :<span class="tlaGNC">         139 :     response-&gt;response_sid  = 0U;</span></span>
+<span id="L32"><span class="lineNum">      32</span>                 :<span class="tlaGNC">         139 :     response-&gt;did_high_resp = 0U;</span></span>
+<span id="L33"><span class="lineNum">      33</span>                 :<span class="tlaGNC">         139 :     response-&gt;did_low_resp  = 0U;</span></span>
+<span id="L34"><span class="lineNum">      34</span>                 :<span class="tlaGNC">         139 :     response-&gt;data1         = 0U;</span></span>
+<span id="L35"><span class="lineNum">      35</span>                 :<span class="tlaGNC">         139 :     response-&gt;data2         = 0U;</span></span>
+<span id="L36"><span class="lineNum">      36</span>                 :<span class="tlaGNC">         139 :     response-&gt;data3         = 0U;</span></span>
+<span id="L37"><span class="lineNum">      37</span>                 :<span class="tlaGNC">         139 :     response-&gt;data4         = 0U;</span></span>
+<span id="L38"><span class="lineNum">      38</span>                 :<span class="tlaGNC">         139 :     response-&gt;data5         = 0U;</span></span>
+<span id="L39"><span class="lineNum">      39</span>                 :<span class="tlaGNC">         139 : }</span></span>
 <span id="L40"><span class="lineNum">      40</span>                 :             : </span>
 <span id="L41"><span class="lineNum">      41</span>                 :             : /**</span>
 <span id="L42"><span class="lineNum">      42</span>                 :             :  * @brief Build a negative response (SID 0x7F).</span>
 <span id="L43"><span class="lineNum">      43</span>                 :             :  */</span>
-<span id="L44"><span class="lineNum">      44</span>                 :<span class="tlaGNC">           4 : static void uds_send_negative(uds_response_t *response,</span></span>
+<span id="L44"><span class="lineNum">      44</span>                 :<span class="tlaGNC">          23 : static void uds_send_negative(uds_response_t *response,</span></span>
 <span id="L45"><span class="lineNum">      45</span>                 :             :                               uint8_t original_sid,</span>
 <span id="L46"><span class="lineNum">      46</span>                 :             :                               uint8_t nrc)</span>
 <span id="L47"><span class="lineNum">      47</span>                 :             : {</span>
-<span id="L48"><span class="lineNum">      48</span>                 :<span class="tlaGNC">           4 :     response-&gt;response_sid  = UDS_SID_NEGATIVE_RESP;</span></span>
-<span id="L49"><span class="lineNum">      49</span>                 :<span class="tlaGNC">           4 :     response-&gt;did_high_resp = original_sid;</span></span>
-<span id="L50"><span class="lineNum">      50</span>                 :<span class="tlaGNC">           4 :     response-&gt;did_low_resp  = nrc;</span></span>
-<span id="L51"><span class="lineNum">      51</span>                 :<span class="tlaGNC">           4 : }</span></span>
+<span id="L48"><span class="lineNum">      48</span>                 :<span class="tlaGNC">          23 :     response-&gt;response_sid  = UDS_SID_NEGATIVE_RESP;</span></span>
+<span id="L49"><span class="lineNum">      49</span>                 :<span class="tlaGNC">          23 :     response-&gt;did_high_resp = original_sid;</span></span>
+<span id="L50"><span class="lineNum">      50</span>                 :<span class="tlaGNC">          23 :     response-&gt;did_low_resp  = nrc;</span></span>
+<span id="L51"><span class="lineNum">      51</span>                 :<span class="tlaGNC">          23 : }</span></span>
 <span id="L52"><span class="lineNum">      52</span>                 :             : </span>
 <span id="L53"><span class="lineNum">      53</span>                 :             : /* ===================================================================</span>
 <span id="L54"><span class="lineNum">      54</span>                 :             :  * SID 0x22 — ReadDataByIdentifier</span>
@@ -142,37 +142,37 @@
 <span id="L64"><span class="lineNum">      64</span>                 :             :  *</span>
 <span id="L65"><span class="lineNum">      65</span>                 :             :  * @req FR-UDS-001</span>
 <span id="L66"><span class="lineNum">      66</span>                 :             :  */</span>
-<span id="L67"><span class="lineNum">      67</span>                 :<span class="tlaGNC">           8 : static void uds_handle_read_did(const uds_request_t *request,</span></span>
+<span id="L67"><span class="lineNum">      67</span>                 :<span class="tlaGNC">          26 : static void uds_handle_read_did(const uds_request_t *request,</span></span>
 <span id="L68"><span class="lineNum">      68</span>                 :             :                                 uds_response_t *response,</span>
 <span id="L69"><span class="lineNum">      69</span>                 :             :                                 const fsm_output_t *fsm_out,</span>
 <span id="L70"><span class="lineNum">      70</span>                 :             :                                 const pid_output_t *pid_out,</span>
 <span id="L71"><span class="lineNum">      71</span>                 :             :                                 const ttc_output_t *ttc_out)</span>
 <span id="L72"><span class="lineNum">      72</span>                 :             : {</span>
 <span id="L73"><span class="lineNum">      73</span>                 :             :     uint16_t requested_id;</span>
-<span id="L74"><span class="lineNum">      74</span>                 :<span class="tlaGNC">           8 :     uint16_t scaled_val = 0U;</span></span>
+<span id="L74"><span class="lineNum">      74</span>                 :<span class="tlaGNC">          26 :     uint16_t scaled_val = 0U;</span></span>
 <span id="L75"><span class="lineNum">      75</span>                 :             : </span>
-<span id="L76"><span class="lineNum">      76</span>                 :<span class="tlaGNC">           8 :     requested_id = ((uint16_t)request-&gt;did_high * 256U)</span></span>
-<span id="L77"><span class="lineNum">      77</span>                 :<span class="tlaGNC">           8 :                  + (uint16_t)request-&gt;did_low;</span></span>
+<span id="L76"><span class="lineNum">      76</span>                 :<span class="tlaGNC">          26 :     requested_id = ((uint16_t)request-&gt;did_high * 256U)</span></span>
+<span id="L77"><span class="lineNum">      77</span>                 :<span class="tlaGNC">          26 :                  + (uint16_t)request-&gt;did_low;</span></span>
 <span id="L78"><span class="lineNum">      78</span>                 :             : </span>
-<span id="L79"><span class="lineNum">      79</span>   [<span class="tlaGBC" title="Branch 0 was taken 3 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 1 time"> + </span>]:<span class="tlaGNC">           8 :     switch (requested_id)</span></span>
+<span id="L79"><span class="lineNum">      79</span>   [<span class="tlaGBC" title="Branch 0 was taken 13 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 10 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 1 time"> + </span>]:<span class="tlaGNC">          26 :     switch (requested_id)</span></span>
 <span id="L80"><span class="lineNum">      80</span>                 :             :     {</span>
-<span id="L81"><span class="lineNum">      81</span>                 :<span class="tlaGNC">           3 :         case UDS_DID_TTC_VAL:           /* 0xF100 */</span></span>
+<span id="L81"><span class="lineNum">      81</span>                 :<span class="tlaGNC">          13 :         case UDS_DID_TTC_VAL:           /* 0xF100 */</span></span>
 <span id="L82"><span class="lineNum">      82</span>                 :             :         {</span>
 <span id="L83"><span class="lineNum">      83</span>                 :             :             /* Bug #1 fix: validate float before cast to uint16_t.</span>
 <span id="L84"><span class="lineNum">      84</span>                 :             :              * C11 §6.3.1.4: float-&gt;int cast is UB if out of range.</span>
 <span id="L85"><span class="lineNum">      85</span>                 :             :              * Guards NaN, +/-Inf, negatives, and values exceeding</span>
 <span id="L86"><span class="lineNum">      86</span>                 :             :              * UINT16_MAX after the x100 scaling (i.e. &gt; 655.35). */</span>
-<span id="L87"><span class="lineNum">      87</span>         [<span class="tlaGBC" title="Branch 0 was taken 3 times"> + </span><span class="tlaUNC" title="Branch 1 was not taken"> - </span>]:<span class="tlaGNC">           3 :             if (!isfinite(ttc_out-&gt;ttc) ||</span></span>
-<span id="L88"><span class="lineNum">      88</span>         [<span class="tlaGBC" title="Branch 0 was taken 3 times"> + </span><span class="tlaUNC" title="Branch 1 was not taken"> - </span>]:<span class="tlaGNC">           3 :                 (ttc_out-&gt;ttc &lt; 0.0f)   ||</span></span>
-<span id="L89"><span class="lineNum">      89</span>         [<span class="tlaUNC" title="Branch 0 was not taken"> - </span><span class="tlaGBC" title="Branch 1 was taken 3 times"> + </span>]:<span class="tlaGNC">           3 :                 (ttc_out-&gt;ttc &gt; 655.35f))</span></span>
+<span id="L87"><span class="lineNum">      87</span>         [<span class="tlaGBC" title="Branch 0 was taken 8 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 5 times"> + </span>]:<span class="tlaGNC">          13 :             if (!isfinite(ttc_out-&gt;ttc) ||</span></span>
+<span id="L88"><span class="lineNum">      88</span>         [<span class="tlaGBC" title="Branch 0 was taken 6 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span>]:<span class="tlaGNC">           8 :                 (ttc_out-&gt;ttc &lt; 0.0f)   ||</span></span>
+<span id="L89"><span class="lineNum">      89</span>         [<span class="tlaGBC" title="Branch 0 was taken 3 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 3 times"> + </span>]:<span class="tlaGNC">           6 :                 (ttc_out-&gt;ttc &gt; 655.35f))</span></span>
 <span id="L90"><span class="lineNum">      90</span>                 :             :             {</span>
-<span id="L91"><span class="lineNum">      91</span>                 :<span class="tlaUNC tlaBgUNC">           0 :                 uds_send_negative(response,</span></span>
+<span id="L91"><span class="lineNum">      91</span>                 :<span class="tlaGNC">          10 :                 uds_send_negative(response,</span></span>
 <span id="L92"><span class="lineNum">      92</span>                 :             :                                   UDS_SID_READ_DID,</span>
 <span id="L93"><span class="lineNum">      93</span>                 :             :                                   UDS_NRC_REQUEST_OOR);</span>
-<span id="L94"><span class="lineNum">      94</span>                 :<span class="tlaUNC">           0 :                 break;</span></span>
+<span id="L94"><span class="lineNum">      94</span>                 :<span class="tlaGNC">          10 :                 break;</span></span>
 <span id="L95"><span class="lineNum">      95</span>                 :             :             }</span>
 <span id="L96"><span class="lineNum">      96</span>                 :             : </span>
-<span id="L97"><span class="lineNum">      97</span>                 :<span class="tlaGNC tlaBgGNC">           3 :             scaled_val = (uint16_t)(ttc_out-&gt;ttc * 100.0f);</span></span>
+<span id="L97"><span class="lineNum">      97</span>                 :<span class="tlaGNC">           3 :             scaled_val = (uint16_t)(ttc_out-&gt;ttc * 100.0f);</span></span>
 <span id="L98"><span class="lineNum">      98</span>                 :             : </span>
 <span id="L99"><span class="lineNum">      99</span>                 :<span class="tlaGNC">           3 :             response-&gt;response_sid  = UDS_SID_READ_DID_RESP;</span></span>
 <span id="L100"><span class="lineNum">     100</span>                 :<span class="tlaGNC">           3 :             response-&gt;did_high_resp = request-&gt;did_high;</span></span>
@@ -191,22 +191,22 @@
 <span id="L113"><span class="lineNum">     113</span>                 :<span class="tlaGNC">           2 :             break;</span></span>
 <span id="L114"><span class="lineNum">     114</span>                 :             :         }</span>
 <span id="L115"><span class="lineNum">     115</span>                 :             : </span>
-<span id="L116"><span class="lineNum">     116</span>                 :<span class="tlaGNC">           2 :         case UDS_DID_BRAKE_PRESS_VAL:   /* 0xF102 */</span></span>
+<span id="L116"><span class="lineNum">     116</span>                 :<span class="tlaGNC">          10 :         case UDS_DID_BRAKE_PRESS_VAL:   /* 0xF102 */</span></span>
 <span id="L117"><span class="lineNum">     117</span>                 :             :         {</span>
 <span id="L118"><span class="lineNum">     118</span>                 :             :             /* Bug #1 fix: validate float before cast to uint16_t.</span>
 <span id="L119"><span class="lineNum">     119</span>                 :             :              * Guards NaN, +/-Inf, negatives, and values exceeding</span>
 <span id="L120"><span class="lineNum">     120</span>                 :             :              * UINT16_MAX after the x10 scaling (i.e. &gt; 6553.5). */</span>
-<span id="L121"><span class="lineNum">     121</span>         [<span class="tlaGBC" title="Branch 0 was taken 2 times"> + </span><span class="tlaUNC" title="Branch 1 was not taken"> - </span>]:<span class="tlaGNC">           2 :             if (!isfinite(pid_out-&gt;brake_pct) ||</span></span>
-<span id="L122"><span class="lineNum">     122</span>         [<span class="tlaGBC" title="Branch 0 was taken 2 times"> + </span><span class="tlaUNC" title="Branch 1 was not taken"> - </span>]:<span class="tlaGNC">           2 :                 (pid_out-&gt;brake_pct &lt; 0.0f)   ||</span></span>
-<span id="L123"><span class="lineNum">     123</span>         [<span class="tlaUNC" title="Branch 0 was not taken"> - </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span>]:<span class="tlaGNC">           2 :                 (pid_out-&gt;brake_pct &gt; 6553.5f))</span></span>
+<span id="L121"><span class="lineNum">     121</span>         [<span class="tlaGBC" title="Branch 0 was taken 6 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 4 times"> + </span>]:<span class="tlaGNC">          10 :             if (!isfinite(pid_out-&gt;brake_pct) ||</span></span>
+<span id="L122"><span class="lineNum">     122</span>         [<span class="tlaGBC" title="Branch 0 was taken 4 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span>]:<span class="tlaGNC">           6 :                 (pid_out-&gt;brake_pct &lt; 0.0f)   ||</span></span>
+<span id="L123"><span class="lineNum">     123</span>         [<span class="tlaGBC" title="Branch 0 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span>]:<span class="tlaGNC">           4 :                 (pid_out-&gt;brake_pct &gt; 6553.5f))</span></span>
 <span id="L124"><span class="lineNum">     124</span>                 :             :             {</span>
-<span id="L125"><span class="lineNum">     125</span>                 :<span class="tlaUNC tlaBgUNC">           0 :                 uds_send_negative(response,</span></span>
+<span id="L125"><span class="lineNum">     125</span>                 :<span class="tlaGNC">           8 :                 uds_send_negative(response,</span></span>
 <span id="L126"><span class="lineNum">     126</span>                 :             :                                   UDS_SID_READ_DID,</span>
 <span id="L127"><span class="lineNum">     127</span>                 :             :                                   UDS_NRC_REQUEST_OOR);</span>
-<span id="L128"><span class="lineNum">     128</span>                 :<span class="tlaUNC">           0 :                 break;</span></span>
+<span id="L128"><span class="lineNum">     128</span>                 :<span class="tlaGNC">           8 :                 break;</span></span>
 <span id="L129"><span class="lineNum">     129</span>                 :             :             }</span>
 <span id="L130"><span class="lineNum">     130</span>                 :             : </span>
-<span id="L131"><span class="lineNum">     131</span>                 :<span class="tlaGNC tlaBgGNC">           2 :             scaled_val = (uint16_t)(pid_out-&gt;brake_pct * 10.0f);</span></span>
+<span id="L131"><span class="lineNum">     131</span>                 :<span class="tlaGNC">           2 :             scaled_val = (uint16_t)(pid_out-&gt;brake_pct * 10.0f);</span></span>
 <span id="L132"><span class="lineNum">     132</span>                 :             : </span>
 <span id="L133"><span class="lineNum">     133</span>                 :<span class="tlaGNC">           2 :             response-&gt;response_sid  = UDS_SID_READ_DID_RESP;</span></span>
 <span id="L134"><span class="lineNum">     134</span>                 :<span class="tlaGNC">           2 :             response-&gt;did_high_resp = request-&gt;did_high;</span></span>
@@ -224,7 +224,7 @@
 <span id="L146"><span class="lineNum">     146</span>                 :<span class="tlaGNC">           1 :             break;</span></span>
 <span id="L147"><span class="lineNum">     147</span>                 :             :         }</span>
 <span id="L148"><span class="lineNum">     148</span>                 :             :     }</span>
-<span id="L149"><span class="lineNum">     149</span>                 :<span class="tlaGNC">           8 : }</span></span>
+<span id="L149"><span class="lineNum">     149</span>                 :<span class="tlaGNC">          26 : }</span></span>
 <span id="L150"><span class="lineNum">     150</span>                 :             : </span>
 <span id="L151"><span class="lineNum">     151</span>                 :             : /* ===================================================================</span>
 <span id="L152"><span class="lineNum">     152</span>                 :             :  * SID 0x14 — ClearDiagnosticInformation</span>
@@ -234,15 +234,15 @@
 <span id="L156"><span class="lineNum">     156</span>                 :             :  * @brief Handle SID 0x14 — reset all stored DTCs.</span>
 <span id="L157"><span class="lineNum">     157</span>                 :             :  * @req FR-UDS-003</span>
 <span id="L158"><span class="lineNum">     158</span>                 :             :  */</span>
-<span id="L159"><span class="lineNum">     159</span>                 :<span class="tlaGNC">           2 : static void uds_handle_clear_dtc(uds_state_t *state,</span></span>
+<span id="L159"><span class="lineNum">     159</span>                 :<span class="tlaGNC">           3 : static void uds_handle_clear_dtc(uds_state_t *state,</span></span>
 <span id="L160"><span class="lineNum">     160</span>                 :             :                                  uds_response_t *response)</span>
 <span id="L161"><span class="lineNum">     161</span>                 :             : {</span>
-<span id="L162"><span class="lineNum">     162</span>                 :<span class="tlaGNC">           2 :     state-&gt;dtc_sensor   = 0U;</span></span>
-<span id="L163"><span class="lineNum">     163</span>                 :<span class="tlaGNC">           2 :     state-&gt;dtc_crc      = 0U;</span></span>
-<span id="L164"><span class="lineNum">     164</span>                 :<span class="tlaGNC">           2 :     state-&gt;dtc_actuator = 0U;</span></span>
+<span id="L162"><span class="lineNum">     162</span>                 :<span class="tlaGNC">           3 :     state-&gt;dtc_sensor   = 0U;</span></span>
+<span id="L163"><span class="lineNum">     163</span>                 :<span class="tlaGNC">           3 :     state-&gt;dtc_crc      = 0U;</span></span>
+<span id="L164"><span class="lineNum">     164</span>                 :<span class="tlaGNC">           3 :     state-&gt;dtc_actuator = 0U;</span></span>
 <span id="L165"><span class="lineNum">     165</span>                 :             : </span>
-<span id="L166"><span class="lineNum">     166</span>                 :<span class="tlaGNC">           2 :     response-&gt;response_sid = UDS_SID_CLEAR_DTC_RESP;</span></span>
-<span id="L167"><span class="lineNum">     167</span>                 :<span class="tlaGNC">           2 : }</span></span>
+<span id="L166"><span class="lineNum">     166</span>                 :<span class="tlaGNC">           3 :     response-&gt;response_sid = UDS_SID_CLEAR_DTC_RESP;</span></span>
+<span id="L167"><span class="lineNum">     167</span>                 :<span class="tlaGNC">           3 : }</span></span>
 <span id="L168"><span class="lineNum">     168</span>                 :             : </span>
 <span id="L169"><span class="lineNum">     169</span>                 :             : /* ===================================================================</span>
 <span id="L170"><span class="lineNum">     170</span>                 :             :  * SID 0x31 — RoutineControl</span>
@@ -252,34 +252,34 @@
 <span id="L174"><span class="lineNum">     174</span>                 :             :  * @brief Handle SID 0x31, routine 0x0301 — AEB enable/disable.</span>
 <span id="L175"><span class="lineNum">     175</span>                 :             :  * @req FR-UDS-004</span>
 <span id="L176"><span class="lineNum">     176</span>                 :             :  */</span>
-<span id="L177"><span class="lineNum">     177</span>                 :<span class="tlaGNC">           6 : static void uds_handle_routine_ctrl(uds_state_t *state,</span></span>
+<span id="L177"><span class="lineNum">     177</span>                 :<span class="tlaGNC">         106 : static void uds_handle_routine_ctrl(uds_state_t *state,</span></span>
 <span id="L178"><span class="lineNum">     178</span>                 :             :                                     const uds_request_t *request,</span>
 <span id="L179"><span class="lineNum">     179</span>                 :             :                                     uds_response_t *response)</span>
 <span id="L180"><span class="lineNum">     180</span>                 :             : {</span>
 <span id="L181"><span class="lineNum">     181</span>                 :             :     uint16_t routine_id;</span>
 <span id="L182"><span class="lineNum">     182</span>                 :             : </span>
-<span id="L183"><span class="lineNum">     183</span>                 :<span class="tlaGNC">           6 :     routine_id = ((uint16_t)request-&gt;did_high * 256U)</span></span>
-<span id="L184"><span class="lineNum">     184</span>                 :<span class="tlaGNC">           6 :                + (uint16_t)request-&gt;did_low;</span></span>
+<span id="L183"><span class="lineNum">     183</span>                 :<span class="tlaGNC">         106 :     routine_id = ((uint16_t)request-&gt;did_high * 256U)</span></span>
+<span id="L184"><span class="lineNum">     184</span>                 :<span class="tlaGNC">         106 :                + (uint16_t)request-&gt;did_low;</span></span>
 <span id="L185"><span class="lineNum">     185</span>                 :             : </span>
-<span id="L186"><span class="lineNum">     186</span>         [<span class="tlaGBC" title="Branch 0 was taken 5 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1 time"> + </span>]:<span class="tlaGNC">           6 :     if (routine_id == UDS_RID_AEB_CTRL)     /* 0x0301 */</span></span>
+<span id="L186"><span class="lineNum">     186</span>         [<span class="tlaGBC" title="Branch 0 was taken 105 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1 time"> + </span>]:<span class="tlaGNC">         106 :     if (routine_id == UDS_RID_AEB_CTRL)     /* 0x0301 */</span></span>
 <span id="L187"><span class="lineNum">     187</span>                 :             :     {</span>
-<span id="L188"><span class="lineNum">     188</span>         [<span class="tlaGBC" title="Branch 0 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 3 times"> + </span>]:<span class="tlaGNC">           5 :         if (request-&gt;value == 0U)           /* Disable */</span></span>
+<span id="L188"><span class="lineNum">     188</span>         [<span class="tlaGBC" title="Branch 0 was taken 52 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 53 times"> + </span>]:<span class="tlaGNC">         105 :         if (request-&gt;value == 0U)           /* Disable */</span></span>
 <span id="L189"><span class="lineNum">     189</span>                 :             :         {</span>
-<span id="L190"><span class="lineNum">     190</span>                 :<span class="tlaGNC">           2 :             state-&gt;aeb_enabled = 0U;</span></span>
+<span id="L190"><span class="lineNum">     190</span>                 :<span class="tlaGNC">          52 :             state-&gt;aeb_enabled = 0U;</span></span>
 <span id="L191"><span class="lineNum">     191</span>                 :             : </span>
-<span id="L192"><span class="lineNum">     192</span>                 :<span class="tlaGNC">           2 :             response-&gt;response_sid  = UDS_SID_ROUTINE_CTRL_RESP;</span></span>
-<span id="L193"><span class="lineNum">     193</span>                 :<span class="tlaGNC">           2 :             response-&gt;did_high_resp = request-&gt;did_high;</span></span>
-<span id="L194"><span class="lineNum">     194</span>                 :<span class="tlaGNC">           2 :             response-&gt;did_low_resp  = request-&gt;did_low;</span></span>
-<span id="L195"><span class="lineNum">     195</span>                 :<span class="tlaGNC">           2 :             response-&gt;data1         = 0U;</span></span>
+<span id="L192"><span class="lineNum">     192</span>                 :<span class="tlaGNC">          52 :             response-&gt;response_sid  = UDS_SID_ROUTINE_CTRL_RESP;</span></span>
+<span id="L193"><span class="lineNum">     193</span>                 :<span class="tlaGNC">          52 :             response-&gt;did_high_resp = request-&gt;did_high;</span></span>
+<span id="L194"><span class="lineNum">     194</span>                 :<span class="tlaGNC">          52 :             response-&gt;did_low_resp  = request-&gt;did_low;</span></span>
+<span id="L195"><span class="lineNum">     195</span>                 :<span class="tlaGNC">          52 :             response-&gt;data1         = 0U;</span></span>
 <span id="L196"><span class="lineNum">     196</span>                 :             :         }</span>
-<span id="L197"><span class="lineNum">     197</span>         [<span class="tlaGBC" title="Branch 0 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1 time"> + </span>]:<span class="tlaGNC">           3 :         else if (request-&gt;value == 1U)      /* Enable */</span></span>
+<span id="L197"><span class="lineNum">     197</span>         [<span class="tlaGBC" title="Branch 0 was taken 52 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 1 time"> + </span>]:<span class="tlaGNC">          53 :         else if (request-&gt;value == 1U)      /* Enable */</span></span>
 <span id="L198"><span class="lineNum">     198</span>                 :             :         {</span>
-<span id="L199"><span class="lineNum">     199</span>                 :<span class="tlaGNC">           2 :             state-&gt;aeb_enabled = 1U;</span></span>
+<span id="L199"><span class="lineNum">     199</span>                 :<span class="tlaGNC">          52 :             state-&gt;aeb_enabled = 1U;</span></span>
 <span id="L200"><span class="lineNum">     200</span>                 :             : </span>
-<span id="L201"><span class="lineNum">     201</span>                 :<span class="tlaGNC">           2 :             response-&gt;response_sid  = UDS_SID_ROUTINE_CTRL_RESP;</span></span>
-<span id="L202"><span class="lineNum">     202</span>                 :<span class="tlaGNC">           2 :             response-&gt;did_high_resp = request-&gt;did_high;</span></span>
-<span id="L203"><span class="lineNum">     203</span>                 :<span class="tlaGNC">           2 :             response-&gt;did_low_resp  = request-&gt;did_low;</span></span>
-<span id="L204"><span class="lineNum">     204</span>                 :<span class="tlaGNC">           2 :             response-&gt;data1         = 1U;</span></span>
+<span id="L201"><span class="lineNum">     201</span>                 :<span class="tlaGNC">          52 :             response-&gt;response_sid  = UDS_SID_ROUTINE_CTRL_RESP;</span></span>
+<span id="L202"><span class="lineNum">     202</span>                 :<span class="tlaGNC">          52 :             response-&gt;did_high_resp = request-&gt;did_high;</span></span>
+<span id="L203"><span class="lineNum">     203</span>                 :<span class="tlaGNC">          52 :             response-&gt;did_low_resp  = request-&gt;did_low;</span></span>
+<span id="L204"><span class="lineNum">     204</span>                 :<span class="tlaGNC">          52 :             response-&gt;data1         = 1U;</span></span>
 <span id="L205"><span class="lineNum">     205</span>                 :             :         }</span>
 <span id="L206"><span class="lineNum">     206</span>                 :             :         else                                /* Invalid value */</span>
 <span id="L207"><span class="lineNum">     207</span>                 :             :         {</span>
@@ -294,87 +294,87 @@
 <span id="L216"><span class="lineNum">     216</span>                 :             :                           UDS_SID_ROUTINE_CTRL,</span>
 <span id="L217"><span class="lineNum">     217</span>                 :             :                           UDS_NRC_REQUEST_OOR);</span>
 <span id="L218"><span class="lineNum">     218</span>                 :             :     }</span>
-<span id="L219"><span class="lineNum">     219</span>                 :<span class="tlaGNC">           6 : }</span></span>
+<span id="L219"><span class="lineNum">     219</span>                 :<span class="tlaGNC">         106 : }</span></span>
 <span id="L220"><span class="lineNum">     220</span>                 :             : </span>
 <span id="L221"><span class="lineNum">     221</span>                 :             : /* ===================================================================</span>
 <span id="L222"><span class="lineNum">     222</span>                 :             :  * Public API</span>
 <span id="L223"><span class="lineNum">     223</span>                 :             :  * =================================================================== */</span>
 <span id="L224"><span class="lineNum">     224</span>                 :             : </span>
-<span id="L225"><span class="lineNum">     225</span>                 :<span class="tlaGNC">          23 : void uds_init(uds_state_t *state)</span></span>
+<span id="L225"><span class="lineNum">     225</span>                 :<span class="tlaGNC">          47 : void uds_init(uds_state_t *state)</span></span>
 <span id="L226"><span class="lineNum">     226</span>                 :             : {</span>
-<span id="L227"><span class="lineNum">     227</span>                 :<span class="tlaGNC">          23 :     state-&gt;aeb_enabled  = 1U;</span></span>
-<span id="L228"><span class="lineNum">     228</span>                 :<span class="tlaGNC">          23 :     state-&gt;dtc_sensor   = 0U;</span></span>
-<span id="L229"><span class="lineNum">     229</span>                 :<span class="tlaGNC">          23 :     state-&gt;dtc_crc      = 0U;</span></span>
-<span id="L230"><span class="lineNum">     230</span>                 :<span class="tlaGNC">          23 :     state-&gt;dtc_actuator = 0U;</span></span>
-<span id="L231"><span class="lineNum">     231</span>                 :<span class="tlaGNC">          23 : }</span></span>
+<span id="L227"><span class="lineNum">     227</span>                 :<span class="tlaGNC">          47 :     state-&gt;aeb_enabled  = 1U;</span></span>
+<span id="L228"><span class="lineNum">     228</span>                 :<span class="tlaGNC">          47 :     state-&gt;dtc_sensor   = 0U;</span></span>
+<span id="L229"><span class="lineNum">     229</span>                 :<span class="tlaGNC">          47 :     state-&gt;dtc_crc      = 0U;</span></span>
+<span id="L230"><span class="lineNum">     230</span>                 :<span class="tlaGNC">          47 :     state-&gt;dtc_actuator = 0U;</span></span>
+<span id="L231"><span class="lineNum">     231</span>                 :<span class="tlaGNC">          47 : }</span></span>
 <span id="L232"><span class="lineNum">     232</span>                 :             : </span>
-<span id="L233"><span class="lineNum">     233</span>                 :<span class="tlaGNC">           9 : void uds_monitor_faults(uds_state_t *state,</span></span>
+<span id="L233"><span class="lineNum">     233</span>                 :<span class="tlaGNC">          10 : void uds_monitor_faults(uds_state_t *state,</span></span>
 <span id="L234"><span class="lineNum">     234</span>                 :             :                         uint8_t sensor_fault,</span>
 <span id="L235"><span class="lineNum">     235</span>                 :             :                         uint8_t crc_error,</span>
 <span id="L236"><span class="lineNum">     236</span>                 :             :                         uint8_t actuator_fault)</span>
 <span id="L237"><span class="lineNum">     237</span>                 :             : {</span>
 <span id="L238"><span class="lineNum">     238</span>                 :             :     /* DD-UDS-01: immediate latch, no debounce. */</span>
-<span id="L239"><span class="lineNum">     239</span>         [<span class="tlaGBC" title="Branch 0 was taken 5 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 4 times"> + </span>]:<span class="tlaGNC">           9 :     if (sensor_fault != 0U)</span></span>
+<span id="L239"><span class="lineNum">     239</span>         [<span class="tlaGBC" title="Branch 0 was taken 6 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 4 times"> + </span>]:<span class="tlaGNC">          10 :     if (sensor_fault != 0U)</span></span>
 <span id="L240"><span class="lineNum">     240</span>                 :             :     {</span>
-<span id="L241"><span class="lineNum">     241</span>                 :<span class="tlaGNC">           5 :         state-&gt;dtc_sensor = 1U;</span></span>
+<span id="L241"><span class="lineNum">     241</span>                 :<span class="tlaGNC">           6 :         state-&gt;dtc_sensor = 1U;</span></span>
 <span id="L242"><span class="lineNum">     242</span>                 :             :     }</span>
 <span id="L243"><span class="lineNum">     243</span>                 :             : </span>
-<span id="L244"><span class="lineNum">     244</span>         [<span class="tlaGBC" title="Branch 0 was taken 4 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 5 times"> + </span>]:<span class="tlaGNC">           9 :     if (crc_error != 0U)</span></span>
+<span id="L244"><span class="lineNum">     244</span>         [<span class="tlaGBC" title="Branch 0 was taken 4 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 6 times"> + </span>]:<span class="tlaGNC">          10 :     if (crc_error != 0U)</span></span>
 <span id="L245"><span class="lineNum">     245</span>                 :             :     {</span>
 <span id="L246"><span class="lineNum">     246</span>                 :<span class="tlaGNC">           4 :         state-&gt;dtc_crc = 1U;</span></span>
 <span id="L247"><span class="lineNum">     247</span>                 :             :     }</span>
 <span id="L248"><span class="lineNum">     248</span>                 :             : </span>
-<span id="L249"><span class="lineNum">     249</span>         [<span class="tlaGBC" title="Branch 0 was taken 3 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 6 times"> + </span>]:<span class="tlaGNC">           9 :     if (actuator_fault != 0U)</span></span>
+<span id="L249"><span class="lineNum">     249</span>         [<span class="tlaGBC" title="Branch 0 was taken 3 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 7 times"> + </span>]:<span class="tlaGNC">          10 :     if (actuator_fault != 0U)</span></span>
 <span id="L250"><span class="lineNum">     250</span>                 :             :     {</span>
 <span id="L251"><span class="lineNum">     251</span>                 :<span class="tlaGNC">           3 :         state-&gt;dtc_actuator = 1U;</span></span>
 <span id="L252"><span class="lineNum">     252</span>                 :             :     }</span>
-<span id="L253"><span class="lineNum">     253</span>                 :<span class="tlaGNC">           9 : }</span></span>
+<span id="L253"><span class="lineNum">     253</span>                 :<span class="tlaGNC">          10 : }</span></span>
 <span id="L254"><span class="lineNum">     254</span>                 :             : </span>
-<span id="L255"><span class="lineNum">     255</span>                 :<span class="tlaGNC">          19 : void uds_process_request(uds_state_t *state,</span></span>
+<span id="L255"><span class="lineNum">     255</span>                 :<span class="tlaGNC">         139 : void uds_process_request(uds_state_t *state,</span></span>
 <span id="L256"><span class="lineNum">     256</span>                 :             :                          const uds_request_t *request,</span>
 <span id="L257"><span class="lineNum">     257</span>                 :             :                          uds_response_t *response,</span>
 <span id="L258"><span class="lineNum">     258</span>                 :             :                          const fsm_output_t *fsm_out,</span>
 <span id="L259"><span class="lineNum">     259</span>                 :             :                          const pid_output_t *pid_out,</span>
 <span id="L260"><span class="lineNum">     260</span>                 :             :                          const ttc_output_t *ttc_out)</span>
 <span id="L261"><span class="lineNum">     261</span>                 :             : {</span>
-<span id="L262"><span class="lineNum">     262</span>                 :<span class="tlaGNC">          19 :     uds_clear_response(response);</span></span>
+<span id="L262"><span class="lineNum">     262</span>                 :<span class="tlaGNC">         139 :     uds_clear_response(response);</span></span>
 <span id="L263"><span class="lineNum">     263</span>                 :             : </span>
 <span id="L264"><span class="lineNum">     264</span>                 :             :     /* Only process if sid is valid (sid != 0) — single exit point (Rule 15.5) */</span>
-<span id="L265"><span class="lineNum">     265</span>         [<span class="tlaGBC" title="Branch 0 was taken 17 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span>]:<span class="tlaGNC">          19 :     if (request-&gt;sid != 0U)</span></span>
+<span id="L265"><span class="lineNum">     265</span>         [<span class="tlaGBC" title="Branch 0 was taken 137 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span>]:<span class="tlaGNC">         139 :     if (request-&gt;sid != 0U)</span></span>
 <span id="L266"><span class="lineNum">     266</span>                 :             :     {</span>
-<span id="L267"><span class="lineNum">     267</span>   [<span class="tlaGBC" title="Branch 0 was taken 8 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 2 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 6 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 1 time"> + </span>]:<span class="tlaGNC">          17 :         switch (request-&gt;sid)</span></span>
+<span id="L267"><span class="lineNum">     267</span>   [<span class="tlaGBC" title="Branch 0 was taken 26 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 3 times"> + </span><span class="tlaGBC" title="Branch 2 was taken 106 times"> + </span><span class="tlaGBC" title="Branch 3 was taken 2 times"> + </span>]:<span class="tlaGNC">         137 :         switch (request-&gt;sid)</span></span>
 <span id="L268"><span class="lineNum">     268</span>                 :             :         {</span>
-<span id="L269"><span class="lineNum">     269</span>                 :<span class="tlaGNC">           8 :             case UDS_SID_READ_DID:          /* 0x22 */</span></span>
+<span id="L269"><span class="lineNum">     269</span>                 :<span class="tlaGNC">          26 :             case UDS_SID_READ_DID:          /* 0x22 */</span></span>
 <span id="L270"><span class="lineNum">     270</span>                 :             :             {</span>
-<span id="L271"><span class="lineNum">     271</span>                 :<span class="tlaGNC">           8 :                 uds_handle_read_did(request, response,</span></span>
+<span id="L271"><span class="lineNum">     271</span>                 :<span class="tlaGNC">          26 :                 uds_handle_read_did(request, response,</span></span>
 <span id="L272"><span class="lineNum">     272</span>                 :             :                                     fsm_out, pid_out, ttc_out);</span>
-<span id="L273"><span class="lineNum">     273</span>                 :<span class="tlaGNC">           8 :                 break;</span></span>
+<span id="L273"><span class="lineNum">     273</span>                 :<span class="tlaGNC">          26 :                 break;</span></span>
 <span id="L274"><span class="lineNum">     274</span>                 :             :             }</span>
 <span id="L275"><span class="lineNum">     275</span>                 :             : </span>
-<span id="L276"><span class="lineNum">     276</span>                 :<span class="tlaGNC">           2 :             case UDS_SID_CLEAR_DTC:         /* 0x14 */</span></span>
+<span id="L276"><span class="lineNum">     276</span>                 :<span class="tlaGNC">           3 :             case UDS_SID_CLEAR_DTC:         /* 0x14 */</span></span>
 <span id="L277"><span class="lineNum">     277</span>                 :             :             {</span>
-<span id="L278"><span class="lineNum">     278</span>                 :<span class="tlaGNC">           2 :                 uds_handle_clear_dtc(state, response);</span></span>
-<span id="L279"><span class="lineNum">     279</span>                 :<span class="tlaGNC">           2 :                 break;</span></span>
+<span id="L278"><span class="lineNum">     278</span>                 :<span class="tlaGNC">           3 :                 uds_handle_clear_dtc(state, response);</span></span>
+<span id="L279"><span class="lineNum">     279</span>                 :<span class="tlaGNC">           3 :                 break;</span></span>
 <span id="L280"><span class="lineNum">     280</span>                 :             :             }</span>
 <span id="L281"><span class="lineNum">     281</span>                 :             : </span>
-<span id="L282"><span class="lineNum">     282</span>                 :<span class="tlaGNC">           6 :             case UDS_SID_ROUTINE_CTRL:      /* 0x31 */</span></span>
+<span id="L282"><span class="lineNum">     282</span>                 :<span class="tlaGNC">         106 :             case UDS_SID_ROUTINE_CTRL:      /* 0x31 */</span></span>
 <span id="L283"><span class="lineNum">     283</span>                 :             :             {</span>
-<span id="L284"><span class="lineNum">     284</span>                 :<span class="tlaGNC">           6 :                 uds_handle_routine_ctrl(state, request, response);</span></span>
-<span id="L285"><span class="lineNum">     285</span>                 :<span class="tlaGNC">           6 :                 break;</span></span>
+<span id="L284"><span class="lineNum">     284</span>                 :<span class="tlaGNC">         106 :                 uds_handle_routine_ctrl(state, request, response);</span></span>
+<span id="L285"><span class="lineNum">     285</span>                 :<span class="tlaGNC">         106 :                 break;</span></span>
 <span id="L286"><span class="lineNum">     286</span>                 :             :             }</span>
 <span id="L287"><span class="lineNum">     287</span>                 :             : </span>
-<span id="L288"><span class="lineNum">     288</span>                 :<span class="tlaGNC">           1 :             default:                        /* NRC 0x11 */</span></span>
+<span id="L288"><span class="lineNum">     288</span>                 :<span class="tlaGNC">           2 :             default:                        /* NRC 0x11 */</span></span>
 <span id="L289"><span class="lineNum">     289</span>                 :             :             {</span>
-<span id="L290"><span class="lineNum">     290</span>                 :<span class="tlaGNC">           1 :                 uds_send_negative(response,</span></span>
-<span id="L291"><span class="lineNum">     291</span>                 :<span class="tlaGNC">           1 :                                   request-&gt;sid,</span></span>
+<span id="L290"><span class="lineNum">     290</span>                 :<span class="tlaGNC">           2 :                 uds_send_negative(response,</span></span>
+<span id="L291"><span class="lineNum">     291</span>                 :<span class="tlaGNC">           2 :                                   request-&gt;sid,</span></span>
 <span id="L292"><span class="lineNum">     292</span>                 :             :                                   UDS_NRC_SERVICE_NOT_SUPP);</span>
-<span id="L293"><span class="lineNum">     293</span>                 :<span class="tlaGNC">           1 :                 break;</span></span>
+<span id="L293"><span class="lineNum">     293</span>                 :<span class="tlaGNC">           2 :                 break;</span></span>
 <span id="L294"><span class="lineNum">     294</span>                 :             :             }</span>
 <span id="L295"><span class="lineNum">     295</span>                 :             :         }</span>
 <span id="L296"><span class="lineNum">     296</span>                 :             :     }</span>
-<span id="L297"><span class="lineNum">     297</span>                 :<span class="tlaGNC">          19 : }</span></span>
+<span id="L297"><span class="lineNum">     297</span>                 :<span class="tlaGNC">         139 : }</span></span>
 <span id="L298"><span class="lineNum">     298</span>                 :             : </span>
-<span id="L299"><span class="lineNum">     299</span>                 :<span class="tlaGNC">          15 : void uds_get_output(const uds_state_t *state, uds_output_t *output)</span></span>
+<span id="L299"><span class="lineNum">     299</span>                 :<span class="tlaGNC">          20 : void uds_get_output(const uds_state_t *state, uds_output_t *output)</span></span>
 <span id="L300"><span class="lineNum">     300</span>                 :             : {</span>
 <span id="L301"><span class="lineNum">     301</span>                 :             :     /* Bugs #2 and #3 fix: Boolean normalisation against SEU (single-event upset).</span>
 <span id="L302"><span class="lineNum">     302</span>                 :             :      * Each flag is specified as Boolean (0 or 1), but a bit-flip from EMI,</span>
@@ -386,14 +386,14 @@
 <span id="L308"><span class="lineNum">     308</span>                 :             :      *     (e.g. 3*0xFF = 0x2FD -&gt; 0xFD), producing a nonsensical count.</span>
 <span id="L309"><span class="lineNum">     309</span>                 :             :      * Normalising each flag via (x != 0U) ? 1U : 0U bounds the sum to [0..3]</span>
 <span id="L310"><span class="lineNum">     310</span>                 :             :      * and delivers deterministic Boolean semantics to downstream consumers. */</span>
-<span id="L311"><span class="lineNum">     311</span>         [<span class="tlaGBC" title="Branch 0 was taken 4 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 11 times"> + </span>]:<span class="tlaGNC">          15 :     uint8_t s = (state-&gt;dtc_sensor   != 0U) ? 1U : 0U;</span></span>
-<span id="L312"><span class="lineNum">     312</span>         [<span class="tlaGBC" title="Branch 0 was taken 4 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 11 times"> + </span>]:<span class="tlaGNC">          15 :     uint8_t c = (state-&gt;dtc_crc      != 0U) ? 1U : 0U;</span></span>
-<span id="L313"><span class="lineNum">     313</span>         [<span class="tlaGBC" title="Branch 0 was taken 3 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 12 times"> + </span>]:<span class="tlaGNC">          15 :     uint8_t a = (state-&gt;dtc_actuator != 0U) ? 1U : 0U;</span></span>
+<span id="L311"><span class="lineNum">     311</span>         [<span class="tlaGBC" title="Branch 0 was taken 6 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 14 times"> + </span>]:<span class="tlaGNC">          20 :     uint8_t s = (state-&gt;dtc_sensor   != 0U) ? 1U : 0U;</span></span>
+<span id="L312"><span class="lineNum">     312</span>         [<span class="tlaGBC" title="Branch 0 was taken 5 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 15 times"> + </span>]:<span class="tlaGNC">          20 :     uint8_t c = (state-&gt;dtc_crc      != 0U) ? 1U : 0U;</span></span>
+<span id="L313"><span class="lineNum">     313</span>         [<span class="tlaGBC" title="Branch 0 was taken 4 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 16 times"> + </span>]:<span class="tlaGNC">          20 :     uint8_t a = (state-&gt;dtc_actuator != 0U) ? 1U : 0U;</span></span>
 <span id="L314"><span class="lineNum">     314</span>                 :             : </span>
-<span id="L315"><span class="lineNum">     315</span>         [<span class="tlaGBC" title="Branch 0 was taken 12 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 3 times"> + </span>]:<span class="tlaGNC">          15 :     output-&gt;aeb_enabled = (state-&gt;aeb_enabled != 0U) ? 1U : 0U;</span></span>
-<span id="L316"><span class="lineNum">     316</span>                 :<span class="tlaGNC">          15 :     output-&gt;dtc_count   = (uint8_t)(s + c + a);                /* &lt;= 3 */</span></span>
-<span id="L317"><span class="lineNum">     317</span>         [<span class="tlaGBC" title="Branch 0 was taken 7 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 8 times"> + </span>]:<span class="tlaGNC">          15 :     output-&gt;fault_lamp  = (output-&gt;dtc_count &gt; 0U) ? 1U : 0U;</span></span>
-<span id="L318"><span class="lineNum">     318</span>                 :<span class="tlaGNC">          15 : }</span></span>
+<span id="L315"><span class="lineNum">     315</span>         [<span class="tlaGBC" title="Branch 0 was taken 17 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 3 times"> + </span>]:<span class="tlaGNC">          20 :     output-&gt;aeb_enabled = (state-&gt;aeb_enabled != 0U) ? 1U : 0U;</span></span>
+<span id="L316"><span class="lineNum">     316</span>                 :<span class="tlaGNC">          20 :     output-&gt;dtc_count   = (uint8_t)(s + c + a);                /* &lt;= 3 */</span></span>
+<span id="L317"><span class="lineNum">     317</span>         [<span class="tlaGBC" title="Branch 0 was taken 9 times"> + </span><span class="tlaGBC" title="Branch 1 was taken 11 times"> + </span>]:<span class="tlaGNC">          20 :     output-&gt;fault_lamp  = (output-&gt;dtc_count &gt; 0U) ? 1U : 0U;</span></span>
+<span id="L318"><span class="lineNum">     318</span>                 :<span class="tlaGNC">          20 : }</span></span>
         </pre>
               </td>
             </tr>

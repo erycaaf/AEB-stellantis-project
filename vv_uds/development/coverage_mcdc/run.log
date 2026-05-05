@@ -26,8 +26,50 @@
   [21] test_fsm_state_post_brake                          PASS
   [22] test_enable_disable_cycle                          PASS
   [23] test_dtc_clear_then_refault                        PASS
+  [24] test_read_did_ttc_inf                              PASS
+  [25] test_read_did_ttc_nan                              PASS
+  [26] test_read_did_ttc_negative                         PASS
+  [27] test_read_did_ttc_overflow                         PASS
+  [28] test_read_did_brake_pressure_inf                   PASS
+  [29] test_read_did_brake_pressure_nan                   PASS
+  [30] test_read_did_brake_pressure_negative              PASS
+  [31] test_read_did_brake_pressure_overflow              PASS
 
 ======================================
-  Results: 23 / 23 passed
+  Results: 31 / 31 passed
+======================================
+
+
+======================================
+  AEB UDS — Fault Injection Suite
+  ISO 26262-6 Tab. 11 item 1e (++ ASIL-D)
+======================================
+
+-- Category A: NaN / Infinity --
+  [fault_a1_ttc_nan]
+  [fault_a2_ttc_pos_inf]
+  [fault_a3_ttc_neg_inf]
+  [fault_a4_brake_nan]
+  [fault_a5_brake_pos_inf]
+
+-- Category B: Numeric extremes --
+  [fault_b1_ttc_negative]
+  [fault_b2_ttc_overflow]
+  [fault_b3_ttc_float_max]
+  [fault_b4_brake_negative]
+  [fault_b5_brake_overflow]
+
+-- Category C: Corrupted state (SEU) --
+  [fault_c1_aeb_enabled_corrupted]
+  [fault_c2_dtc_flags_corrupted]
+  [fault_c3_single_dtc_corrupted]
+
+-- Category D: Persistence --
+  [fault_d1_clear_while_active]
+  [fault_d2_rapid_toggle]
+  [fault_d3_unknown_sid_does_not_spoof]
+
+======================================
+  Assertions: 18 run  18 passed  0 failed
 ======================================
 

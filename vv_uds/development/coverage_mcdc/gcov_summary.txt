@@ -1,9 +1,9 @@
-Cannot open source file src/communication/aeb_uds.c
-File 'src/communication/aeb_uds.c'
-Lines executed:96.69% of 121
+File '/home/runner/work/AEB-stellantis-project/AEB-stellantis-project/src/communication/aeb_uds.c'
+Lines executed:100.00% of 121
 Branches executed:100.00% of 44
-Taken at least once:86.36% of 44
-Calls executed:80.00% of 10
+Taken at least once:100.00% of 44
+Calls executed:100.00% of 10
+Condition outcomes covered:100.00% of 36
 Creating 'aeb_uds.c.gcov'
 
-Lines executed:96.69% of 121
+Lines executed:100.00% of 121
