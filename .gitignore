@@ -48,15 +48,30 @@ reports/vv_perception/**/*.gcno
 
 # V&V intermediate artefacts — CAN
 # Only text/XML/CSV/gcov evidence under reports/vv_can/ is committed.
+# Logs, binaries, HTML bundles and coverage intermediates are regenerated
+# by `make mcdc-can / html-can` and published to gh-pages by publish-pages.
 reports/vv_can/**/test_can*
+reports/vv_can/**/test_can_fault*
+reports/vv_can/**/test_can_struct*
 reports/vv_can/**/*.gcda
 reports/vv_can/**/*.gcno
-
-# V&V HTML bundles — CAN — regenerated locally, never committed
+reports/vv_can/coverage_mcdc/report.*
+reports/vv_can/coverage_mcdc/*.info
+reports/vv_can/coverage_mcdc/*.png
+reports/vv_can/coverage_mcdc/*.css
+reports/vv_can/coverage_mcdc/cmd_line
+reports/vv_can/coverage_mcdc/updown.png
+reports/vv_can/coverage_mcdc/html/
+reports/vv_can/coverage_mcdc/index*.html
+reports/vv_can/coverage_mcdc/communication/
 reports/vv_can/coverage_html/
 reports/vv_can/misra_html/
 reports/vv_can/memory_html/
 reports/vv_can/fault_html/
+reports/vv_can/fault_injection/*.log
+reports/vv_can/memory_safety/*.log
+reports/vv_can/misra/cppcheck_can.xml
+reports/vv_can/misra/run.log
 
 # Consolidated V&V reports live in the team docs area, not in the repo
 reports/vv_uds/*.tex
