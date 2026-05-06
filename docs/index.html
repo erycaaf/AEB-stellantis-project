@@ -147,11 +147,54 @@
 
 </div>
 
+<h2>CAN Interface</h2>
+<p class="module-meta">
+  ASIL-D V&amp;V stack: MC/DC coverage, memory safety (Valgrind + ASan + UBSan),
+  MISRA C:2012 conformance, fault injection.
+  <a href="https://github.com/erycaaf/AEB-stellantis-project/blob/development/src/communication/aeb_can.c">source</a>
+<h2>PID + Alert</h2>
+<p class="module-meta">
+  ASIL-D V&amp;V stack: MC/DC coverage, memory safety (Valgrind + ASan + UBSan),
+  MISRA C:2012 conformance, fault injection. Covers brake pressure PID controller
+  and multi-level driver alert system.
+  <a href="https://github.com/erycaaf/AEB-stellantis-project/blob/development/src/execution/aeb_pid.c">PID source</a> ·
+  <a href="https://github.com/erycaaf/AEB-stellantis-project/blob/development/src/execution/aeb_alert.c">Alert source</a>
+</p>
+<div class="grid">
+
+  <div class="card">
+    <h3><span class="branch-tag branch-main">main</span></h3>
+    <a href="vv_can/main/coverage_html/">MC/DC coverage</a>
+    <a href="vv_can/main/misra_html/">MISRA C:2012</a>
+    <a href="vv_can/main/memory_html/">Memory safety</a>
+    <a href="vv_can/main/fault_html/">Fault injection</a>
+    <a href="vv_pid_alert/main/coverage_html/">MC/DC coverage</a>
+    <a href="vv_pid_alert/main/misra_html/">MISRA C:2012</a>
+    <a href="vv_pid_alert/main/memory_html/">Memory safety</a>
+    <a href="vv_pid_alert/main/fault_html/">Fault injection</a>
+  </div>
+
+  <div class="card">
+    <h3><span class="branch-tag branch-dev">development</span></h3>
+    <a href="vv_can/development/coverage_html/">MC/DC coverage</a>
+    <a href="vv_can/development/misra_html/">MISRA C:2012</a>
+    <a href="vv_can/development/memory_html/">Memory safety</a>
+    <a href="vv_can/development/fault_html/">Fault injection</a>
+    <a href="vv_pid_alert/development/coverage_html/">MC/DC coverage</a>
+    <a href="vv_pid_alert/development/misra_html/">MISRA C:2012</a>
+    <a href="vv_pid_alert/development/memory_html/">Memory safety</a>
+    <a href="vv_pid_alert/development/fault_html/">Fault injection</a>
+  </div>
+
+</div>
+
 <h2>Other modules</h2>
 <div class="placeholder">
-  Per-module workflows for Perception, PID + Alert and CAN are in
+  Per-module workflows for Perception and PID + Alert are in
   progress. Their reports will appear here once the corresponding
   <code>vv-&lt;module&gt;.yml</code> workflow is merged into
+  The Perception and CAN Interface V&amp;V workflows are in progress. Their reports
+  will appear here once the corresponding workflows are merged into
   <code>development</code>.
 </div>
 

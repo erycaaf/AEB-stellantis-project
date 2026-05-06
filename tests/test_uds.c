@@ -28,6 +28,7 @@
 #include "aeb_uds.h"
 #include "aeb_types.h"
 #include "aeb_config.h"
+#include <math.h>
 
 /* ===================================================================
  * Test infrastructure
@@ -472,6 +473,144 @@ static void test_dtc_clear_then_refault(void)
     ASSERT_EQ(out.fault_lamp, 1U, "Lamp ON after re-fault");
 }
 
+/* ================================================================
+ * TEST: Read DID TTC with Infinity value (covers line 87: !isfinite)
+ * ================================================================ */
+static void test_read_did_ttc_inf(void)
+{
+    reset();
+    ttc.ttc = __builtin_inff();
+    req.sid = UDS_SID_READ_DID;
+    req.did_high = 0xF1U;
+    req.did_low = 0x00U;
+
+    uds_process_request(&st, &req, &resp, &fsm, &pid, &ttc);
+
+    /* Should return negative response (NRC 0x31 - Request Out Of Range) */
+    ASSERT_EQ(resp.response_sid, UDS_SID_NEGATIVE_RESP, "SID should be 0x7F");
+    ASSERT_EQ(resp.did_low_resp, UDS_NRC_REQUEST_OOR, "NRC should be 0x31");
+}
+
+/* ================================================================
+ * TEST: Read DID TTC with NaN value (covers line 87: !isfinite)
+ * ================================================================ */
+static void test_read_did_ttc_nan(void)
+{
+    reset();
+    ttc.ttc = __builtin_nanf("");
+    req.sid = UDS_SID_READ_DID;
+    req.did_high = 0xF1U;
+    req.did_low = 0x00U;
+
+    uds_process_request(&st, &req, &resp, &fsm, &pid, &ttc);
+
+    ASSERT_EQ(resp.response_sid, UDS_SID_NEGATIVE_RESP, "SID should be 0x7F");
+    ASSERT_EQ(resp.did_low_resp, UDS_NRC_REQUEST_OOR, "NRC should be 0x31");
+}
+
+/* ================================================================
+ * TEST: Read DID TTC with negative value (covers line 87: ttc < 0.0f)
+ * ================================================================ */
+static void test_read_did_ttc_negative(void)
+{
+    reset();
+    ttc.ttc = -5.0f;
+    req.sid = UDS_SID_READ_DID;
+    req.did_high = 0xF1U;
+    req.did_low = 0x00U;
+
+    uds_process_request(&st, &req, &resp, &fsm, &pid, &ttc);
+
+    ASSERT_EQ(resp.response_sid, UDS_SID_NEGATIVE_RESP, "SID should be 0x7F");
+    ASSERT_EQ(resp.did_low_resp, UDS_NRC_REQUEST_OOR, "NRC should be 0x31");
+}
+
+/* ================================================================
+ * TEST: Read DID TTC with value above max (covers line 87: ttc > 655.35f)
+ * ================================================================ */
+static void test_read_did_ttc_overflow(void)
+{
+    reset();
+    ttc.ttc = 1000.0f;
+    req.sid = UDS_SID_READ_DID;
+    req.did_high = 0xF1U;
+    req.did_low = 0x00U;
+
+    uds_process_request(&st, &req, &resp, &fsm, &pid, &ttc);
+
+    ASSERT_EQ(resp.response_sid, UDS_SID_NEGATIVE_RESP, "SID should be 0x7F");
+    ASSERT_EQ(resp.did_low_resp, UDS_NRC_REQUEST_OOR, "NRC should be 0x31");
+}
+
+/* ================================================================
+ * TEST: Read DID Brake Pressure with Infinity value (covers line 121: !isfinite)
+ * ================================================================ */
+static void test_read_did_brake_pressure_inf(void)
+{
+    reset();
+    pid.brake_pct = __builtin_inff();
+    req.sid = UDS_SID_READ_DID;
+    req.did_high = 0xF1U;
+    req.did_low = 0x02U;
+
+    uds_process_request(&st, &req, &resp, &fsm, &pid, &ttc);
+
+    ASSERT_EQ(resp.response_sid, UDS_SID_NEGATIVE_RESP, "SID should be 0x7F");
+    ASSERT_EQ(resp.did_low_resp, UDS_NRC_REQUEST_OOR, "NRC should be 0x31");
+}
+
+/* ================================================================
+ * TEST: Read DID Brake Pressure with NaN value (covers line 121: !isfinite)
+ * ================================================================ */
+static void test_read_did_brake_pressure_nan(void)
+{
+    reset();
+    pid.brake_pct = __builtin_nanf("");
+    req.sid = UDS_SID_READ_DID;
+    req.did_high = 0xF1U;
+    req.did_low = 0x02U;
+
+    uds_process_request(&st, &req, &resp, &fsm, &pid, &ttc);
+
+    ASSERT_EQ(resp.response_sid, UDS_SID_NEGATIVE_RESP, "SID should be 0x7F");
+    ASSERT_EQ(resp.did_low_resp, UDS_NRC_REQUEST_OOR, "NRC should be 0x31");
+}
+
+/* ================================================================
+ * TEST: Read DID Brake Pressure with negative value (line 121: brake_pct < 0.0f)
+ * ================================================================ */
+static void test_read_did_brake_pressure_negative(void)
+{
+    reset();
+    pid.brake_pct = -10.0f;
+    req.sid = UDS_SID_READ_DID;
+    req.did_high = 0xF1U;
+    req.did_low = 0x02U;
+
+    uds_process_request(&st, &req, &resp, &fsm, &pid, &ttc);
+
+    ASSERT_EQ(resp.response_sid, UDS_SID_NEGATIVE_RESP, "SID should be 0x7F");
+    ASSERT_EQ(resp.did_low_resp, UDS_NRC_REQUEST_OOR, "NRC should be 0x31");
+}
+/* ================================================================
+ * TEST: Read DID Brake Pressure with value above max (covers line 121: brake_pct > 6553.5f)
+ * condition 2 not covered (true)
+ * ================================================================ */
+static void test_read_did_brake_pressure_overflow(void)
+{
+    reset();
+    pid.brake_pct = 10000.0f;  /* > 6553.5, should trigger overflow */
+    req.sid = UDS_SID_READ_DID;
+    req.did_high = 0xF1U;
+    req.did_low = 0x02U;
+
+    uds_process_request(&st, &req, &resp, &fsm, &pid, &ttc);
+
+    /* Should return negative response (NRC 0x31 - Request Out Of Range) */
+    ASSERT_EQ(resp.response_sid, UDS_SID_NEGATIVE_RESP, "SID should be 0x7F");
+    ASSERT_EQ(resp.did_low_resp, UDS_NRC_REQUEST_OOR, "NRC should be 0x31");
+}
+
 /* ===================================================================
  * Main — test runner
  * =================================================================== */
@@ -518,6 +657,18 @@ int main(void)
     RUN_TEST(test_fsm_state_post_brake);
     RUN_TEST(test_enable_disable_cycle);
     RUN_TEST(test_dtc_clear_then_refault);
+
+    /* Edge cases for TTC DID (line 87) */
+    RUN_TEST(test_read_did_ttc_inf);
+    RUN_TEST(test_read_did_ttc_nan);
+    RUN_TEST(test_read_did_ttc_negative);
+    RUN_TEST(test_read_did_ttc_overflow);
+    
+    /* Edge cases for Brake Pressure DID (line 121) */
+    RUN_TEST(test_read_did_brake_pressure_inf);
+    RUN_TEST(test_read_did_brake_pressure_nan);
+    RUN_TEST(test_read_did_brake_pressure_negative);
+    RUN_TEST(test_read_did_brake_pressure_overflow);
 
     printf("\n======================================\n");
     printf("  Results: %d / %d passed\n",
