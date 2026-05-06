@@ -1,0 +1,72 @@
+##############################################################################
+# Dockerfile — Zephyr AEB ECU (native_sim + TCP CAN)
+#
+# Multi-stage so CI can validate the setup (apt + west update + COPY paths
+# + line-ending normalization) without paying the ~3-5 min cost of the
+# Zephyr `west build` step:
+#
+#   --target=zephyr-setup → stages 1 + 2 (apt + west init/update + sources)
+#   default               → stage 3 (full image with built ECU binary)
+#
+# Sources are COPYed from the repo-root build context (NOT a remote
+# `git clone` — the image must be reproducible against the exact code
+# under review in this PR; cloning a mutable branch would silently
+# produce a different ECU binary on rebuild).
+#
+# Expects to be built with `context: ..` from sil/docker-compose.yml so
+# `src/`, `include/`, `stubs/`, and `sil/zephyr_aeb/` are all visible
+# under the build context root.
+##############################################################################
+
+# ─── Stage 1 — base image with extra apt deps ────────────────────────────
+FROM ghcr.io/zephyrproject-rtos/ci:v0.26.13 AS base
+
+ENV DEBIAN_FRONTEND=noninteractive
+SHELL ["/bin/bash", "-c"]
+
+RUN apt-get update && apt-get install -y \
+    can-utils \
+    iproute2 \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# ─── Stage 2 — Zephyr SDK + AEB sources, but no `west build` ─────────────
+# CI's heavier gate (`docker build --target=zephyr-setup`) stops here:
+# COPY paths, apt packages, west init/update, pip requirements are all
+# exercised; only the Zephyr application compile is skipped.
+FROM base AS zephyr-setup
+
+WORKDIR /opt/zephyrproject
+RUN west init -m https://github.com/zephyrproject-rtos/zephyr --mr v3.6.0 && \
+    west update --narrow -o=--depth=1
+
+ENV ZEPHYR_BASE=/opt/zephyrproject/zephyr
+
+RUN pip3 install -r ${ZEPHYR_BASE}/scripts/requirements.txt
+
+WORKDIR /app
+COPY sil/zephyr_aeb /app/zephyr_aeb
+
+# Mirror the layout the Zephyr CMakeLists.txt expects under
+# /app/zephyr_aeb/repo so the include paths and source globs in the
+# CMake file keep working.
+COPY src     /app/zephyr_aeb/repo/src
+COPY include /app/zephyr_aeb/repo/include
+COPY stubs   /app/zephyr_aeb/repo/stubs
+
+# Normalize line endings (Windows CRLF would break shebangs and
+# Zephyr's CMake string parsing in some places).
+RUN find /app/zephyr_aeb -type f \
+        \( -name '*.py' -o -name '*.sh' -o -name '*.c' -o -name '*.h' \) \
+        -exec sed -i 's/\r$//' {} +
+
+# ─── Stage 3 — actually compile the ECU binary ───────────────────────────
+FROM zephyr-setup AS build
+
+RUN west build /app/zephyr_aeb \
+        -b native_sim \
+        -d /app/build \
+    2>&1 || { echo "=== BUILD FAILED ==="; \
+              cat /app/build/CMakeFiles/CMakeError.log 2>/dev/null | tail -80; \
+              cat /app/build/CMakeFiles/CMakeOutput.log 2>/dev/null | tail -20; \
+              exit 1; }

@@ -1,0 +1,166 @@
+##############################################################################
+# AEB SIL Validation — Docker Compose
+#
+# Architecture:
+#   canbus    — TCP CAN bus relay server (:29536)
+#   gazebo    — Gazebo + perception + scenario controller + noVNC (:6080)
+#   aeb-ecu   — Zephyr native_sim (AEB C code, connects to canbus)
+#   api       — FastAPI scenario control (:8000)
+#   dashboard — nginx web UI (:3000)
+#
+# Data flow (all via TCP CAN bus on port 29536):
+#   perception → canbus → Zephyr ECU → canbus → scenario_controller
+#
+# Usage:
+#   docker compose up --build
+#   Open http://localhost:3000
+##############################################################################
+
+services:
+
+  # ── TCP CAN Bus Server ──────────────────────────────────────────────────
+  canbus:
+    image: python:3.11-slim
+    container_name: aeb-canbus
+    volumes:
+      - ./docker/canbus:/app
+    command: python3 /app/can_tcp_server.py 29536
+    networks:
+      aeb-net:
+        ipv4_address: 10.99.0.10
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import socket; s=socket.socket(); s.connect(('127.0.0.1',29536)); s.close()"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  # ── Gazebo + Test Harness ───────────────────────────────────────────────
+  gazebo:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.gazebo
+    container_name: aeb-gazebo
+    environment:
+      - DISPLAY=:1
+      - ROS_DOMAIN_ID=0
+      - CAN_TCP_HOST=10.99.0.10
+      - CAN_TCP_PORT=29536
+    networks:
+      - aeb-net
+    ports:
+      - "6080:6080"
+    volumes:
+      - live-data:/tmp
+    depends_on:
+      canbus:
+        condition: service_healthy
+    command:
+      - bash
+      - -c
+      - |
+        source /opt/ros/humble/setup.bash
+        source /ws/install/setup.bash
+
+        # Suppress ALSA errors (no sound device in container)
+        export DISPLAY=:1
+        export ALSA_CARD=none
+        export SDL_AUDIODRIVER=dummy
+
+        # VNC setup — clean stale X locks left in the persistent /tmp volume
+        # by previous container runs (Xvfb exits silently if .X1-lock exists).
+        rm -f /tmp/.X*-lock
+        rm -rf /tmp/.X11-unix
+        Xvfb :1 -screen 0 1280x720x24 &
+        sleep 2
+        x11vnc -display :1 -forever -nopw -rfbport 5900 -shared -bg
+        websockify --web /usr/share/novnc 6080 localhost:5900 &
+        sleep 1
+
+        echo "=== Launching AEB scenario ==="
+        exec ros2 launch aeb_gazebo aeb_scenario.launch.py scenario:=ccrs_40 gui:=true
+    healthcheck:
+      test: ["CMD", "bash", "-c", "source /opt/ros/humble/setup.bash && source /ws/install/setup.bash && ros2 topic list"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  # ── Zephyr AEB ECU ─────────────────────────────────────────────────────
+  aeb-ecu:
+    build:
+      # Build context is the repo root so the Dockerfile can COPY the AEB
+      # C sources directly from src/, include/, stubs/ — the image is then
+      # bound to whatever code is under review in this PR, not to a
+      # mutable upstream branch.
+      context: ..
+      dockerfile: sil/docker/Dockerfile.zephyr
+    container_name: aeb-ecu
+    environment:
+      - CAN_TCP_HOST=10.99.0.10
+      - CAN_TCP_PORT=29536
+    networks:
+      - aeb-net
+    depends_on:
+      canbus:
+        condition: service_healthy
+      gazebo:
+        condition: service_healthy
+    command:
+      - bash
+      - -c
+      - |
+        echo "Starting Zephyr AEB ECU (TCP CAN on $${CAN_TCP_HOST:-10.99.0.10}:$${CAN_TCP_PORT:-29536})"
+        exec /app/build/zephyr/zephyr.exe
+
+  # ── Scenario Control API ────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    container_name: aeb-api
+    environment:
+      - ROS_DOMAIN_ID=0
+    volumes:
+      - ./aeb_gazebo:/workspace/aeb_gazebo
+      - ./docker/api:/workspace/api
+      - live-data:/tmp
+      # Read-write socket mount so /scenarios/start can restart aeb-ecu —
+      # the Zephyr perception module's ROC-fault watchdog otherwise latches
+      # forever once a scenario teleport jumps the target distance > 10 m
+      # (DIST_ROC_LIMIT). Restarting the ECU container is the only way to
+      # clear `prev_d` / `prev_vr` since perception_init() runs only at
+      # power-on. Trade-off: the api container has docker-daemon access,
+      # which is fine on a dev SIL host but should NOT be replicated in
+      # any deployed environment.
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8000:8000"
+    depends_on:
+      gazebo:
+        condition: service_healthy
+    networks:
+      - aeb-net
+
+  # ── Web Dashboard ───────────────────────────────────────────────────────
+  dashboard:
+    image: nginx:alpine
+    container_name: aeb-dashboard
+    volumes:
+      - ./docker/dashboard:/usr/share/nginx/html:ro
+      - ./docker/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "3000:80"
+    depends_on:
+      - gazebo
+      - api
+    networks:
+      - aeb-net
+
+volumes:
+  live-data:
+
+networks:
+  aeb-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.99.0.0/24

@@ -1,0 +1,28 @@
+##############################################################################
+# Dockerfile — Scenario Control REST API
+##############################################################################
+FROM osrf/ros:humble-desktop
+
+ENV DEBIAN_FRONTEND=noninteractive
+SHELL ["/bin/bash", "-c"]
+
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    ros-humble-gazebo-ros-pkgs \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install fastapi uvicorn pyyaml docker
+
+WORKDIR /workspace
+
+COPY aeb_gazebo /workspace/aeb_gazebo
+COPY docker/api /workspace/api
+
+# Normalize line endings (Windows CRLF would break the FastAPI entrypoint)
+RUN find /workspace -type f \( -name '*.py' -o -name '*.sh' \) \
+        -exec sed -i 's/\r$//' {} +
+
+EXPOSE 8000
+
+# Source ROS inline — no entrypoint script (avoids CRLF issues on Windows)
+CMD ["bash", "-c", "source /opt/ros/humble/setup.bash && exec uvicorn api.scenario_api:app --host 0.0.0.0 --port 8000"]

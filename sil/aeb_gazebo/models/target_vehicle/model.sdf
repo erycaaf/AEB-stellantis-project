@@ -1,0 +1,102 @@
+<?xml version="1.0" ?>
+<sdf version="1.6">
+  <model name="target_vehicle">
+    <static>false</static>
+    <pose>100 -1.85 0 0 0 0</pose>
+
+    <link name="chassis">
+      <pose>0 0 0.5 0 0 0</pose>
+      <inertial>
+        <mass>2000.0</mass>
+        <inertia>
+          <ixx>700.0</ixx><ixy>0</ixy><ixz>0</ixz>
+          <iyy>2000.0</iyy><iyz>0</iyz>
+          <izz>2000.0</izz>
+        </inertia>
+      </inertial>
+
+      <!-- Visual: use SUV mesh from gazebo_models -->
+      <visual name="body_visual">
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <uri>model://suv/meshes/suv.obj</uri>
+            <scale>1 1 1</scale>
+          </mesh>
+        </geometry>
+      </visual>
+
+      <!-- Collision: simplified box -->
+      <collision name="body_collision">
+        <pose>0 0 0.2 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>4.8 2.0 1.8</size>
+          </box>
+        </geometry>
+      </collision>
+
+      <!-- Rear reflector (visual indicator for lidar detection) -->
+      <visual name="rear_reflector">
+        <pose>-2.4 0 0.3 0 0 0</pose>
+        <geometry>
+          <box><size>0.05 1.6 0.3</size></box>
+        </geometry>
+        <material>
+          <ambient>1.0 0.0 0.0 1</ambient>
+          <diffuse>1.0 0.0 0.0 1</diffuse>
+        </material>
+      </visual>
+    </link>
+
+    <!-- Wheels (visual only for target) -->
+    <link name="fl_wheel">
+      <pose>1.5 0.9 0.35 -1.5708 0 0</pose>
+      <inertial><mass>15.0</mass><inertia><ixx>0.5</ixx><ixy>0</ixy><ixz>0</ixz><iyy>0.5</iyy><iyz>0</iyz><izz>0.9</izz></inertia></inertial>
+      <visual name="visual"><geometry><cylinder><radius>0.35</radius><length>0.22</length></cylinder></geometry>
+        <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material></visual>
+      <collision name="collision"><geometry><cylinder><radius>0.35</radius><length>0.22</length></cylinder></geometry></collision>
+    </link>
+    <link name="fr_wheel">
+      <pose>1.5 -0.9 0.35 -1.5708 0 0</pose>
+      <inertial><mass>15.0</mass><inertia><ixx>0.5</ixx><ixy>0</ixy><ixz>0</ixz><iyy>0.5</iyy><iyz>0</iyz><izz>0.9</izz></inertia></inertial>
+      <visual name="visual"><geometry><cylinder><radius>0.35</radius><length>0.22</length></cylinder></geometry>
+        <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material></visual>
+      <collision name="collision"><geometry><cylinder><radius>0.35</radius><length>0.22</length></cylinder></geometry></collision>
+    </link>
+    <link name="rl_wheel">
+      <pose>-1.5 0.9 0.35 -1.5708 0 0</pose>
+      <inertial><mass>15.0</mass><inertia><ixx>0.5</ixx><ixy>0</ixy><ixz>0</ixz><iyy>0.5</iyy><iyz>0</iyz><izz>0.9</izz></inertia></inertial>
+      <visual name="visual"><geometry><cylinder><radius>0.35</radius><length>0.22</length></cylinder></geometry>
+        <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material></visual>
+      <collision name="collision"><geometry><cylinder><radius>0.35</radius><length>0.22</length></cylinder></geometry></collision>
+    </link>
+    <link name="rr_wheel">
+      <pose>-1.5 -0.9 0.35 -1.5708 0 0</pose>
+      <inertial><mass>15.0</mass><inertia><ixx>0.5</ixx><ixy>0</ixy><ixz>0</ixz><iyy>0.5</iyy><iyz>0</iyz><izz>0.9</izz></inertia></inertial>
+      <visual name="visual"><geometry><cylinder><radius>0.35</radius><length>0.22</length></cylinder></geometry>
+        <material><ambient>0.1 0.1 0.1 1</ambient><diffuse>0.1 0.1 0.1 1</diffuse></material></visual>
+      <collision name="collision"><geometry><cylinder><radius>0.35</radius><length>0.22</length></cylinder></geometry></collision>
+    </link>
+
+    <joint name="fl_joint" type="revolute"><parent>chassis</parent><child>fl_wheel</child><axis><xyz>0 0 1</xyz></axis></joint>
+    <joint name="fr_joint" type="revolute"><parent>chassis</parent><child>fr_wheel</child><axis><xyz>0 0 1</xyz></axis></joint>
+    <joint name="rl_joint" type="revolute"><parent>chassis</parent><child>rl_wheel</child><axis><xyz>0 0 1</xyz></axis></joint>
+    <joint name="rr_joint" type="revolute"><parent>chassis</parent><child>rr_wheel</child><axis><xyz>0 0 1</xyz></axis></joint>
+
+    <!-- Planar move plugin: controlled by scenario_controller via cmd_vel -->
+    <plugin name="object_controller" filename="libgazebo_ros_planar_move.so">
+      <ros>
+        <namespace>/aeb/target</namespace>
+      </ros>
+      <command_topic>cmd_vel</command_topic>
+      <odometry_topic>odom</odometry_topic>
+      <odometry_frame>odom_target</odometry_frame>
+      <robot_base_frame>target_vehicle</robot_base_frame>
+      <odometry_rate>100.0</odometry_rate>
+      <publish_odom>true</publish_odom>
+      <publish_odom_tf>true</publish_odom_tf>
+    </plugin>
+
+  </model>
+</sdf>

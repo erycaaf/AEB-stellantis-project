@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AEB Simulation</title>
+    <style>
+        /* ═════════════════════════════════════════════════════════════════
+           Palette: deep navy with cyan / orange / red accents.
+           Mirrors the QML dashboard from RemoteFlasher (CircularGauge,
+           ArcGauge, InfoCard) — same component vocabulary, browser idiom.
+           ═════════════════════════════════════════════════════════════════ */
+        :root {
+            --bg-deep:     #0a0a18;
+            --bg-card:     #0c0c20;
+            --bg-card-2:   #12122a;
+            --bg-track:    #151530;
+
+            --border:      #1a3050;
+            --border-2:    #1a1a3a;
+            --border-soft: #1a3a5a;
+
+            --accent:      #00e5ff;
+            --accent-soft: rgba(0, 229, 255, 0.15);
+            --orange:      #f39c12;
+            --green:       #2ecc71;
+            --red:         #e74c3c;
+            --red-strong:  #ff3333;
+            --purple:      #9b59b6;
+
+            --text-bright: #ffffff;
+            --text-mid:    #99aabb;
+            --text-dim:    #778899;
+            --text-faint:  #556677;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-deep);
+            color: var(--text-mid);
+            overflow: hidden;
+        }
+
+        /* ── Layout: simulation top, dashboard bottom ─────── */
+        .layout {
+            display: grid;
+            grid-template-rows: 1fr auto;
+            height: 100vh;
+        }
+
+        /* ── Gazebo 3D pane ───────────────────────────────── */
+        .sim-view {
+            position: relative;
+            background: #000;
+        }
+        .sim-view iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+
+        /* ── Floating scenario controls ───────────────────── */
+        .scenario-bar {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 10, 24, 0.92);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 8px 14px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            z-index: 10;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+        }
+        .scenario-bar select {
+            padding: 6px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-soft);
+            background: var(--bg-card-2);
+            color: var(--text-bright);
+            font-size: 12px;
+            font-family: inherit;
+        }
+        .scenario-bar select:focus { outline: 1px solid var(--accent); }
+
+        .btn {
+            padding: 6px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: inherit;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: opacity 0.15s, transform 0.05s;
+        }
+        .btn:hover  { opacity: 0.85; }
+        .btn:active { transform: translateY(1px); }
+        .btn-go    { background: var(--green);  color: #06281a; }
+        .btn-halt  { background: var(--red);    color: #fff; }
+        .btn-redo  { background: var(--orange); color: #2a1a05; }
+
+        .scenario-bar .info {
+            font-size: 11px;
+            color: var(--text-dim);
+            max-width: 220px;
+            letter-spacing: 0.3px;
+        }
+
+        .status-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: var(--text-faint);
+            display: inline-block;
+        }
+        .status-dot.running  { background: var(--green); box-shadow: 0 0 8px var(--green); }
+        .status-dot.stopped  { background: var(--red); }
+        .status-dot.starting { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+
+        /* ── Bottom dashboard strip ───────────────────────── */
+        .dashboard {
+            background: linear-gradient(180deg, #0d0d22 0%, #060614 100%);
+            border-top: 1px solid var(--border);
+            height: 240px;
+            display: grid;
+            grid-template-columns: 240px 1fr 110px 70px;
+            gap: 16px;
+            align-items: center;
+            padding: 16px 24px;
+        }
+
+        /* ── Speedometer (left) ───────────────────────────── */
+        .speedo-wrap {
+            background: var(--bg-card);
+            border: 1px solid var(--border-2);
+            border-radius: 14px;
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .speedo-wrap::before {
+            content: "";
+            position: absolute; top: 0; left: 12px; right: 12px;
+            height: 2px;
+            border-radius: 2px;
+            background: var(--accent);
+            opacity: 0.55;
+        }
+        .speedo-wrap canvas { display: block; }
+
+        /* ── Center cluster ───────────────────────────────── */
+        .cluster {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            height: 100%;
+            padding: 4px 0;
+        }
+
+        /* FSM pill row — each cell is a card with its own accent */
+        .fsm-row {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            height: 44px;
+        }
+        .fsm-cell {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-card-2);
+            border: 1px solid var(--border-2);
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--text-faint);
+            transition: all 0.25s ease;
+        }
+        .fsm-cell::before {
+            content: "";
+            position: absolute; top: 1px; left: 6px; right: 6px;
+            height: 2px;
+            border-radius: 1px;
+            background: currentColor;
+            opacity: 0.0;
+            transition: opacity 0.25s;
+        }
+        .fsm-cell.on::before { opacity: 0.65; }
+        .fsm-cell.on {
+            background: var(--bg-card);
+            color: var(--text-bright);
+            border-color: transparent;
+            box-shadow: 0 0 16px var(--cell-glow, rgba(0, 229, 255, 0.35));
+        }
+        .fsm-off  { --cell-color: #6c757d; --cell-glow: rgba(108,117,125,0.35); }
+        .fsm-stby { --cell-color: var(--green); --cell-glow: rgba(46,204,113,0.4); }
+        .fsm-warn { --cell-color: #ffc107; --cell-glow: rgba(255,193,7,0.45); }
+        .fsm-l1   { --cell-color: var(--orange); --cell-glow: rgba(243,156,18,0.5); }
+        .fsm-l2   { --cell-color: #ff7043; --cell-glow: rgba(255,112,67,0.55); }
+        .fsm-l3   { --cell-color: var(--red); --cell-glow: rgba(231,76,60,0.6); }
+        .fsm-post { --cell-color: var(--purple); --cell-glow: rgba(155,89,182,0.45); }
+        .fsm-cell.on { color: var(--cell-color); }
+        .fsm-cell.on .fsm-name { color: var(--text-bright); }
+
+        /* TTC bar */
+        .ttc-card {
+            position: relative;
+            background: var(--bg-card-2);
+            border: 1px solid var(--border-soft);
+            border-radius: 8px;
+            height: 50px;
+            overflow: hidden;
+        }
+        .ttc-card::before {
+            content: "";
+            position: absolute; top: 1px; left: 8px; right: 8px;
+            height: 2px;
+            border-radius: 1px;
+            background: var(--accent);
+            opacity: 0.55;
+        }
+        .ttc-fill {
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            transition: width 0.18s, background 0.3s;
+            opacity: 0.18;
+        }
+        .ttc-text {
+            position: relative; z-index: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 100%;
+            padding: 0 16px;
+        }
+        .ttc-text .lbl {
+            font-size: 10px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1.4px;
+            font-weight: 600;
+        }
+        .ttc-text .val {
+            font-size: 22px;
+            font-weight: 700;
+            font-family: 'Segoe UI', sans-serif;
+            color: var(--accent);
+        }
+
+        /* Distance + target row */
+        .info-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .info-card {
+            position: relative;
+            background: var(--bg-card-2);
+            border: 1px solid var(--border-soft);
+            border-radius: 8px;
+            height: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .info-card::before {
+            content: "";
+            position: absolute; top: 1px; left: 8px; right: 8px;
+            height: 2px;
+            border-radius: 1px;
+            opacity: 0.6;
+        }
+        .info-dist::before { background: var(--accent); }
+        .info-tgt::before  { background: var(--purple); }
+        .info-card .val {
+            font-size: 26px;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .info-card .lbl {
+            font-size: 10px;
+            color: var(--text-faint);
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-top: 4px;
+            font-weight: 600;
+        }
+        .info-dist .val { color: var(--accent); }
+        .info-tgt  .val { color: var(--purple); }
+
+        /* ── Alert lamps column ───────────────────────────── */
+        .alerts {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            height: 100%;
+            justify-content: center;
+        }
+        .alert-lamp {
+            position: relative;
+            width: 100%;
+            height: 90px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-card-2);
+            border: 1px solid var(--border-2);
+            transition: all 0.25s ease;
+        }
+        .alert-lamp::before {
+            content: "";
+            position: absolute; top: 1px; left: 8px; right: 8px;
+            height: 2px;
+            border-radius: 1px;
+            opacity: 0.0;
+            transition: opacity 0.25s;
+        }
+        .alert-lamp .icon {
+            font-size: 26px;
+            color: var(--text-faint);
+            transition: color 0.25s;
+        }
+        .alert-lamp .lbl {
+            font-size: 9px;
+            color: var(--text-faint);
+            text-transform: uppercase;
+            letter-spacing: 1.3px;
+            margin-top: 6px;
+            font-weight: 700;
+            transition: color 0.25s;
+        }
+        .alert-lamp.on-vis {
+            background: rgba(255, 193, 7, 0.12);
+            border-color: rgba(255, 193, 7, 0.55);
+            box-shadow: 0 0 22px rgba(255, 193, 7, 0.4);
+        }
+        .alert-lamp.on-vis .icon { color: #ffd54f; }
+        .alert-lamp.on-vis .lbl  { color: #ffd54f; }
+        .alert-lamp.on-vis::before { background: #ffd54f; opacity: 0.7; }
+
+        .alert-lamp.on-aud {
+            background: rgba(231, 76, 60, 0.14);
+            border-color: rgba(231, 76, 60, 0.6);
+            box-shadow: 0 0 22px rgba(231, 76, 60, 0.45);
+        }
+        .alert-lamp.on-aud .icon { color: #ff6b5b; }
+        .alert-lamp.on-aud .lbl  { color: #ff6b5b; }
+        .alert-lamp.on-aud::before { background: #ff6b5b; opacity: 0.7; }
+
+        /* ── Vertical brake gauge ─────────────────────────── */
+        .brake-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            height: 100%;
+            gap: 6px;
+            padding: 4px 0;
+        }
+        .brake-lbl {
+            font-size: 10px;
+            color: var(--text-faint);
+            text-transform: uppercase;
+            letter-spacing: 1.4px;
+            font-weight: 700;
+        }
+        .brake-bar-outer {
+            width: 36px;
+            flex: 1;
+            background: var(--bg-track);
+            border: 1px solid var(--border-2);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.4);
+        }
+        .brake-bar-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(0deg, var(--orange) 0%, #ffb74d 100%);
+            transition: height 0.18s, background 0.25s, box-shadow 0.25s;
+            box-shadow: 0 0 12px var(--orange);
+        }
+        .brake-bar-fill.danger {
+            background: linear-gradient(0deg, var(--red) 0%, #ff7b7b 100%);
+            box-shadow: 0 0 16px var(--red);
+        }
+        .brake-pct {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--orange);
+            font-family: 'Segoe UI', sans-serif;
+        }
+        .brake-pct.danger { color: var(--red); }
+
+        /* ── Scenario result overlay ──────────────────────── */
+        .result-overlay {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 28px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.6px;
+            z-index: 20;
+            display: none;
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.5);
+            border: 1px solid;
+        }
+        .result-pass {
+            background: rgba(46, 204, 113, 0.18);
+            color: var(--green);
+            border-color: rgba(46, 204, 113, 0.55);
+            display: block;
+        }
+        .result-fail {
+            background: rgba(231, 76, 60, 0.2);
+            color: var(--red);
+            border-color: rgba(231, 76, 60, 0.6);
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<div class="layout">
+
+    <!-- ── Top: Gazebo 3D ──────────────────────────────────────────────── -->
+    <div class="sim-view">
+        <iframe id="gazeboFrame" src="/novnc/vnc_lite.html?autoconnect=true&resize=remote&host=localhost&port=6080"></iframe>
+
+        <!-- Floating scenario controls -->
+        <div class="scenario-bar">
+            <span class="status-dot" id="statusDot"></span>
+            <select id="scenarioSelect"><option>Loading…</option></select>
+            <button class="btn btn-go"   onclick="startScenario()">Start</button>
+            <button class="btn btn-halt" onclick="stopScenario()">Stop</button>
+            <button class="btn btn-redo" onclick="restartScenario()">Reset</button>
+            <span class="info" id="scenarioInfo"></span>
+        </div>
+
+        <div class="result-overlay" id="resultOverlay"></div>
+    </div>
+
+    <!-- ── Bottom: Car Dashboard ───────────────────────────────────────── -->
+    <div class="dashboard">
+
+        <!-- Speedometer -->
+        <div class="speedo-wrap">
+            <canvas id="speedoCanvas" width="220" height="220"></canvas>
+        </div>
+
+        <!-- Center cluster: FSM | TTC | distance + target -->
+        <div class="cluster">
+
+            <div class="fsm-row">
+                <div class="fsm-cell fsm-off"  id="f0"><span class="fsm-name">OFF</span></div>
+                <div class="fsm-cell fsm-stby on" id="f1"><span class="fsm-name">STBY</span></div>
+                <div class="fsm-cell fsm-warn" id="f2"><span class="fsm-name">WARN</span></div>
+                <div class="fsm-cell fsm-l1"   id="f3"><span class="fsm-name">L1</span></div>
+                <div class="fsm-cell fsm-l2"   id="f4"><span class="fsm-name">L2</span></div>
+                <div class="fsm-cell fsm-l3"   id="f5"><span class="fsm-name">L3</span></div>
+                <div class="fsm-cell fsm-post" id="f6"><span class="fsm-name">POST</span></div>
+            </div>
+
+            <div class="ttc-card">
+                <div class="ttc-fill" id="ttcFill"></div>
+                <div class="ttc-text">
+                    <span class="lbl">Time to Collision</span>
+                    <span class="val" id="ttcVal">— s</span>
+                </div>
+            </div>
+
+            <div class="info-row">
+                <div class="info-card info-dist">
+                    <div class="val" id="distVal">—</div>
+                    <div class="lbl">Distance · m</div>
+                </div>
+                <div class="info-card info-tgt">
+                    <div class="val" id="tgtVal">—</div>
+                    <div class="lbl">Target · km/h</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Alert lamps -->
+        <div class="alerts">
+            <div class="alert-lamp" id="lampVis">
+                <span class="icon">&#9888;</span>
+                <span class="lbl">Visual</span>
+            </div>
+            <div class="alert-lamp" id="lampAud">
+                <span class="icon">&#9835;</span>
+                <span class="lbl">Buzzer</span>
+            </div>
+        </div>
+
+        <!-- Vertical brake gauge -->
+        <div class="brake-col">
+            <div class="brake-lbl">Brake</div>
+            <div class="brake-bar-outer">
+                <div class="brake-bar-fill" id="brakeFill"></div>
+            </div>
+            <div class="brake-pct" id="brakePct">0%</div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// ═════════════════════════════════════════════════════════════════════════
+//  Speedometer — 270° circular gauge with multi-stroke glow.
+//  Mirrors the QML CircularGauge: track arc + outer glow + inner glow +
+//  main arc + needle gradient + tick marks + digital readout.
+// ═════════════════════════════════════════════════════════════════════════
+
+const speedCanvas = document.getElementById('speedoCanvas');
+const speedoCtx   = speedCanvas.getContext('2d');
+
+const SPEED_MAX = 80;
+const ACCENT    = '#00e5ff';
+const ACCENT_RGBA = (a) => `rgba(0, 229, 255, ${a})`;
+const WARN      = '#e74c3c';
+const WARN_RGBA = (a) => `rgba(231, 76, 60, ${a})`;
+const TRACK     = '#151530';
+const TICK      = '#445566';
+const TICK_TEXT = '#8899aa';
+
+const START_DEG = 135;
+const SWEEP_DEG = 270;
+
+function drawSpeedo(speed) {
+    const W = speedCanvas.width, H = speedCanvas.height;
+    const cx = W / 2, cy = H / 2;
+    const size = Math.min(W, H);
+    const r    = size / 2 - 14;
+    const arcW = r * 0.13;
+
+    speedoCtx.clearRect(0, 0, W, H);
+
+    // Background disk
+    speedoCtx.beginPath();
+    speedoCtx.arc(cx, cy, size / 2 - 2, 0, Math.PI * 2);
+    speedoCtx.fillStyle = '#0c0c20';
+    speedoCtx.fill();
+    speedoCtx.lineWidth = 1.5;
+    speedoCtx.strokeStyle = '#1a1a3a';
+    speedoCtx.stroke();
+
+    const startRad = START_DEG * Math.PI / 180;
+    const sweepRad = SWEEP_DEG * Math.PI / 180;
+
+    // Track arc
+    speedoCtx.beginPath();
+    speedoCtx.arc(cx, cy, r, startRad, startRad + sweepRad);
+    speedoCtx.lineWidth = arcW;
+    speedoCtx.strokeStyle = TRACK;
+    speedoCtx.lineCap = 'butt';
+    speedoCtx.stroke();
+
+    const frac = Math.min(1, Math.max(0, speed / SPEED_MAX));
+    const warnFrac = 0.85;
+
+    if (frac > 0.005) {
+        const normalEnd = Math.min(frac, warnFrac);
+
+        // Outer glow
+        speedoCtx.beginPath();
+        speedoCtx.arc(cx, cy, r, startRad, startRad + normalEnd * sweepRad);
+        speedoCtx.lineWidth = arcW + 18;
+        speedoCtx.strokeStyle = ACCENT_RGBA(0.08);
+        speedoCtx.lineCap = 'round';
+        speedoCtx.stroke();
+
+        // Inner glow
+        speedoCtx.beginPath();
+        speedoCtx.arc(cx, cy, r, startRad, startRad + normalEnd * sweepRad);
+        speedoCtx.lineWidth = arcW + 8;
+        speedoCtx.strokeStyle = ACCENT_RGBA(0.18);
+        speedoCtx.stroke();
+
+        // Main arc
+        speedoCtx.beginPath();
+        speedoCtx.arc(cx, cy, r, startRad, startRad + normalEnd * sweepRad);
+        speedoCtx.lineWidth = arcW;
+        speedoCtx.strokeStyle = ACCENT;
+        speedoCtx.stroke();
+
+        // Warning portion (red)
+        if (frac > warnFrac) {
+            speedoCtx.beginPath();
+            speedoCtx.arc(cx, cy, r, startRad + warnFrac * sweepRad, startRad + frac * sweepRad);
+            speedoCtx.lineWidth = arcW;
+            speedoCtx.strokeStyle = WARN;
+            speedoCtx.lineCap = 'butt';
+            speedoCtx.stroke();
+        }
+    }
+
+    // Tick marks
+    const majorTicks = 8;
+    const minorPerMajor = 5;
+    speedoCtx.font = "bold 10px 'Segoe UI', sans-serif";
+    speedoCtx.fillStyle = TICK_TEXT;
+    speedoCtx.textAlign = 'center';
+    speedoCtx.textBaseline = 'middle';
+
+    for (let i = 0; i <= majorTicks; i++) {
+        const tFrac = i / majorTicks;
+        const ang = (START_DEG + tFrac * SWEEP_DEG) * Math.PI / 180;
+        const cosA = Math.cos(ang), sinA = Math.sin(ang);
+        const outerR = r - arcW / 2 - 4;
+        const innerR = outerR - 9;
+        const labelR = innerR - 11;
+
+        // Major tick
+        speedoCtx.beginPath();
+        speedoCtx.moveTo(cx + innerR * cosA, cy + innerR * sinA);
+        speedoCtx.lineTo(cx + outerR * cosA, cy + outerR * sinA);
+        speedoCtx.lineWidth = 2;
+        speedoCtx.strokeStyle = TICK_TEXT;
+        speedoCtx.stroke();
+
+        const val = Math.round(tFrac * SPEED_MAX);
+        speedoCtx.fillText(String(val), cx + labelR * cosA, cy + labelR * sinA);
+
+        // Minor ticks
+        if (i < majorTicks) {
+            for (let m = 1; m < minorPerMajor; m++) {
+                const mFrac = (i + m / minorPerMajor) / majorTicks;
+                const mAng = (START_DEG + mFrac * SWEEP_DEG) * Math.PI / 180;
+                const mCos = Math.cos(mAng), mSin = Math.sin(mAng);
+                speedoCtx.beginPath();
+                speedoCtx.moveTo(cx + (outerR - 3) * mCos, cy + (outerR - 3) * mSin);
+                speedoCtx.lineTo(cx + outerR * mCos, cy + outerR * mSin);
+                speedoCtx.lineWidth = 1;
+                speedoCtx.strokeStyle = TICK;
+                speedoCtx.stroke();
+            }
+        }
+    }
+
+    // Needle with gradient (cyan → white tip).
+    // Local needle points up (-Y); rotation must be (gauge angle - 270°)
+    // to align with canvas-angle convention (0° = right, clockwise).
+    const needleAng = (START_DEG + frac * SWEEP_DEG + 90) * Math.PI / 180;
+    const needleLen = r - arcW / 2 - 10;
+    speedoCtx.save();
+    speedoCtx.translate(cx, cy);
+    speedoCtx.rotate(needleAng);
+    const grad = speedoCtx.createLinearGradient(0, 0, 0, -needleLen);
+    grad.addColorStop(0.0, ACCENT);
+    grad.addColorStop(0.4, '#7df0ff');
+    grad.addColorStop(0.7, '#ffffff');
+    grad.addColorStop(1.0, '#bbbbbb');
+    speedoCtx.fillStyle = grad;
+    speedoCtx.beginPath();
+    speedoCtx.moveTo(-2, 8);
+    speedoCtx.lineTo(2, 8);
+    speedoCtx.lineTo(1.5, -needleLen);
+    speedoCtx.lineTo(-1.5, -needleLen);
+    speedoCtx.closePath();
+    speedoCtx.fill();
+    speedoCtx.restore();
+
+    // Hub
+    const hubGrad = speedoCtx.createRadialGradient(cx, cy, 2, cx, cy, 9);
+    hubGrad.addColorStop(0, '#dddddd');
+    hubGrad.addColorStop(1, '#555555');
+    speedoCtx.fillStyle = hubGrad;
+    speedoCtx.beginPath();
+    speedoCtx.arc(cx, cy, 8, 0, 2 * Math.PI);
+    speedoCtx.fill();
+
+    // Digital readout under the hub
+    speedoCtx.fillStyle = '#99aabb';
+    speedoCtx.font = "bold 11px 'Segoe UI', sans-serif";
+    speedoCtx.fillText('SPEED', cx, cy + 30);
+
+    speedoCtx.fillStyle = '#ffffff';
+    speedoCtx.font = "bold 28px 'Segoe UI', sans-serif";
+    speedoCtx.fillText(speed.toFixed(0), cx, cy + 56);
+
+    speedoCtx.fillStyle = '#778899';
+    speedoCtx.font = "10px 'Segoe UI', sans-serif";
+    speedoCtx.fillText('km/h', cx, cy + 72);
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  Dashboard update functions
+// ═════════════════════════════════════════════════════════════════════════
+
+function updateFSM(state) {
+    for (let i = 0; i <= 6; i++) {
+        const el = document.getElementById('f' + i);
+        if (!el) continue;
+        el.classList.toggle('on', i === state);
+    }
+}
+
+function updateTTC(ttc) {
+    const fill = document.getElementById('ttcFill');
+    const val = document.getElementById('ttcVal');
+    const frac = Math.min(1, Math.max(0, ttc / 6));
+    let color;
+    if      (ttc > 4) color = '#2ecc71';   // green
+    else if (ttc > 3) color = '#f39c12';   // orange
+    else if (ttc > 2) color = '#ff7043';   // dark orange
+    else              color = '#e74c3c';   // red
+    fill.style.width = (frac * 100) + '%';
+    fill.style.background = color;
+    val.textContent = ttc < 10 ? ttc.toFixed(1) + ' s' : '> 10 s';
+    val.style.color = color;
+}
+
+function updateAlerts(vis, aud) {
+    document.getElementById('lampVis').className = 'alert-lamp' + (vis ? ' on-vis' : '');
+    document.getElementById('lampAud').className = 'alert-lamp' + (aud ? ' on-aud' : '');
+}
+
+function updateBrake(pct) {
+    const fill = document.getElementById('brakeFill');
+    const label = document.getElementById('brakePct');
+    const f = Math.min(100, Math.max(0, pct));
+    fill.style.height = f + '%';
+    if (f >= 50) {
+        fill.classList.add('danger');
+        label.classList.add('danger');
+    } else {
+        fill.classList.remove('danger');
+        label.classList.remove('danger');
+    }
+    label.textContent = f.toFixed(0) + '%';
+}
+
+function showResult(text) {
+    const el = document.getElementById('resultOverlay');
+    if (!text) { el.style.display = 'none'; el.className = 'result-overlay'; return; }
+    const pass = text.includes('STOPPED') && !text.includes('user halt');
+    el.textContent = text;
+    el.className = 'result-overlay ' + (pass ? 'result-pass' : 'result-fail');
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  API
+// ═════════════════════════════════════════════════════════════════════════
+
+const API = '/api';
+
+async function loadScenarios() {
+    try {
+        const r = await fetch(API + '/scenarios');
+        const d = await r.json();
+        const sel = document.getElementById('scenarioSelect');
+        sel.innerHTML = '';
+        d.scenarios.forEach(s => {
+            const o = document.createElement('option');
+            o.value = s.id;
+            o.textContent = s.name;
+            o.dataset.info = `Ego ${s.ego_speed_kmh} km/h · Gap ${s.initial_gap_m} m`;
+            sel.appendChild(o);
+        });
+        sel.onchange = () => {
+            const opt = sel.options[sel.selectedIndex];
+            document.getElementById('scenarioInfo').textContent = opt.dataset.info || '';
+        };
+        sel.onchange();
+    } catch (e) { console.warn('API not ready'); }
+}
+
+async function startScenario() {
+    const id = document.getElementById('scenarioSelect').value;
+    if (!id) return;
+    resetDashboard();
+    setDot('starting');
+    await fetch(API + '/scenarios/start', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({scenario: id})
+    });
+    setDot('running');
+}
+
+async function stopScenario() {
+    await fetch(API + '/scenarios/stop', {method: 'POST'});
+    setDot('stopped');
+}
+
+async function restartScenario() {
+    resetDashboard();
+    await fetch(API + '/scenarios/restart', {method: 'POST'});
+    setDot('running');
+}
+
+function resetDashboard() {
+    showResult('');
+    drawSpeedo(0);
+    updateFSM(1);
+    updateTTC(10);
+    updateBrake(0);
+    updateAlerts(false, false);
+    document.getElementById('distVal').textContent = '—';
+    document.getElementById('tgtVal').textContent = '—';
+}
+
+function setDot(status) {
+    const d = document.getElementById('statusDot');
+    d.className = 'status-dot ' + status;
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  Live data poll
+// ═════════════════════════════════════════════════════════════════════════
+
+const FSM_MAP = {
+    'OFF': 0, 'STANDBY': 1, 'WARNING': 2,
+    'BRAKE_L1': 3, 'BRAKE_L2': 4, 'BRAKE_L3': 5, 'POST_BRAKE': 6
+};
+
+async function tick() {
+    try {
+        const resp = await fetch(API + '/live');
+        const d = await resp.json();
+
+        const speed = d.speed_kmh || 0;
+        const dist  = d.distance || 0;
+        const brake = d.brake_pct || 0;
+        const ttc   = d.ttc || 10;
+        const fsm   = FSM_MAP[d.fsm_state] !== undefined ? FSM_MAP[d.fsm_state] : 0;
+        const vis   = fsm >= 2 && fsm <= 5;
+        const aud   = fsm >= 3 && fsm <= 5;
+
+        drawSpeedo(speed);
+        updateFSM(fsm);
+        updateTTC(ttc);
+        updateBrake(brake);
+        updateAlerts(vis, aud);
+        document.getElementById('distVal').textContent = dist.toFixed(1);
+        document.getElementById('tgtVal').textContent = '0';
+
+        if (speed < 0.5 && dist > 0 && dist < 100 && d.fsm_state === 'POST_BRAKE') {
+            showResult('STOPPED · gap ' + dist.toFixed(1) + ' m');
+        }
+
+        if (speed > 0.5 || brake > 0) {
+            setDot('running');
+        }
+
+    } catch (e) {
+        drawSpeedo(0);
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════
+//  Init
+// ═════════════════════════════════════════════════════════════════════════
+
+loadScenarios();
+drawSpeedo(0);
+setInterval(tick, 100);
+</script>
+
+</body>
+</html>
