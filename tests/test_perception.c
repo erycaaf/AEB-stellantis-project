@@ -539,6 +539,269 @@ static void test_can_timeout_preserves_counters(void)
 }
 
 /* =========================================================================
+ * TEST 19 — FR-PER-006, FR-PER-007
+ * LiDAR fault counter overflow protection: the "if (ctr < 255U)" guard
+ * must clamp the counter at 255 and never let it wrap.
+ *
+ * On the 256th consecutive bad frame the guard's FALSE branch executes,
+ * keeping ctr at 255. The fault must remain latched throughout.
+ * ====================================================================== */
+static void test_lidar_counter_saturation(void)
+{
+    raw_sensor_input_t in;
+    perception_output_t out;
+    int i;
+
+    perception_init();
+    in = make_good_input();
+    in.lidar_d = 999.0f;   /* above LIDAR_DIST_MAX=100 m — bad every cycle */
+
+    for (i = 0; i < 256; i++) {
+        perception_step(&in, &out);
+    }
+    CHECK((out.fault_flag & AEB_FAULT_LIDAR) != 0U,
+          "LiDAR counter saturation: fault active after 256 bad cycles");
+}
+
+/* =========================================================================
+ * TEST 20 — FR-PER-006, FR-PER-007
+ * Radar fault counter overflow protection: analogous to TEST 19.
+ * ====================================================================== */
+static void test_radar_counter_saturation(void)
+{
+    raw_sensor_input_t in;
+    perception_output_t out;
+    int i;
+
+    perception_init();
+    in = make_good_input();
+    in.radar_d = 999.0f;   /* above RADAR_DIST_MAX=200 m — bad every cycle */
+
+    for (i = 0; i < 256; i++) {
+        perception_step(&in, &out);
+    }
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) != 0U,
+          "Radar counter saturation: fault active after 256 bad cycles");
+}
+
+/* =========================================================================
+ * TEST 21 — FR-PER-001 (radar-only confidence path)
+ * When LiDAR is permanently faulted but radar is healthy, kalman_fusion()
+ * must take the "else if (r_ok != 0U)" branch (base = 0.7).
+ * Confidence must be > 0 but below the both-sensor ceiling.
+ * ====================================================================== */
+static void test_confidence_radar_only(void)
+{
+    raw_sensor_input_t in;
+    perception_output_t out;
+    int i;
+
+    perception_init();
+    in = make_good_input();        /* radar_d=30, radar_vr=5 (healthy) */
+    in.lidar_d = 999.0f;          /* above LIDAR_DIST_MAX — always faulty */
+
+    for (i = 0; i < 20; i++) {
+        perception_step(&in, &out);
+    }
+    CHECK((out.fault_flag & AEB_FAULT_LIDAR) != 0U,
+          "Radar-only: LiDAR fault flag set");
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) == 0U,
+          "Radar-only: Radar fault flag clear");
+    CHECK(out.confidence > 0.0f,
+          "Radar-only: confidence > 0 (base = 0.7 path)");
+    CHECK(out.confidence < 0.8f,
+          "Radar-only: confidence < 0.8 (below both-sensor ceiling)");
+}
+
+/* =========================================================================
+ * TEST 22 — FR-PER-006 (MC/DC: velocity ROC independently triggers fault)
+ * Covers the second condition in the radar ROC compound OR:
+ *   (FABSF(d_r - prev_d) > DIST_ROC_LIMIT) || (FABSF(vr_r - prev_vr) > VEL_ROC_LIMIT)
+ *
+ * The MC/DC complement to TEST 16 which only exercised the distance-ROC
+ * condition. Here distance is stable (ROC = 0) and velocity jumps by
+ * +3 m/s per cycle, which exceeds VEL_ROC_LIMIT = 2.0 m/s while
+ * remaining well within MAX_REL_VEL = 50 m/s (range check stays clear).
+ *
+ * Warm-up establishes prev_vr = 5 m/s. Then:
+ *   Cycle 1: vr=8.5  -> |8.5-5.0|  = 3.5 > 2.0, d_roc=0 -> bad, ctr=1
+ *   Cycle 2: vr=11.5 -> |11.5-8.5| = 3.0 > 2.0, d_roc=0 -> bad, ctr=2
+ *   Cycle 3: vr=14.5 -> |14.5-11.5|= 3.0 > 2.0, d_roc=0 -> bad, ctr=3 -> FAULT
+ * ====================================================================== */
+static void test_radar_vel_roc_triggers_fault(void)
+{
+    raw_sensor_input_t in;
+    perception_output_t out;
+
+    perception_init();
+    in = make_good_input();   /* radar_d=30, radar_vr=5 */
+
+    /* Warm-up: establish prev_d=30 m, prev_vr=5 m/s */
+    perception_step(&in, &out);
+
+    in.radar_d  = 30.0f;  in.radar_vr =  8.5f;  perception_step(&in, &out);
+    in.radar_d  = 30.0f;  in.radar_vr = 11.5f;  perception_step(&in, &out);
+    in.radar_d  = 30.0f;  in.radar_vr = 14.5f;  perception_step(&in, &out);
+
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) != 0U,
+          "Radar vel ROC: velocity jump > 2 m/s for 3 cycles latches fault");
+}
+
+/* =========================================================================
+ * TEST 23 — FR-PER-006 (radar ROC — FABSF negative-distance-difference paths)
+ * Covers the FABSF macro's negate branch for distance inside the radar ROC
+ * check. All prior tests only had stable or *increasing* distance, so the
+ * negative-difference path of FABSF(d_r - prev_d) was never exercised.
+ *
+ * Phase A (small decrease): d drops by 3 m — FABSF = 3 <= DIST_ROC_LIMIT.
+ *   Covers: FABSF ternary TRUE (negate), ROC comparison FALSE (fallthrough).
+ * Phase B (large decrease): d drops by 20 m — FABSF = 20 > DIST_ROC_LIMIT.
+ *   Covers: FABSF ternary TRUE (negate), ROC comparison TRUE (short-circuit).
+ * ====================================================================== */
+static void test_radar_roc_decreasing_distance(void)
+{
+    raw_sensor_input_t in;
+    perception_output_t out;
+
+    perception_init();
+    in = make_good_input();   /* radar_d=30, radar_vr=5 */
+
+    /* Warm-up: establish prev_d=90, prev_vr=5 */
+    in.radar_d = 90.0f;
+    perception_step(&in, &out);
+
+    /* Phase A: small decrease — ROC does NOT fire (3 <= 10).
+     * diff = 87-90 = -3 < 0 -> FABSF negate branch; result=3 <= 10. */
+    in.radar_d = 87.0f;
+    perception_step(&in, &out);
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) == 0U,
+          "Radar ROC dec-d: small decrease (3 m) does NOT latch fault");
+
+    /* Phase B: large decrease — ROC fires (20 > 10).
+     * diff = 67-87 = -20 < 0 -> FABSF negate branch; result=20 > 10. */
+    in.radar_d = 67.0f;
+    perception_step(&in, &out);
+    in.radar_d = 47.0f;
+    perception_step(&in, &out);
+    in.radar_d = 27.0f;
+    perception_step(&in, &out);
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) != 0U,
+          "Radar ROC dec-d: large decrease (20 m) latches fault after 3 cycles");
+}
+
+/* =========================================================================
+ * TEST 24 — FR-PER-006 (radar velocity ROC — FABSF negative-velocity-diff)
+ * Covers the FABSF ternary negate branch for velocity inside the radar ROC
+ * check. Test 22 only covered velocity *increasing*; here velocity decreases.
+ *
+ * VEL_ROC_LIMIT = 2.0 m/s/cycle. We step vr by -3 m/s each cycle:
+ *   Cycle 1: vr=7.0  from prev=10 -> diff=-3, FABSF=3 > 2 -> bad, ctr=1
+ *   Cycle 2: vr=4.0  from prev=7  -> diff=-3, FABSF=3 > 2 -> bad, ctr=2
+ *   Cycle 3: vr=1.0  from prev=4  -> diff=-3, FABSF=3 > 2 -> bad, ctr=3 -> FAULT
+ * Distance stays at 30 m (dist ROC = 0), so the distance condition is FALSE
+ * and the velocity condition alone drives the OR to TRUE.
+ * ====================================================================== */
+static void test_radar_vel_roc_decreasing_vr(void)
+{
+    raw_sensor_input_t in;
+    perception_output_t out;
+
+    perception_init();
+    in = make_good_input();
+
+    /* Warm-up: establish prev_d=30, prev_vr=10 */
+    in.radar_d  = 30.0f;
+    in.radar_vr = 10.0f;
+    perception_step(&in, &out);
+
+    in.radar_d = 30.0f;  in.radar_vr = 7.0f;  perception_step(&in, &out);
+    in.radar_d = 30.0f;  in.radar_vr = 4.0f;  perception_step(&in, &out);
+    in.radar_d = 30.0f;  in.radar_vr = 1.0f;  perception_step(&in, &out);
+
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) != 0U,
+          "Radar vel ROC dec-vr: decreasing velocity > 2 m/s latches fault");
+}
+
+/* =========================================================================
+ * TEST 25 — FR-PER-006 (radar range check — negative relative velocity)
+ * Covers the FABSF macro's negate branch on line 86 for the third condition
+ * of the radar range check: FABSF(vr_r) > MAX_REL_VEL.
+ * All prior tests used vr_r >= 0. This test uses a *negative* vr_r (receding
+ * target) that is within range: FABSF(-15) = 15 <= MAX_REL_VEL=50 -> bad=0.
+ * ====================================================================== */
+static void test_radar_negative_velocity_in_range(void)
+{
+    raw_sensor_input_t in;
+    perception_output_t out;
+    int i;
+
+    perception_init();
+    in = make_good_input();
+    in.radar_d  = 30.0f;
+    in.radar_vr = -15.0f;  /* negative (receding), within [-50, 50] */
+
+    for (i = 0; i < 10; i++) {
+        perception_step(&in, &out);
+    }
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) == 0U,
+          "Radar negative vr in range: no fault for vr=-15 m/s (within limit)");
+}
+
+/* =========================================================================
+ * TEST 26 — FR-PER-006 (radar velocity ROC — negative diff within limit)
+ * Complements TEST 24 (which fires the velocity ROC) and TEST 22 (positive
+ * diff). Here velocity DECREASES by less than VEL_ROC_LIMIT=2.0 m/s so the
+ * ROC guard's FABSF negate branch executes but the comparison stays FALSE.
+ *
+ * prev_vr=5, then vr=4.5 -> diff=-0.5, FABSF(-0.5)=0.5 <= 2.0 -> no fault.
+ * ====================================================================== */
+static void test_radar_small_velocity_decrease_no_roc(void)
+{
+    raw_sensor_input_t in;
+    perception_output_t out;
+    int i;
+
+    perception_init();
+    in = make_good_input();   /* radar_vr=5.0, prev_vr will be 5.0 */
+    perception_step(&in, &out);   /* warm-up: prev_vr=5.0, is_first=0 */
+
+    /* Small velocity decrease — diff=-0.5, FABSF(-0.5)=0.5 <= VEL_ROC_LIMIT=2 */
+    in.radar_d  = 30.0f;
+    in.radar_vr = 4.5f;
+    for (i = 0; i < 5; i++) {
+        perception_step(&in, &out);
+    }
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) == 0U,
+          "Radar vel ROC: small decrease (0.5 m/s) does NOT latch fault");
+}
+
+/* =========================================================================
+ * TEST 27 — FR-PER-006 (radar range check — negative vr near RADAR_DIST_MIN)
+ * Exercises the specific combination: d close to (but above) RADAR_DIST_MIN,
+ * and vr negative (receding target). Forces the FABSF ternary's negate branch
+ * on line 86 via a path that prior tests did not walk.
+ *
+ * Uses d=1.0 (above RADAR_DIST_MIN=0.5) and vr=-20.0 (negative, |20|<=50).
+ * ====================================================================== */
+static void test_radar_negative_vr_near_dist_min(void)
+{
+    raw_sensor_input_t in;
+    perception_output_t out;
+    int i;
+
+    perception_init();
+    in = make_good_input();
+    in.radar_d  = 1.0f;    /* just above RADAR_DIST_MIN=0.5 — in range */
+    in.radar_vr = -20.0f;  /* negative velocity, |20|<=MAX_REL_VEL=50 */
+
+    for (i = 0; i < 10; i++) {
+        perception_step(&in, &out);
+    }
+    CHECK((out.fault_flag & AEB_FAULT_RADAR) == 0U,
+          "Radar neg-vr near dist-min: no range fault (d=1.0, vr=-20)");
+}
+
+/* =========================================================================
  * Main
  * ====================================================================== */
 int main(void)
@@ -563,6 +826,16 @@ int main(void)
     test_radar_roc_triggers_counter();
     test_init_resets_state();
     test_can_timeout_preserves_counters();
+    /* New tests — coverage gap closers */
+    test_lidar_counter_saturation();
+    test_radar_counter_saturation();
+    test_confidence_radar_only();
+    test_radar_vel_roc_triggers_fault();
+    test_radar_roc_decreasing_distance();
+    test_radar_vel_roc_decreasing_vr();
+    test_radar_negative_velocity_in_range();
+    test_radar_small_velocity_decrease_no_roc();
+    test_radar_negative_vr_near_dist_min();
 
     printf("\n=== Results: %d passed, %d failed ===\n", g_pass, g_fail);
 
