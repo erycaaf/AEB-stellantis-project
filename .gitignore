@@ -39,12 +39,13 @@ reports/vv_decision/memory_html/
 reports/vv_decision/fault_html/
 
 # V&V intermediate artefacts — Perception
-# Only text/XML/CSV/gcov evidence under reports/vv_perception/ is committed.
+# Only text/XML/CSV evidence under reports/vv_perception/ is committed.
 reports/vv_perception/**/test_perception*
 reports/vv_perception/**/test_nominal
 reports/vv_perception/**/test_mcdc
 reports/vv_perception/**/*.gcda
 reports/vv_perception/**/*.gcno
+reports/vv_perception/**/*.gcov
 
 # V&V intermediate artefacts — CAN
 # Only text/XML/CSV/gcov evidence under reports/vv_can/ is committed.

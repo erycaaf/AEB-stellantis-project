@@ -287,14 +287,16 @@ static void cat_B_alternating_extreme(void)
 
     perception_init();
     in = make_good_input();
-    /* Establish baseline */
+    /* cycle 0 (seed): radar_d=30 → good, prev_d=30 */
     perception_step(&in, &out);
-    /* Now jump by 50 m every cycle (5x DIST_ROC_LIMIT) */
+    /* cycle 1: ROC=50 vs prev_d=30 → bad, ctr=1 */
     in.radar_d = 80.0f;
     perception_step(&in, &out);
-    in.radar_d = 30.0f;
+    /* cycle 2: ROC=100 vs prev_d=30 (prev_d only updates on good) → bad, ctr=2 */
+    in.radar_d = 130.0f;
     perception_step(&in, &out);
-    in.radar_d = 80.0f;
+    /* cycle 3: ROC=150 vs prev_d=30 → bad, ctr=3 → latch */
+    in.radar_d = 180.0f;
     perception_step(&in, &out);
     printf("       distance=%f  fault=0x%02x\n",
            (double)out.distance, (unsigned)out.fault_flag);
