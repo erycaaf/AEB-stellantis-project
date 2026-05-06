@@ -203,6 +203,27 @@ def start_scenario(req: StartRequest):
     time.sleep(0.5)
     restart_aeb_ecu()
 
+    # AEB enable bit handling for the scenario:
+    #   1) Toggle perception_node's CAN 0x101 broadcast (via ROS topic)
+    #      so the production C `state->driver.aeb_enabled` field — which
+    #      `aeb_core.c` overwrites from CAN every cycle — actually carries
+    #      the right value for the run.
+    #   2) Also fire the UDS RoutineControl as a defensive belt-and-suspenders
+    #      (writes to state->uds.aeb_enabled; cosmetic since the FSM reads
+    #      the driver field, but keeps the UDS panel display consistent).
+    aeb_enable_value = 0 if cfg.get("disable_aeb") else 1
+    ros2_pub("/aeb/driver_aeb_enable", "std_msgs/msg/Int32",
+             f'{{data: {aeb_enable_value}}}')
+    if cfg.get("disable_aeb"):
+        try:
+            client = _get_uds_client()
+            client.routine_control(RID_AEB_CONTROL, value=0)
+            print(f"[api] disable_aeb=true for {req.scenario} — AEB disabled via "
+                  f"perception 0x101 + UDS RoutineControl", flush=True)
+        except (UDSError, UDSTimeout, ConnectionError, OSError) as e:
+            print(f"[api] could not disable AEB via UDS: {e!r}", flush=True)
+            _reset_uds_client()
+
     with lock:
         current_scenario["status"] = "running"
 

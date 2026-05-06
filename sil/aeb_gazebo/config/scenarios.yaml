@@ -39,6 +39,19 @@ scenarios:
     target_brake_time: 0.0
     pass_criterion: "v_impact < 5 km/h"
 
+  # AEB disabled — control run, demonstrates what happens without intervention.
+  # Identical to ccrs_50 but the api fires UDS RoutineControl(0x0301, 0)
+  # right after the ECU restart, so the FSM stays in OFF the entire run.
+  ccrs_50_no_aeb:
+    name: "CCRs - Ego 50 km/h (AEB DISABLED)"
+    ego_speed_kmh: 50.0
+    target_speed_kmh: 0.0
+    initial_gap_m: 100.0
+    target_decel: 0.0
+    target_brake_time: 0.0
+    pass_criterion: "control run — AEB intentionally off"
+    disable_aeb: true
+
   # CCRm: Car-to-Car Rear Moving
   # Initial gap 50 m: closing speed is 30 km/h (8.3 m/s), so 50 m = ~6 s
   # approach. With 100 m the run was unnecessarily long for visualization.
