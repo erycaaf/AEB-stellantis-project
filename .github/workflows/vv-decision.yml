@@ -1,0 +1,271 @@
+name: Decision V&V
+
+# Runs the ASIL-D V&V stack scoped to the Decision module (TTC + FSM).
+# On PRs to development/main, four blocking gates must pass: MC/DC
+# coverage, dynamic memory safety, MISRA C:2012 conformance, and fault
+# injection. The fault-injection and MISRA Required gates became
+# blocking after PR #107 (fix/decision-robustness) and PR #111
+# (fix/decision-review-followup) closed all V&V findings; any new
+# regression is now treated as a CI failure, mirroring vv-uds.
+#
+# Reports are published as workflow artefacts on every run and to
+# GitHub Pages on push to development/main under
+# https://erycaaf.github.io/AEB-stellantis-project/vv_decision/<branch>/.
+
+on:
+  pull_request:
+    branches: [development, main]
+    paths:
+      - 'src/decision/aeb_ttc.c'
+      - 'src/decision/aeb_fsm.c'
+      - 'include/aeb_ttc.h'
+      - 'include/aeb_fsm.h'
+      - 'include/aeb_types.h'
+      - 'include/aeb_config.h'
+      - 'tests/test_decision.c'
+      - 'tests/test_decision_mcdc.c'
+      - 'tests/test_decision_fault.c'
+      - 'Makefile'
+      - 'scripts/wrap_memory.sh'
+      - 'scripts/wrap_fault.py'
+      - 'docker/Dockerfile.vv'
+      - '.github/workflows/vv-decision.yml'
+  push:
+    branches: [development, main]
+    paths:
+      - 'src/decision/aeb_ttc.c'
+      - 'src/decision/aeb_fsm.c'
+      - 'include/aeb_ttc.h'
+      - 'include/aeb_fsm.h'
+      - 'include/aeb_types.h'
+      - 'include/aeb_config.h'
+      - 'tests/test_decision.c'
+      - 'tests/test_decision_mcdc.c'
+      - 'tests/test_decision_fault.c'
+      - 'Makefile'
+      - 'scripts/wrap_memory.sh'
+      - 'scripts/wrap_fault.py'
+      - 'docker/Dockerfile.vv'
+      - '.github/workflows/vv-decision.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: vv-decision-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  vv-decision:
+    name: Decision V&V stack
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install V&V toolchain (matches docker/Dockerfile.vv)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-14 g++-14 make libc6-dev \
+            cppcheck python3-pygments \
+            valgrind lcov python3-minimal python3-venv bc
+          sudo ln -sf /usr/bin/gcc-14  /usr/local/bin/gcc
+          sudo ln -sf /usr/bin/g++-14  /usr/local/bin/g++
+          sudo ln -sf /usr/bin/gcov-14 /usr/local/bin/gcov
+          # gcovr ≥ 8.0 is required for GCC 14 condition-coverage to show up
+          # in --json-summary (the apt version on Ubuntu 24.04 is 7.2, which
+          # omits condition_percent). The Makefile auto-selects venv/bin/gcovr
+          # via wildcard, so no Makefile change is needed.
+          python3 -m venv venv
+          venv/bin/pip install --quiet --upgrade pip
+          venv/bin/pip install --quiet 'gcovr>=8.0'
+          venv/bin/gcovr --version | head -1
+          # cppcheck-htmlreport pinned to the tag matching the apt cppcheck
+          # version (docker/Dockerfile.vv documents cppcheck 2.13).
+          sudo curl -fsSL \
+            https://raw.githubusercontent.com/danmar/cppcheck/2.13.0/htmlreport/cppcheck-htmlreport \
+            -o /usr/local/bin/cppcheck-htmlreport
+          sudo chmod +x /usr/local/bin/cppcheck-htmlreport
+          gcc --version | head -1
+          gcov --version | head -1
+          cppcheck --version
+          cppcheck-htmlreport --help | head -1
+          valgrind --version
+
+      # ─── Blocking gate 1: structural coverage ─────────────────────────────
+      # gcovr --json-summary aggregates line, branch, and condition coverage
+      # across all test binaries into totals; the gate enforces ≥95% on each.
+      - name: MC/DC coverage (gate ≥ 95%)
+        run: |
+          make mcdc-decision
+          python3 - <<'PY'
+          import json, sys
+          with open("reports/vv_decision/coverage_mcdc/coverage.json") as f:
+              d = json.load(f)
+          stmt   = d.get("line_percent")
+          branch = d.get("branch_percent")
+          mcdc   = d.get("condition_percent")
+          if stmt is None or branch is None:
+              print("::error title=Decision coverage parse::line_percent/branch_percent missing in coverage.json")
+              sys.exit(1)
+          if mcdc is None:
+              print("::error title=Decision MC/DC parse::condition_percent missing in coverage.json — check -fcondition-coverage and gcovr version")
+              sys.exit(1)
+          print(f"Decision coverage (aggregate) — stmt={stmt:.2f}% branch={branch:.2f}% mcdc={mcdc:.2f}%")
+          failed = False
+          for name, value in (("Statement", stmt), ("Branch", branch), ("MC/DC", mcdc)):
+              if value < 95.0:
+                  print(f"::error title=Decision coverage regression::{name} at {value:.2f}% (required ≥95%)")
+                  failed = True
+          if failed:
+              sys.exit(1)
+          PY
+
+      # ─── Blocking gate 2: dynamic memory safety on nominal suites ─────────
+      - name: Memory safety (Valgrind + ASan + UBSan)
+        run: |
+          make memory-decision
+          MS="reports/vv_decision/memory_safety"
+          # Nominal and MC/DC suites must be silent; the fault-injection suite
+          # may carry expected UBSan reports until fix/decision-robustness lands.
+          for log in \
+              valgrind_test_decision.log \
+              valgrind_test_decision_mcdc.log \
+              ubsan_test_decision.log \
+              ubsan_test_decision_mcdc.log; do
+            if [ -s "$MS/$log" ]; then
+              echo "::error title=Memory safety regression::Errors in $log"
+              cat "$MS/$log"; exit 1
+            fi
+          done
+
+      # ─── Blocking gate 3: MISRA C:2012 Required (0 findings in scope) ────
+      # Promoted to blocking after PR #107 (fix/decision-robustness) closed
+      # the 5 Required findings from issue #92 and PR #111 eliminated the
+      # Rule 10.5 cascade. The Advisory findings (Rules 15.5, 8.7) remain
+      # documented as deviations per ISO 26262-8 §9.4.2 in the consolidated
+      # V&V report §6 and are filtered out below via the `accepted_deviations`
+      # set.
+      - name: MISRA Required/Mandatory (0 findings in aeb_ttc/aeb_fsm)
+        run: |
+          make misra-decision
+          DEC_ISSUES=$(python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          t = ET.parse("reports/vv_decision/misra/cppcheck_decision.xml")
+          target = (
+              "src/decision/aeb_ttc.c",
+              "src/decision/aeb_fsm.c",
+              "include/aeb_ttc.h",
+              "include/aeb_fsm.h",
+          )
+          # MISRA C:2012 Advisory rules — informational, do not block.
+          # Candidates for deviation analysis; not failure signals.
+          ADVISORY = {
+              "misra-c2012-8.7",
+              "misra-c2012-15.5",
+          }
+          n = 0
+          for e in t.findall(".//error"):
+              rid = e.get("id", "")
+              if not rid.startswith("misra-c2012"):
+                  continue
+              if rid in ADVISORY:
+                  continue
+              loc = e.find("location")
+              if loc is not None and loc.get("file", "") in target:
+                  n += 1
+          print(n)
+          PY
+          )
+          echo "MISRA Required/Mandatory findings in Decision scope: $DEC_ISSUES"
+          if [ "$DEC_ISSUES" != "0" ]; then
+            echo "::error title=MISRA regression::$DEC_ISSUES Required/Mandatory finding(s) in aeb_ttc/aeb_fsm"
+            exit 1
+          fi
+
+      # ─── Blocking gate 4: fault injection (32/32 required) ────────────────
+      # Promoted to blocking after PR #107 (fix/decision-robustness) patched
+      # the four robustness bugs and PR #111 corrected the aeb_enabled SEU
+      # semantic. Any new fault-injection regression is now treated as a CI
+      # failure — this gate guards against the exact classes of defects that
+      # V&V cross-validation originally surfaced.
+      - name: Fault injection
+        run: make fault-decision
+
+      - name: Generate HTML reports
+        if: always()
+        run: make html-decision
+
+      - name: Step summary
+        if: always()
+        run: |
+          {
+            echo "## Decision V&V — run #${{ github.run_number }}"
+            echo ""
+            if [ "${{ github.event_name }}" = "push" ]; then
+              echo "📊 **Browse reports:** https://erycaaf.github.io/AEB-stellantis-project/vv_decision/${{ github.ref_name }}/"
+              echo ""
+            fi
+            echo "### Structural coverage"
+            echo '```'
+            cat reports/vv_decision/coverage_mcdc/gcov_summary.txt
+            echo '```'
+            echo ""
+            echo "### Fault injection"
+            echo '```'
+            tail -5 reports/vv_decision/fault_injection/run.log
+            echo '```'
+            echo ""
+            echo "### Memory safety"
+            for f in reports/vv_decision/memory_safety/*.log; do
+              name=$(basename "$f")
+              if [ -s "$f" ]; then
+                echo "**${name}:**"
+                echo '```'
+                head -20 "$f"
+                echo '```'
+              else
+                echo "**${name}:** _clean_"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vv-decision-reports-run${{ github.run_number }}
+          path: reports/vv_decision/
+          retention-days: 30
+
+  # Per-module workflows publish their own subdirectory under vv_<module>/
+  # on gh-pages; keep_files: true preserves the others.
+  publish-pages:
+    needs: vv-decision
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    # Shared group across all gh-pages deploys to avoid non-fast-forward races.
+    concurrency:
+      group: gh-pages-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Download reports
+        uses: actions/download-artifact@v4
+        with:
+          name: vv-decision-reports-run${{ github.run_number }}
+          path: site/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          destination_dir: vv_decision/${{ github.ref_name }}
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: '41898282+github-actions[bot]@users.noreply.github.com'
+          commit_message: 'docs(vv-decision): publish reports from run #${{ github.run_number }} (${{ github.ref_name }})'

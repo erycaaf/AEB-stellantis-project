@@ -1,0 +1,33 @@
+
+======================================
+  AEB UDS Module — Unit Tests
+======================================
+
+  [01] test_init_defaults                                 PASS
+  [02] test_read_did_ttc                                  PASS
+  [03] test_read_did_fsm_state                            PASS
+  [04] test_read_did_brake_pressure                       PASS
+  [05] test_read_did_unsupported                          PASS
+  [06] test_clear_dtc                                     PASS
+  [07] test_routine_disable_aeb                           PASS
+  [08] test_routine_enable_aeb                            PASS
+  [09] test_routine_invalid_value                         PASS
+  [10] test_routine_unsupported_rid                       PASS
+  [11] test_dtc_sensor_fault                              PASS
+  [12] test_dtc_crc_error                                 PASS
+  [13] test_dtc_actuator_fault                            PASS
+  [14] test_dtc_latch_persists                            PASS
+  [15] test_dtc_multiple_faults                           PASS
+  [16] test_unsupported_sid                               PASS
+  [17] test_empty_request                                 PASS
+  [18] test_ttc_zero                                      PASS
+  [19] test_ttc_max                                       PASS
+  [20] test_brake_pressure_max                            PASS
+  [21] test_fsm_state_post_brake                          PASS
+  [22] test_enable_disable_cycle                          PASS
+  [23] test_dtc_clear_then_refault                        PASS
+
+======================================
+  Results: 23 / 23 passed
+======================================
+

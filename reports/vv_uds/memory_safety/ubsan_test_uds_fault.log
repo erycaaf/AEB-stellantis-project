@@ -1,0 +1,2 @@
+src/communication/aeb_uds.c:82:50: runtime error: nan is outside the range of representable values of type 'short unsigned int'
+src/communication/aeb_uds.c:103:56: runtime error: nan is outside the range of representable values of type 'short unsigned int'

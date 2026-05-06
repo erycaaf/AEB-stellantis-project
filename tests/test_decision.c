@@ -154,6 +154,106 @@ static void test_fsm_override(void)
 }
 
 /* ============================================================ */
+/* Regression test for issue #95                                */
+/* "Continue braking when v_ego drops below V_EGO_MIN mid-run"  */
+/* ============================================================ */
+
+/* Drive the FSM into BRAKE_L2 with a credible CCRs trajectory, then drop
+ * v_ego below V_EGO_MIN while the target is still close (distance under
+ * the 20 m floor). The pre-#95 code forced FSM_STANDBY here and zeroed
+ * decel_target, leaving the ego coasting the last metres. The fix lets
+ * Priority 4 run instead, so the distance-floor logic in
+ * evaluate_desired_state keeps a BRAKE_Lx state and decel_target > 0. */
+static void test_fsm_continue_braking_below_vmin(void)
+{
+    perception_output_t perc = {
+        .distance = 8.0f,        /* under the 10 m floor → desired = BRAKE_L2 */
+        .v_ego = 6.0f,           /* above V_EGO_MIN to start */
+        .v_rel = 6.0f,
+        .fault_flag = 0U
+    };
+    driver_input_t driver = {
+        .brake_pedal = 0U,
+        .accel_pedal = 0U,
+        .steering_angle = 0.0f,
+        .aeb_enabled = 1U
+    };
+    ttc_output_t ttc = {
+        .ttc = 1.3f,             /* below TTC_BRAKE_L2 */
+        .d_brake = 7.0f,
+        .is_closing = 1U
+    };
+    fsm_output_t fsm_out;
+    int i;
+
+    fsm_init(&fsm_out);
+
+    /* Run a few cycles to enter and confirm a BRAKE_Lx state. */
+    for (i = 0; i < 100; i++)
+    {
+        fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
+    }
+    TEST_ASSERT(fsm_out.fsm_state >= (uint8_t)FSM_BRAKE_L1 &&
+                fsm_out.fsm_state <= (uint8_t)FSM_BRAKE_L3,
+                "FSM enters a BRAKE_Lx state under TTC + distance floor");
+
+    /* Now ego drops below V_EGO_MIN (10 km/h = 2.78 m/s) but is still
+     * above V_STOP_THRESHOLD. Target is still close (distance in floor). */
+    perc.v_ego = 1.5f;            /* < V_EGO_MIN, > V_STOP_THRESHOLD */
+    perc.distance = 6.5f;         /* still under the 10 m floor */
+    fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
+
+    TEST_ASSERT(fsm_out.fsm_state >= (uint8_t)FSM_BRAKE_L1 &&
+                fsm_out.fsm_state <= (uint8_t)FSM_BRAKE_L3,
+                "FSM stays in BRAKE_Lx when v_ego dips below V_EGO_MIN "
+                "while distance floor still applies (#95)");
+    TEST_ASSERT(fsm_out.brake_active != 0U,
+                "Brake remains active when actively braking below V_EGO_MIN");
+    TEST_ASSERT(fsm_out.decel_target > 0.0f,
+                "decel_target stays > 0 when actively braking below V_EGO_MIN");
+
+    /* Once ego truly stops (v_ego < V_STOP_THRESHOLD) the existing branch
+     * hands off to POST_BRAKE — same behaviour as before #95. */
+    perc.v_ego = V_STOP_THRESHOLD * 0.5f;   /* guaranteed below the threshold */
+    fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
+    TEST_ASSERT(fsm_out.fsm_state == (uint8_t)FSM_POST_BRAKE,
+                "FSM enters POST_BRAKE once v_ego < V_STOP_THRESHOLD");
+}
+
+/* When the ego is below V_EGO_MIN and *not* in a braking state (e.g. the
+ * vehicle is rolling along at low speed with no threat), the FSM still
+ * collapses cleanly to STANDBY — no regression on the existing path. */
+static void test_fsm_low_speed_no_brake_goes_standby(void)
+{
+    perception_output_t perc = {
+        .distance = 80.0f,       /* far from any distance floor */
+        .v_ego = 1.0f,           /* below V_EGO_MIN */
+        .v_rel = 0.0f,           /* not closing */
+        .fault_flag = 0U
+    };
+    driver_input_t driver = {
+        .brake_pedal = 0U,
+        .accel_pedal = 0U,
+        .steering_angle = 0.0f,
+        .aeb_enabled = 1U
+    };
+    ttc_output_t ttc = {
+        .ttc = 99.0f,
+        .d_brake = 0.5f,
+        .is_closing = 0U
+    };
+    fsm_output_t fsm_out;
+
+    fsm_init(&fsm_out);
+    fsm_step(0.01f, &perc, &driver, &ttc, &fsm_out);
+
+    TEST_ASSERT(fsm_out.fsm_state == (uint8_t)FSM_STANDBY,
+                "Low-speed idle (not braking) falls to STANDBY");
+    TEST_ASSERT(fsm_out.brake_active == 0U,
+                "Brake is released in STANDBY at low speed");
+}
+
+/* ============================================================ */
 /* Parameter Validation (SRS Table 10)                          */
 /* ============================================================ */
 
@@ -196,7 +296,11 @@ int main(void)
     test_fsm_initial();
     test_fsm_fault();
     test_fsm_override();
-    
+
+    printf("\n--- Issue #95: brake-hold below V_EGO_MIN ---\n");
+    test_fsm_continue_braking_below_vmin();
+    test_fsm_low_speed_no_brake_goes_standby();
+
     printf("\n--- Parameter Validation (SRS Table 10) ---\n");
     test_deceleration_values();
     

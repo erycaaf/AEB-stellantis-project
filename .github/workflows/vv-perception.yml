@@ -1,0 +1,267 @@
+name: Perception V&V
+
+# Runs the ASIL-D V&V stack scoped to the Perception module.
+#
+# Triggers only on paths that can affect Perception behaviour. On PRs to
+# development/main, four blocking gates must pass: MC/DC coverage,
+# dynamic memory safety, MISRA C:2012 conformance, and fault injection.
+# The fault-injection gate became blocking after PR #93
+# (fix/perception-robustness) patched the three robustness bugs (#79,
+# #80, #82) surfaced by the V&V cross-validation; any new fault
+# regression is now treated as a CI failure, mirroring vv-uds.
+#
+# Reports are published in two layers:
+#   1. Workflow Artifacts on every run (PR or push), retention 30 days.
+#   2. GitHub Pages (gh-pages branch) on push to development/main —
+#      navigable HTML reports under
+#      https://erycaaf.github.io/AEB-stellantis-project/vv_perception/<branch>/.
+
+on:
+  pull_request:
+    branches: [development, main]
+    paths:
+      - 'src/perception/aeb_perception.c'
+      - 'include/aeb_perception.h'
+      - 'include/aeb_types.h'
+      - 'include/aeb_config.h'
+      - 'tests/test_perception.c'
+      - 'tests/test_perception_fault.c'
+      - 'tests/test_perception_mcdc.c'
+      - 'Makefile'
+      - 'scripts/wrap_memory.sh'
+      - 'scripts/wrap_fault.py'
+      - 'docker/Dockerfile.vv'
+      - '.github/workflows/vv-perception.yml'
+  push:
+    branches: [development, main]
+    paths:
+      - 'src/perception/aeb_perception.c'
+      - 'include/aeb_perception.h'
+      - 'include/aeb_types.h'
+      - 'include/aeb_config.h'
+      - 'tests/test_perception.c'
+      - 'tests/test_perception_fault.c'
+      - 'tests/test_perception_mcdc.c'
+      - 'Makefile'
+      - 'scripts/wrap_memory.sh'
+      - 'scripts/wrap_fault.py'
+      - 'docker/Dockerfile.vv'
+      - '.github/workflows/vv-perception.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: vv-perception-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  vv-perception:
+    name: Perception V&V stack
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install V&V toolchain (matches docker/Dockerfile.vv)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-14 g++-14 make libc6-dev \
+            cppcheck python3-pygments \
+            valgrind lcov gcovr python3-minimal bc
+          sudo ln -sf /usr/bin/gcc-14  /usr/local/bin/gcc
+          sudo ln -sf /usr/bin/g++-14  /usr/local/bin/g++
+          sudo ln -sf /usr/bin/gcov-14 /usr/local/bin/gcov
+          # cppcheck-htmlreport is no longer packaged on Ubuntu 24.04 — fetch
+          # the upstream script pinned to the tag matching the apt-installed
+          # cppcheck version (docker/Dockerfile.vv documents cppcheck 2.13).
+          sudo curl -fsSL \
+            https://raw.githubusercontent.com/danmar/cppcheck/2.13.0/htmlreport/cppcheck-htmlreport \
+            -o /usr/local/bin/cppcheck-htmlreport
+          sudo chmod +x /usr/local/bin/cppcheck-htmlreport
+          gcc --version | head -1
+          gcov --version | head -1
+          cppcheck --version
+          cppcheck-htmlreport --help | head -1
+          valgrind --version
+
+      # ─── Blocking gate 1: structural coverage ─────────────────────────────
+      # Perception runs a shared-.o pattern: aeb_perception.c is compiled
+      # once with coverage and linked into both test_nominal and test_mcdc.
+      # A single gcov call produces gcov_summary_combined.txt — the real
+      # measured union, not the per-suite numbers.
+      #
+      # Threshold ≥95% matches the UDS, Decision and PID-Alert modules.
+      # The complementary MC/DC suite (test_perception_mcdc.c) covers the
+      # G6/G7/G8 robustness branches added by PR #93/#115 (NaN/inf guards
+      # on lidar_d, radar_d/vr, and v_ego) plus FABSF sign-branch and
+      # ROC-direction extensions of G2/G3.
+      - name: MC/DC coverage (gate ≥ 95%)
+        run: |
+          make mcdc-perception
+          SUM="reports/vv_perception/coverage_mcdc/gcov_summary_combined.txt"
+          STMT=$(grep '^Lines executed:'             "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          BRCH=$(grep '^Taken at least once:'        "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          MCDC=$(grep '^Condition outcomes covered:' "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          echo "Perception coverage — stmt=${STMT}% branch=${BRCH}% mcdc=${MCDC}%"
+          for metric in "Statement:$STMT" "Branch:$BRCH" "MC/DC:$MCDC"; do
+            name="${metric%%:*}"; value="${metric##*:}"
+            if [ "$(echo "$value < 95.0" | bc -l)" = "1" ]; then
+              echo "::error title=Perception coverage regression::${name} dropped to ${value}% (required ≥95%)"
+              exit 1
+            fi
+          done
+
+      # ─── Blocking gate 2: dynamic memory safety on nominal suite ──────────
+      - name: Memory safety (Valgrind + ASan + UBSan)
+        run: |
+          make memory-perception
+          MS="reports/vv_perception/memory_safety"
+          # Valgrind/ASan on the *nominal* suite must be silent.
+          # Logs from the *fault* suite are currently clean because the
+          # Perception module emits float32_t without any float→int cast,
+          # so NaN/∞ propagation flows through legal IEEE-754 arithmetic
+          # that UBSan cannot detect — fault injection is the technique
+          # that surfaces those defects, not the sanitizers.
+          if [ -s "$MS/valgrind_test_perception.log" ]; then
+            echo "::error title=Valgrind regression::Errors on nominal Perception suite"
+            cat "$MS/valgrind_test_perception.log"; exit 1
+          fi
+          if [ -s "$MS/ubsan_test_perception.log" ]; then
+            echo "::error title=UBSan regression::Errors on nominal Perception suite"
+            cat "$MS/ubsan_test_perception.log"; exit 1
+          fi
+
+      # ─── Blocking gate 3: MISRA C:2012 (Perception scope only) ────────────
+      # Counts only findings emitted by the MISRA addon (id prefix
+      # "misra-c2012"), not cppcheck-native style/portability/unused
+      # warnings. After that, the single advisory deviation (Rule 15.5)
+      # is filtered out, so the gate enforces the `required` + `mandatory`
+      # rule set in full.
+      - name: MISRA (0 required/mandatory issues in aeb_perception.{c,h})
+        run: |
+          make misra-perception
+          PER_ISSUES=$(python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          t = ET.parse("reports/vv_perception/misra/cppcheck_perception.xml")
+          target = ("src/perception/aeb_perception.c", "include/aeb_perception.h")
+          # Documented advisory deviation — filtered out of the gate count:
+          #   15.5 (advisory, Rule 15.5): multiple return statements in
+          #       clampf() and perception_step(). Accepted as deviation per
+          #       consolidated V&V report §5.3.
+          # 14.4 deviation removed in PR #115 (fix/perception-misra-14-4) —
+          # aeb_perception.c:295 now uses explicit != 0 on the isfinite guard.
+          accepted_advisory = {"misra-c2012-15.5"}
+          n = 0
+          for e in t.findall(".//error"):
+              eid = e.get("id", "")
+              if not eid.startswith("misra-c2012"):
+                  continue
+              if eid in accepted_advisory:
+                  continue
+              loc = e.find("location")
+              if loc is not None and any(loc.get("file", "").endswith(t) for t in target):
+                  n += 1
+          print(n)
+          PY
+          )
+          echo "MISRA required/mandatory issues in aeb_perception scope: $PER_ISSUES"
+          if [ "$PER_ISSUES" != "0" ]; then
+            echo "::error title=MISRA regression::$PER_ISSUES required/mandatory issue(s) in aeb_perception.{c,h}"
+            exit 1
+          fi
+
+      # ─── Blocking gate 4: fault injection ─────────────────────────────────
+      # Promoted to blocking after PR #93 (fix/perception-robustness)
+      # patched the three robustness bugs (#79, #80, #82) originally
+      # surfaced by the V&V cross-validation. Any new fault-injection
+      # regression is now treated as a CI failure — this gate guards
+      # against the exact classes of defects that V&V uncovered.
+      - name: Fault injection
+        run: make fault-perception
+
+      # ─── Generate navigable HTML reports ──────────────────────────────────
+      # Mirrors html-uds and html-decision: lcov genhtml for coverage,
+      # cppcheck-htmlreport for MISRA, plus memory/fault HTML wrappers.
+      - name: Generate HTML reports
+        run: make html-perception
+
+      # ─── Summary for the PR/commit checks UI ──────────────────────────────
+      - name: Step summary
+        if: always()
+        run: |
+          {
+            echo "## Perception V&V — run #${{ github.run_number }}"
+            echo ""
+            if [ "${{ github.event_name }}" = "push" ]; then
+              echo "📊 **Browse reports:** https://erycaaf.github.io/AEB-stellantis-project/vv_perception/${{ github.ref_name }}/"
+              echo ""
+            fi
+            echo "### Structural coverage (combined nominal + complementary)"
+            echo '```'
+            cat reports/vv_perception/coverage_mcdc/gcov_summary_combined.txt
+            echo '```'
+            echo ""
+            echo "### Fault injection"
+            echo '```'
+            tail -5 reports/vv_perception/fault_injection/run.log
+            echo '```'
+            echo ""
+            echo "### Memory safety"
+            for f in reports/vv_perception/memory_safety/*.log; do
+              name=$(basename "$f")
+              if [ -s "$f" ]; then
+                echo "**${name}:**"
+                echo '```'
+                head -20 "$f"
+                echo '```'
+              else
+                echo "**${name}:** _clean_"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vv-perception-reports-run${{ github.run_number }}
+          path: reports/vv_perception/
+          retention-days: 30
+
+  # ───────────────────────────────────────────────────────────────────────
+  # Publish HTML reports to GitHub Pages on push to development/main only.
+  # Each module workflow publishes its own subdirectory under vv_<module>/
+  # on the gh-pages branch; keep_files: true preserves the others.
+  # ───────────────────────────────────────────────────────────────────────
+  publish-pages:
+    needs: vv-perception
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    # Serialise every gh-pages push across ALL workflows in the repo
+    # (vv-uds, vv-perception, vv-<other>, publish-index, ...) to avoid
+    # non-fast-forward races. Shared string, no ref suffix.
+    concurrency:
+      group: gh-pages-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Download reports
+        uses: actions/download-artifact@v4
+        with:
+          name: vv-perception-reports-run${{ github.run_number }}
+          path: site/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          destination_dir: vv_perception/${{ github.ref_name }}
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: '41898282+github-actions[bot]@users.noreply.github.com'
+          commit_message: 'docs(vv-perception): publish reports from run #${{ github.run_number }} (${{ github.ref_name }})'

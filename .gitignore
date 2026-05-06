@@ -8,7 +8,122 @@ test_decision
 test_pid
 test_alert
 test_uds
+test_uds_fault
 test_integration
+
+# V&V intermediate artefacts — UDS
+reports/vv_uds/**/test_uds*
+reports/vv_uds/**/*.gcda
+reports/vv_uds/**/*.gcno
+
+# V&V HTML bundles — regenerated locally by `make html-uds` and
+# published to gh-pages by the publish-pages job; never committed.
+reports/vv_uds/coverage_html/
+reports/vv_uds/misra_html/
+reports/vv_uds/memory_html/
+reports/vv_uds/fault_html/
+
+# V&V intermediate artefacts — Decision
+# Only text/XML/CSV/gcov evidence under reports/vv_decision/ is committed.
+# The gcovr HTML bundle is regenerated locally by `make mcdc-decision`.
+reports/vv_decision/**/test_decision*
+reports/vv_decision/**/*.gcda
+reports/vv_decision/**/*.gcno
+reports/vv_decision/coverage_mcdc/report.*
+
+# V&V HTML bundles — regenerated locally by `make html-decision` and
+# published to gh-pages by the publish-pages job; never committed.
+reports/vv_decision/coverage_html/
+reports/vv_decision/misra_html/
+reports/vv_decision/memory_html/
+reports/vv_decision/fault_html/
+
+# V&V intermediate artefacts — Perception
+# Only text/XML/CSV evidence under reports/vv_perception/ is committed.
+reports/vv_perception/**/test_perception*
+reports/vv_perception/**/test_nominal
+reports/vv_perception/**/test_mcdc
+reports/vv_perception/**/*.gcda
+reports/vv_perception/**/*.gcno
+reports/vv_perception/**/*.gcov
+
+# V&V intermediate artefacts — CAN
+# Only text/XML/CSV/gcov evidence under reports/vv_can/ is committed.
+# Logs, binaries, HTML bundles and coverage intermediates are regenerated
+# by `make mcdc-can / html-can` and published to gh-pages by publish-pages.
+reports/vv_can/**/test_can*
+reports/vv_can/**/test_can_fault*
+reports/vv_can/**/test_can_struct*
+reports/vv_can/**/*.gcda
+reports/vv_can/**/*.gcno
+reports/vv_can/coverage_mcdc/report.*
+reports/vv_can/coverage_mcdc/*.info
+reports/vv_can/coverage_mcdc/*.png
+reports/vv_can/coverage_mcdc/*.css
+reports/vv_can/coverage_mcdc/cmd_line
+reports/vv_can/coverage_mcdc/updown.png
+reports/vv_can/coverage_mcdc/html/
+reports/vv_can/coverage_mcdc/index*.html
+reports/vv_can/coverage_mcdc/communication/
+reports/vv_can/coverage_html/
+reports/vv_can/misra_html/
+reports/vv_can/memory_html/
+reports/vv_can/fault_html/
+reports/vv_can/fault_injection/*.log
+reports/vv_can/memory_safety/*.log
+reports/vv_can/misra/cppcheck_can.xml
+reports/vv_can/misra/run.log
+
+# Consolidated V&V reports live in the team docs area, not in the repo
+reports/vv_uds/*.tex
+reports/vv_uds/*.pdf
+reports/vv_decision/*.tex
+reports/vv_decision/*.pdf
+reports/vv_perception/*.tex
+reports/vv_perception/*.pdf
+reports/vv_can/*.tex
+reports/vv_can/*.pdf
+
+# Legacy top-level V&V directories (pre-refactor — root-anchored)
+/coverage_mcdc/
+/fault_tests/
+/memory_safety/
+
+# Generic coverage intermediates (root-level runs)
+*.gcov
+*.gcda
+*.gcno
+test_decision_cov
+test_decision_mcdc
+test_decision_fault
+test_perception_fault
+
+# Compiled test binaries within V&V report folders (generic catch-all)
+reports/vv_*/coverage_mcdc/test_*
+reports/vv_*/fault_injection/test_*
+reports/vv_*/memory_safety/bin/
+
+# Memory safety instrumented binaries (not evidence, regenerated each run)
+reports/vv_*/memory_safety/test_*_san
+reports/vv_*/memory_safety/test_*_val
+
+# Auto-generated reports (regenerated each run)
+docs/Memory_Safety_Report.html
+
+# Python venv (local verification toolchain)
+venv/
+
+# LaTeX build artefacts (NOT *.log here — our V&V artefacts include run.log files)
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.out
+*.synctex.gz
+*.toc
+*.nav
+*.snm
 
 # IDE
 .vscode/
@@ -19,3 +134,8 @@ test_integration
 # OS
 Thumbs.db
 .DS_Store
+
+# Development tools (compiled binaries)
+tools/sim_manual
+tools/sim_manual.exe
+tools/output/

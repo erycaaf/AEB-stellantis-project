@@ -1,0 +1,219 @@
+name: CAN V&V
+
+# Runs the ASIL-D V&V stack scoped to the CAN module.
+#
+# Triggers only on paths that can affect CAN behaviour. On PRs to
+# development/main, all four blocking gates must pass: MC/DC coverage,
+# dynamic memory safety, MISRA C:2012 conformance, and fault injection.
+#
+# Reports are published in two layers:
+#   1. Workflow Artifacts on every run (PR or push), retention 30 days.
+#   2. GitHub Pages (gh-pages branch) on push to development/main —
+#      navigable HTML reports under
+#      https://erycaaf.github.io/AEB-stellantis-project/vv_can/<branch>/.
+
+on:
+  pull_request:
+    branches: [development, main]
+    paths:
+      - 'src/communication/aeb_can.c'
+      - 'include/aeb_can.h'
+      - 'include/aeb_types.h'
+      - 'include/aeb_config.h'
+      - 'stubs/can_hal.c'
+      - 'stubs/can_hal.h'
+      - 'tests/test_can.c'
+      - 'tests/test_can_fault.c'
+      - 'tests/test_can_struct.c'
+      - 'Makefile'
+      - 'scripts/wrap_memory.sh'
+      - 'scripts/wrap_fault.py'
+      - 'docker/Dockerfile.vv'
+      - '.github/workflows/vv-can.yml'
+  push:
+    branches: [development, main]
+    paths:
+      - 'src/communication/aeb_can.c'
+      - 'include/aeb_can.h'
+      - 'include/aeb_types.h'
+      - 'include/aeb_config.h'
+      - 'stubs/can_hal.c'
+      - 'stubs/can_hal.h'
+      - 'tests/test_can.c'
+      - 'tests/test_can_fault.c'
+      - 'tests/test_can_struct.c'
+      - 'Makefile'
+      - 'scripts/wrap_memory.sh'
+      - 'scripts/wrap_fault.py'
+      - 'docker/Dockerfile.vv'
+      - '.github/workflows/vv-can.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: vv-can-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  vv-can:
+    name: CAN V&V stack
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install V&V toolchain (matches docker/Dockerfile.vv)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-14 g++-14 make libc6-dev \
+            cppcheck python3-pygments \
+            valgrind lcov gcovr python3-minimal bc
+          sudo ln -sf /usr/bin/gcc-14  /usr/local/bin/gcc
+          sudo ln -sf /usr/bin/g++-14  /usr/local/bin/g++
+          sudo ln -sf /usr/bin/gcov-14 /usr/local/bin/gcov
+          sudo curl -fsSL \
+            https://raw.githubusercontent.com/danmar/cppcheck/2.13.0/htmlreport/cppcheck-htmlreport \
+            -o /usr/local/bin/cppcheck-htmlreport
+          sudo chmod +x /usr/local/bin/cppcheck-htmlreport
+          gcc --version | head -1
+          gcov --version | head -1
+          cppcheck --version
+          cppcheck-htmlreport --help | head -1
+          valgrind --version
+
+      # ─── Blocking gate 1: structural coverage ─────────────────────────────
+      - name: MC/DC coverage (gate ≥ 95%)
+        run: |
+          make mcdc-can
+          SUM="reports/vv_can/coverage_mcdc/gcov_summary.txt"
+          STMT=$(grep '^Lines executed:'             "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          BRCH=$(grep '^Taken at least once:'        "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          MCDC=$(grep '^Condition outcomes covered:' "$SUM" | head -1 | sed 's/.*:\([0-9.]*\)%.*/\1/')
+          echo "CAN coverage — stmt=${STMT}% branch=${BRCH}% mcdc=${MCDC}%"
+          for metric in "Statement:$STMT" "Branch:$BRCH" "MC/DC:$MCDC"; do
+            name="${metric%%:*}"; value="${metric##*:}"
+            if [ "$(echo "$value < 95.0" | bc -l)" = "1" ]; then
+              echo "::error title=CAN coverage regression::${name} dropped to ${value}% (required ≥95%)"
+              exit 1
+            fi
+          done
+
+      # ─── Blocking gate 2: dynamic memory safety on nominal suite ──────────
+      - name: Memory safety (Valgrind + ASan + UBSan)
+        run: |
+          make memory-can
+          MS="reports/vv_can/memory_safety"
+          if [ -s "$MS/valgrind_test_can.log" ]; then
+            echo "::error title=Valgrind regression::Errors on nominal CAN suite"
+            cat "$MS/valgrind_test_can.log"; exit 1
+          fi
+          if [ -s "$MS/ubsan_test_can.log" ]; then
+            echo "::error title=UBSan regression::Errors on nominal CAN suite"
+            cat "$MS/ubsan_test_can.log"; exit 1
+          fi
+
+      # ─── Blocking gate 3: MISRA C:2012 (CAN scope only) ───────────────────
+      - name: MISRA (0 issues in aeb_can.{c,h})
+        run: |
+          make misra-can
+          CAN_ISSUES=$(python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          t = ET.parse("reports/vv_can/misra/cppcheck_can.xml")
+          target = ("src/communication/aeb_can.c", "include/aeb_can.h")
+          n = 0
+          for e in t.findall(".//error"):
+              if not e.get("id", "").startswith("misra-c2012"):
+                  continue
+              loc = e.find("location")
+              if loc is not None and any(loc.get("file", "").endswith(f) for f in target):
+                  n += 1
+          print(n)
+          PY
+          )
+          echo "MISRA issues in aeb_can scope: $CAN_ISSUES"
+          if [ "$CAN_ISSUES" != "0" ]; then
+            echo "::error title=MISRA regression::$CAN_ISSUES issue(s) in aeb_can.{c,h}"
+            exit 1
+          fi
+
+      # ─── Blocking gate 4: fault injection ─────────────────────────────────
+      - name: Fault injection
+        run: make fault-can
+
+      # ─── Generate navigable HTML reports ──────────────────────────────────
+      - name: Generate HTML reports
+        if: always()
+        run: make html-can
+
+      # ─── Summary for the PR/commit checks UI ──────────────────────────────
+      - name: Step summary
+        if: always()
+        run: |
+          {
+            echo "## CAN V&V — run #${{ github.run_number }}"
+            echo ""
+            if [ "${{ github.event_name }}" = "push" ]; then
+              echo "📊 **Browse reports:** https://erycaaf.github.io/AEB-stellantis-project/vv_can/${{ github.ref_name }}/"
+              echo ""
+            fi
+            echo "### Structural coverage"
+            echo '```'
+            cat reports/vv_can/coverage_mcdc/gcov_summary.txt
+            echo '```'
+            echo ""
+            echo "### Fault injection"
+            echo '```'
+            tail -5 reports/vv_can/fault_injection/run.log 2>/dev/null || echo "(fault-can did not run)"
+            echo '```'
+            echo ""
+            echo "### Memory safety"
+            for f in reports/vv_can/memory_safety/*.log; do
+              name=$(basename "$f")
+              if [ -s "$f" ]; then
+                echo "**${name}:**"
+                echo '```'
+                head -20 "$f"
+                echo '```'
+              else
+                echo "**${name}:** _clean_"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vv-can-reports-run${{ github.run_number }}
+          path: reports/vv_can/
+          retention-days: 30
+
+  publish-pages:
+    needs: vv-can
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-pages-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Download reports
+        uses: actions/download-artifact@v4
+        with:
+          name: vv-can-reports-run${{ github.run_number }}
+          path: site/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          destination_dir: vv_can/${{ github.ref_name }}
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: '41898282+github-actions[bot]@users.noreply.github.com'
+          commit_message: 'docs(vv-can): publish reports from run #${{ github.run_number }} (${{ github.ref_name }})'

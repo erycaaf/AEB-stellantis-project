@@ -1,0 +1,32 @@
+aeb-gazebo  | [scenario_controller.py-3] [INFO] [1777935599.821114674] [scenario_controller]: t=6.0s  d=54.9m  v_ego=28.9km/h  brake=0%  FSM=STANDBY
+aeb-gazebo  | [scenario_controller.py-3] [INFO] [1777935602.821327860] [scenario_controller]: t=9.0s  d=30.9m  v_ego=28.9km/h  brake=0%  FSM=WARNING
+aeb-gazebo  | [scenario_controller.py-3] [INFO] [1777935603.820871694] [scenario_controller]: t=10.0s  d=22.8m  v_ego=28.7km/h  brake=20%  FSM=BRAKE_L1
+aeb-gazebo  | [scenario_controller.py-3] [INFO] [1777935604.821053228] [scenario_controller]: t=11.0s  d=16.1m  v_ego=21.8km/h  brake=20%  FSM=BRAKE_L1
+aeb-gazebo  | [scenario_controller.py-3] [INFO] [1777935605.820902891] [scenario_controller]: t=12.0s  d=10.9m  v_ego=14.6km/h  brake=20%  FSM=BRAKE_L1
+aeb-gazebo  | [scenario_controller.py-3] [INFO] [1777935606.821085582] [scenario_controller]: t=13.0s  d=8.2m  v_ego=2.9km/h  brake=40%  FSM=BRAKE_L2
+aeb-gazebo  | [scenario_controller.py-3] [INFO] [1777935606.990678546] [scenario_controller]: *** STOPPED: distance remaining = 8.2 m ***
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1100 st=6 ttc=10.0 brk=0% d=8.0 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1150 st=6 ttc=10.0 brk=0% d=8.1 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1200 st=6 ttc=10.0 brk=0% d=8.0 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1250 st=6 ttc=10.0 brk=0% d=8.2 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1300 st=6 ttc=10.0 brk=0% d=8.2 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1350 st=6 ttc=10.0 brk=0% d=8.0 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1400 st=6 ttc=10.0 brk=0% d=8.3 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1450 st=6 ttc=10.0 brk=0% d=8.2 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1500 st=6 ttc=10.0 brk=0% d=8.2 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1550 st=6 ttc=10.0 brk=0% d=8.1 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1600 st=6 ttc=10.0 brk=0% d=8.0 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1650 st=6 ttc=10.0 brk=0% d=8.1 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1700 st=6 ttc=10.0 brk=0% d=8.2 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1750 st=6 ttc=10.0 brk=0% d=8.2 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1800 st=6 ttc=10.0 brk=0% d=8.1 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1850 st=6 ttc=10.0 brk=0% d=8.3 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1900 st=6 ttc=10.0 brk=0% d=8.1 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=1950 st=6 ttc=10.0 brk=0% d=8.2 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=2000 st=6 ttc=10.0 brk=0% d=8.0 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=2050 st=6 ttc=10.0 brk=0% d=8.0 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=2100 st=6 ttc=10.0 brk=0% d=8.3 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=2150 st=6 ttc=10.0 brk=0% d=8.0 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=2200 st=6 ttc=10.0 brk=0% d=8.1 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=2250 st=6 ttc=10.0 brk=0% d=8.2 v=0.0 flt=0 to=0
+aeb-ecu  | [00:00:00.000,000] <inf> aeb_main: c=2300 st=6 ttc=10.0 brk=0% d=8.1 v=0.0 flt=0 to=0

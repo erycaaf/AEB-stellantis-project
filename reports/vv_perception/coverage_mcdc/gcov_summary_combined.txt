@@ -1,0 +1,17 @@
+File '/Users/jessicaroberta/Desktop/AEB-stellantis-project/src/perception/aeb_perception.c'
+Lines executed:100.00% of 168
+Branches executed:96.55% of 116
+Taken at least once:90.52% of 116
+Calls executed:100.00% of 10
+Condition outcomes covered:85.83% of 120
+Creating 'aeb_perception.c.gcov'
+
+File '/usr/local/Cellar/gcc@14/14.3.0/lib/gcc/14/gcc/x86_64-apple-darwin21/14/include-fixed/math.h'
+Lines executed:100.00% of 1
+Branches executed:100.00% of 36
+Taken at least once:91.67% of 36
+No calls
+Condition outcomes covered:74.14% of 58
+Creating 'math.h.gcov'
+
+Lines executed:100.00% of 169

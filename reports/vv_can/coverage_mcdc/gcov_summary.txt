@@ -1,0 +1,10 @@
+Cannot open source file src/communication/aeb_can.c
+File 'src/communication/aeb_can.c'
+Lines executed:90.82% of 196
+Branches executed:100.00% of 97
+Taken at least once:64.95% of 97
+Calls executed:100.00% of 43
+Condition outcomes covered:71.43% of 84
+Creating 'aeb_can.c.gcov'
+
+Lines executed:90.82% of 196

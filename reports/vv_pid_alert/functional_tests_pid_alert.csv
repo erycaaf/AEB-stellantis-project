@@ -1,0 +1,38 @@
+Requirement,Test function,Input,Expected,P/F,Evidence,Category
+FR-BRK-001,test_pid_progressive,"decel_target increasing over cycles","|Δbrake_pct| ≤ 1.67 %/cycle",P,tests/test_pid.c,nominal
+FR-BRK-002,test_pid_anti_windup,"decel_target=6, a_ego=0 (saturation)","integral clamped to PID_INTEG_MAX=50",P,tests/test_pid.c,nominal
+FR-BRK-003,test_pid_max_brake,"decel_target=6 m/s²","brake_pct reaches 100%",P,tests/test_pid.c,nominal
+FR-BRK-004,test_pid_jerk_limit,"decel_target step from 0 to 6","|Δbrake_pct| ≤ max_delta",P,tests/test_pid.c,nominal
+FR-BRK-005,test_pid_post_brake_hold,"FSM=POST_BRAKE for 2s","brake_pct maintained",P,tests/test_pid.c,nominal
+FR-BRK-006,test_pid_post_brake_release,"FSM exits POST_BRAKE → STANDBY","brake_pct=0 within 1 cycle",P,tests/test_pid.c,nominal
+FR-BRK-007,test_pid_output_clamp,"decel_target=1000 (impossible)","brake_pct ∈ [0, 100]",P,tests/test_pid.c,nominal
+FR-ALR-001,test_alert_visual_warning,"fsm_state=FSM_WARNING","alert_type=ALERT_BOTH, alert_active=1",P,tests/test_alert.c,nominal
+FR-ALR-002,test_alert_audible_warning,"fsm_state=FSM_WARNING","buzzer_cmd=BUZZER_SINGLE",P,tests/test_alert.c,nominal
+FR-ALR-003,test_alert_precedes_braking,"WARNING before BRAKE_L1","alert_active=1 during WARNING",P,tests/test_alert.c,nominal
+FR-ALR-004,test_alert_ceases_standby,"fsm_state=FSM_STANDBY","alert_active=0, buzzer=SILENT",P,tests/test_alert.c,nominal
+FR-DEC-006,test_override_brake_pedal,"brake_pedal=1","override=1",P,tests/test_alert.c,nominal
+FR-DEC-007,test_override_steering,"|steering_angle| > 5°","override=1",P,tests/test_alert.c,nominal
+MC/DC-01,test_pid_clamp_lower_bound,"value < lo in clamp_f32","result = lo",P,tests/test_pid_mcdc.c,mcdc
+MC/DC-02,test_pid_null_guard,"output == NULL","function returns without write",P,tests/test_pid_mcdc.c,mcdc
+MC/DC-03,test_pid_decel_zero_isolated,"fsm_state=BRAKE_L2, decel_target=0","reset path",P,tests/test_pid_mcdc.c,mcdc
+MC/DC-04,test_alert_null_guard,"output == NULL in alert_map","function returns without write",P,tests/test_alert_mcdc.c,mcdc
+NFR-SAF-ROB,test_fault_a_ego_nan,"a_ego=NaN, fsm=BRAKE_L2","brake_pct ∈ [0,100] (no NaN propagation)",F,fault_injection/pid_fault.log (FAULT-A1),fault-A
+NFR-SAF-ROB,test_fault_a_ego_pos_inf,"a_ego=+Inf, fsm=BRAKE_L2","brake_pct ∈ [0,100]",P,fault_injection/pid_fault.log (FAULT-A2),fault-A
+NFR-SAF-ROB,test_fault_a_ego_neg_inf,"a_ego=-Inf, fsm=BRAKE_L2","brake_pct ∈ [0,100]",P,fault_injection/pid_fault.log (FAULT-A3),fault-A
+NFR-SAF-ROB,test_fault_decel_nan,"decel_target=NaN","brake_pct ∈ [0,100]",F,fault_injection/pid_fault.log (FAULT-A4),fault-A
+NFR-SAF-ROB,test_fault_a_ego_extreme,"a_ego=100 m/s²","brake_pct ∈ [0,100]",P,fault_injection/pid_fault.log (FAULT-B1),fault-B
+NFR-SAF-ROB,test_fault_decel_extreme,"decel_target=1000 m/s²","brake_pct saturates at 100",P,fault_injection/pid_fault.log (FAULT-B2),fault-B
+NFR-SAF-ROB,test_fault_flt_max,"a_ego=FLT_MAX","brake_pct ∈ [0,100]",P,fault_injection/pid_fault.log (FAULT-B3),fault-B
+NFR-SAF-ROB,test_fault_fsm_invalid_99,"fsm_state=99","brake_pct=0 (fail-safe)",F,fault_injection/pid_fault.log (FAULT-C1),fault-C
+NFR-SAF-ROB,test_fault_fsm_uint8_max,"fsm_state=255","brake_pct=0 (fail-safe)",F,fault_injection/pid_fault.log (FAULT-C2),fault-C
+NFR-SAF-ROB,test_fault_integrator_reset,"BRAKE→invalid→BRAKE sequence","no stale integrator carry-over",P,fault_injection/pid_fault.log (FAULT-D1),fault-D
+NFR-SAF-ROB,test_fault_jerk_under_fault,"spike decel_target=100","|Δ| ≤ max_delta",P,fault_injection/pid_fault.log (FAULT-D2),fault-D
+NFR-SAF-ROB,test_fault_alert_invalid_7,"fsm_state=7 in alert_map","ALERT_NONE (silent)",P,fault_injection/alert_fault.log (FAULT-A1),fault-A
+NFR-SAF-ROB,test_fault_alert_invalid_99,"fsm_state=99 in alert_map","ALERT_NONE (silent)",P,fault_injection/alert_fault.log (FAULT-A2),fault-A
+NFR-SAF-ROB,test_fault_alert_uint8_max,"fsm_state=255 in alert_map","ALERT_NONE (silent)",P,fault_injection/alert_fault.log (FAULT-A3),fault-A
+NFR-SAF-ROB,test_fault_override_nan,"steering=NaN","returns 0 or 1 (no crash)",P,fault_injection/alert_fault.log (FAULT-B1),fault-B
+NFR-SAF-ROB,test_fault_override_pos_inf,"steering=+Inf","override=1",P,fault_injection/alert_fault.log (FAULT-B2),fault-B
+NFR-SAF-ROB,test_fault_override_neg_inf,"steering=-Inf","override=1",P,fault_injection/alert_fault.log (FAULT-B3),fault-B
+NFR-SAF-ROB,test_fault_override_boundary,"steering=5.0 exactly","no override (strict >)",P,fault_injection/alert_fault.log (FAULT-C3),fault-C
+NFR-SAF-ROB,test_fault_brake_pedal_2,"brake_pedal=2 (non-standard)","override=1 (safe default)",P,fault_injection/alert_fault.log (FAULT-D1),fault-D
+NFR-SAF-ROB,test_fault_brake_pedal_255,"brake_pedal=255","override=1 (safe default)",P,fault_injection/alert_fault.log (FAULT-D2),fault-D

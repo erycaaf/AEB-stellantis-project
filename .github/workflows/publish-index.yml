@@ -1,0 +1,52 @@
+name: Publish V&V index page
+
+# Deploys docs/index.html to the root of the gh-pages branch whenever it
+# changes on development or main. Per-module workflows (vv-uds.yml,
+# vv-pid.yml, etc.) deploy their HTML reports to subdirectories of the
+# same gh-pages branch using keep_files: true, so this index page sits
+# at the root and links into them.
+
+on:
+  push:
+    branches: [development, main]
+    paths:
+      - 'docs/index.html'
+      - '.github/workflows/publish-index.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-index-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish index.html to gh-pages
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    # Serialise every gh-pages push across ALL workflows in the repo to
+    # avoid non-fast-forward races. Shared string, matches the group used
+    # by the per-module publish-pages jobs (e.g. vv-uds.yml).
+    concurrency:
+      group: gh-pages-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Stage index for deploy
+        run: |
+          mkdir -p site
+          cp docs/index.html site/index.html
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: '41898282+github-actions[bot]@users.noreply.github.com'
+          commit_message: 'docs(index): refresh landing page from ${{ github.ref_name }}@${{ github.sha }}'
