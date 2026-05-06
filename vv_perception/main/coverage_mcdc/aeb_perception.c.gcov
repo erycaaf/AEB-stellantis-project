@@ -1,0 +1,500 @@
+        -:    0:Source:/home/runner/work/AEB-stellantis-project/AEB-stellantis-project/src/perception/aeb_perception.c
+        -:    0:Graph:aeb_perception.gcno
+        -:    0:Data:aeb_perception.gcda
+        -:    0:Runs:2
+        -:    1:/**
+        -:    2: * @file  aeb_perception.c
+        -:    3: * @brief AEB Perception module implementation.
+        -:    4: */
+        -:    5:
+        -:    6:#include "aeb_perception.h"
+        -:    7:#include "aeb_config.h"
+        -:    8:#include <stddef.h>
+        -:    9:#include <math.h>
+        -:   10:
+        -:   11:#define FABSF(x) (((x) < 0.0f) ? -(x) : (x))
+        -:   12:
+function clampf called 3736 returned 100% blocks executed 100%
+     3736:   13:static float32_t clampf(float32_t v, float32_t lo, float32_t hi)
+        -:   14:{
+     3736:   15:    if (v < lo) { return lo; }
+branch  0 taken 5 (fallthrough)
+branch  1 taken 3731
+condition outcomes covered 2/2
+     3731:   16:    if (v > hi) { return hi; }
+branch  0 taken 157 (fallthrough)
+branch  1 taken 3574
+condition outcomes covered 2/2
+     3574:   17:    return v;
+        -:   18:}
+        -:   19:
+        -:   20:/* --- LiDAR fault detector (chart_26) --- */
+        -:   21:
+        -:   22:typedef struct {
+        -:   23:    float32_t prev_d;
+        -:   24:    uint8_t   ctr;
+        -:   25:    uint8_t   is_first;
+        -:   26:} lidar_state_t;
+        -:   27:
+        -:   28:static lidar_state_t s_lidar;
+        -:   29:
+function lidar_state_reset called 54 returned 100% blocks executed 100%
+       54:   30:static void lidar_state_reset(lidar_state_t *s)
+        -:   31:{
+       54:   32:    s->prev_d   = 0.0f;
+       54:   33:    s->ctr      = 0U;
+       54:   34:    s->is_first = 1U;
+       54:   35:}
+        -:   36:
+function lidar_fault_detect called 1866 returned 100% blocks executed 95%
+     1866:   37:static uint8_t lidar_fault_detect(float32_t d_l)
+        -:   38:{
+        -:   39:    uint8_t bad;
+        -:   40:    uint8_t fault;
+        -:   41:
+     3494:   42:    bad = (!isfinite(d_l) ||
+branch  0 taken 1637 (fallthrough)
+branch  1 taken 229
+branch  2 taken 1628 (fallthrough)
+branch  3 taken 9
+condition outcomes covered 6/6
+     1628:   43:           (d_l < LIDAR_DIST_MIN) || (d_l > LIDAR_DIST_MAX)) ? 1U : 0U;
+branch  0 taken 595 (fallthrough)
+branch  1 taken 1033
+        -:   44:
+     1866:   45:    if ((s_lidar.is_first == 0U) && (bad == 0U)) {
+branch  0 taken 995 (fallthrough)
+branch  1 taken 871
+branch  2 taken 991 (fallthrough)
+branch  3 taken 4
+condition outcomes covered 4/4
+     991*:   46:        if (FABSF(d_l - s_lidar.prev_d) > DIST_ROC_LIMIT) {
+branch  0 taken 0 (fallthrough)
+branch  1 taken 991
+branch  2 taken 13 (fallthrough)
+branch  3 taken 978
+condition outcomes covered 1/2
+condition  0 not covered (true)
+condition outcomes covered 2/2
+       13:   47:            bad = 1U;
+        -:   48:        }
+        -:   49:    }
+        -:   50:
+     1866:   51:    if (bad != 0U) {
+branch  0 taken 846 (fallthrough)
+branch  1 taken 1020
+condition outcomes covered 2/2
+      846:   52:        if (s_lidar.ctr < 255U) { s_lidar.ctr++; }
+branch  0 taken 799 (fallthrough)
+branch  1 taken 47
+condition outcomes covered 2/2
+        -:   53:    } else {
+        -:   54:        /* Update ROC baseline and arm is_first only on trustworthy frames —
+        -:   55:         * prevents a bad first frame from contaminating prev_d. */
+     1020:   56:        s_lidar.ctr      = 0U;
+     1020:   57:        s_lidar.prev_d   = d_l;
+     1020:   58:        s_lidar.is_first = 0U;
+        -:   59:    }
+        -:   60:
+     1866:   61:    fault = (s_lidar.ctr >= (uint8_t)SENSOR_FAULT_CYCLES) ? 1U : 0U;
+branch  0 taken 804 (fallthrough)
+branch  1 taken 1062
+condition outcomes covered 2/2
+     1866:   62:    return fault;
+        -:   63:}
+        -:   64:
+        -:   65:/* --- Radar fault detector (chart_33) --- */
+        -:   66:
+        -:   67:typedef struct {
+        -:   68:    float32_t prev_d;
+        -:   69:    float32_t prev_vr;
+        -:   70:    uint8_t   ctr;
+        -:   71:    uint8_t   is_first;
+        -:   72:} radar_state_t;
+        -:   73:
+        -:   74:static radar_state_t s_radar;
+        -:   75:
+function radar_state_reset called 54 returned 100% blocks executed 100%
+       54:   76:static void radar_state_reset(radar_state_t *s)
+        -:   77:{
+       54:   78:    s->prev_d   = 0.0f;
+       54:   79:    s->prev_vr  = 0.0f;
+       54:   80:    s->ctr      = 0U;
+       54:   81:    s->is_first = 1U;
+       54:   82:}
+        -:   83:
+function radar_fault_detect called 1866 returned 100% blocks executed 100%
+     1866:   84:static uint8_t radar_fault_detect(float32_t d_r, float32_t vr_r)
+        -:   85:{
+        -:   86:    uint8_t bad;
+        -:   87:    uint8_t fault;
+        -:   88:
+     4537:   89:    bad = (!isfinite(d_r) || !isfinite(vr_r) ||
+branch  0 taken 1641 (fallthrough)
+branch  1 taken 225
+branch  2 taken 1636 (fallthrough)
+branch  3 taken 5
+branch  4 taken 1631 (fallthrough)
+branch  5 taken 5
+branch  6 taken 71 (fallthrough)
+branch  7 taken 969
+condition outcomes covered 13/14
+condition  5 not covered (true)
+     1702:   90:           (d_r < RADAR_DIST_MIN) || (d_r > RADAR_DIST_MAX) ||
+branch  0 taken 1040 (fallthrough)
+branch  1 taken 591
+branch  2 taken 0
+branch  3 taken 71
+      969:   91:           (FABSF(vr_r) > MAX_REL_VEL)) ? 1U : 0U;
+branch  0 taken 6 (fallthrough)
+branch  1 taken 963
+        -:   92:
+     1866:   93:    if ((s_radar.is_first == 0U) && (bad == 0U)) {
+branch  0 taken 1219 (fallthrough)
+branch  1 taken 647
+branch  2 taken 992 (fallthrough)
+branch  3 taken 227
+condition outcomes covered 4/4
+      992:   94:        if ((FABSF(d_r  - s_radar.prev_d)  > DIST_ROC_LIMIT) ||
+branch  0 taken 4 (fallthrough)
+branch  1 taken 988
+branch  2 taken 1
+branch  3 taken 3
+branch  4 taken 968 (fallthrough)
+branch  5 taken 20
+condition outcomes covered 12/12
+      969:   95:            (FABSF(vr_r - s_radar.prev_vr) > VEL_ROC_LIMIT)) {
+branch  0 taken 4 (fallthrough)
+branch  1 taken 965
+branch  2 taken 3
+branch  3 taken 1
+branch  4 taken 10 (fallthrough)
+branch  5 taken 955
+       36:   96:            bad = 1U;
+        -:   97:        }
+        -:   98:    }
+        -:   99:
+     1866:  100:    if (bad != 0U) {
+branch  0 taken 868 (fallthrough)
+branch  1 taken 998
+condition outcomes covered 2/2
+      868:  101:        if (s_radar.ctr < 255U) { s_radar.ctr++; }
+branch  0 taken 821 (fallthrough)
+branch  1 taken 47
+condition outcomes covered 2/2
+        -:  102:    } else {
+        -:  103:        /* Update ROC baseline and arm is_first only on trustworthy frames —
+        -:  104:         * prevents a bad first frame from contaminating prev_d/prev_vr. */
+      998:  105:        s_radar.ctr      = 0U;
+      998:  106:        s_radar.prev_d   = d_r;
+      998:  107:        s_radar.prev_vr  = vr_r;
+      998:  108:        s_radar.is_first = 0U;
+        -:  109:    }
+        -:  110:
+     1866:  111:    fault = (s_radar.ctr >= (uint8_t)SENSOR_FAULT_CYCLES) ? 1U : 0U;
+branch  0 taken 816 (fallthrough)
+branch  1 taken 1050
+condition outcomes covered 2/2
+     1866:  112:    return fault;
+        -:  113:}
+        -:  114:
+        -:  115:/* --- Kalman fusion (chart_41) ---
+        -:  116: *
+        -:  117: * State: x = [distance, v_rel]'
+        -:  118: * F = | 1  -dt |    Q = diag(Q_d, Q_v)
+        -:  119: *     | 0   1  |
+        -:  120: *
+        -:  121: * Sequential update:
+        -:  122: *   1) LiDAR:  H = [1,0],  R = R_lidar
+        -:  123: *   2) Radar:  H = I_2x2,  R = diag(R_radar_d, R_radar_v)
+        -:  124: *
+        -:  125: * Confidence: both=1.0, radar-only=0.7, lidar-only=0.5, none=0.0
+        -:  126: *             scaled by max(0, 1 - tr(P)/2)
+        -:  127: */
+        -:  128:
+        -:  129:typedef struct {
+        -:  130:    float32_t x[2];
+        -:  131:    float32_t P[2][2];
+        -:  132:    uint8_t   initialized;
+        -:  133:} kalman_state_t;
+        -:  134:
+        -:  135:static kalman_state_t s_kalman;
+        -:  136:
+function kalman_state_reset called 54 returned 100% blocks executed 100%
+       54:  137:static void kalman_state_reset(kalman_state_t *s)
+        -:  138:{
+       54:  139:    s->x[0] = 0.0f;
+       54:  140:    s->x[1] = 0.0f;
+       54:  141:    s->P[0][0] = KALMAN_P0_D;  s->P[0][1] = 0.0f;
+       54:  142:    s->P[1][0] = 0.0f;         s->P[1][1] = KALMAN_P0_V;
+       54:  143:    s->initialized = 0U;
+       54:  144:}
+        -:  145:
+function kalman_fusion called 1866 returned 100% blocks executed 95%
+     1866:  146:static void kalman_fusion(
+        -:  147:    float32_t d_l, float32_t d_r, float32_t vr_r,
+        -:  148:    uint8_t l_fault, uint8_t r_fault, uint8_t fi,
+        -:  149:    float32_t *out_d, float32_t *out_v, float32_t *out_conf)
+        -:  150:{
+     1866:  151:    uint8_t l_ok = ((l_fault == 0U) && (fi == 0U) && isfinite(d_l)) ? 1U : 0U;
+branch  0 taken 1062 (fallthrough)
+branch  1 taken 804
+branch  2 taken 1059 (fallthrough)
+branch  3 taken 3
+branch  4 taken 1053 (fallthrough)
+branch  5 taken 6
+condition outcomes covered 6/6
+     2913:  152:    uint8_t r_ok = ((r_fault == 0U) && (fi == 0U) &&
+branch  0 taken 1050 (fallthrough)
+branch  1 taken 816
+branch  2 taken 1047 (fallthrough)
+branch  3 taken 3
+condition outcomes covered 8/8
+     1047:  153:                    isfinite(d_r) && isfinite(vr_r)) ? 1U : 0U;
+branch  0 taken 1042 (fallthrough)
+branch  1 taken 5
+branch  2 taken 1039 (fallthrough)
+branch  3 taken 3
+        -:  154:
+        -:  155:    /* Seed deferred until a finite radar frame; until then, l_ok/r_ok are
+        -:  156:     * both 0 and *out_conf below is forced to 0.0f — "no information" signalled. */
+     1866:  157:    if ((s_kalman.initialized == 0U) && isfinite(d_r) && isfinite(vr_r)) {
+branch  0 taken 60 (fallthrough)
+branch  1 taken 1806
+branch  2 taken 55 (fallthrough)
+branch  3 taken 5
+branch  4 taken 50 (fallthrough)
+branch  5 taken 5
+condition outcomes covered 6/6
+       50:  158:        s_kalman.x[0] = d_r;
+       50:  159:        s_kalman.x[1] = vr_r;
+       50:  160:        s_kalman.initialized = 1U;
+        -:  161:    }
+        -:  162:
+        -:  163:    /* --- PREDICT: xp = F*x, Pp = F*P*F' + Q --- */
+     1866:  164:    float32_t dt = AEB_DT;
+     1866:  165:    float32_t xp0 = s_kalman.x[0] - (dt * s_kalman.x[1]);
+     1866:  166:    float32_t xp1 = s_kalman.x[1];
+        -:  167:
+     1866:  168:    float32_t A00 = s_kalman.P[0][0] - (dt * s_kalman.P[1][0]);
+     1866:  169:    float32_t A01 = s_kalman.P[0][1] - (dt * s_kalman.P[1][1]);
+     1866:  170:    float32_t A10 = s_kalman.P[1][0];
+     1866:  171:    float32_t A11 = s_kalman.P[1][1];
+        -:  172:
+     1866:  173:    float32_t Pp00 = (A00 - (dt * A01)) + KALMAN_Q_D;
+     1866:  174:    float32_t Pp01 = A01;
+     1866:  175:    float32_t Pp10 = A10 - (dt * A11);
+     1866:  176:    float32_t Pp11 = A11 + KALMAN_Q_V;
+        -:  177:
+        -:  178:    /* --- UPDATE 1: LiDAR (H=[1,0], scalar) --- */
+     1866:  179:    float32_t x1_0 = xp0;
+     1866:  180:    float32_t x1_1 = xp1;
+     1866:  181:    float32_t P1_00 = Pp00;
+     1866:  182:    float32_t P1_01 = Pp01;
+     1866:  183:    float32_t P1_10 = Pp10;
+     1866:  184:    float32_t P1_11 = Pp11;
+        -:  185:
+     1866:  186:    if (l_ok != 0U) {
+branch  0 taken 1053 (fallthrough)
+branch  1 taken 813
+condition outcomes covered 2/2
+     1053:  187:        float32_t S_l  = Pp00 + KALMAN_R_LIDAR;
+     1053:  188:        float32_t K0   = Pp00 / S_l;
+     1053:  189:        float32_t K1   = Pp10 / S_l;
+     1053:  190:        float32_t innov = d_l - xp0;
+        -:  191:
+     1053:  192:        x1_0 = xp0 + (K0 * innov);
+     1053:  193:        x1_1 = xp1 + (K1 * innov);
+        -:  194:
+     1053:  195:        float32_t imK0 = 1.0f - K0;
+     1053:  196:        P1_00 = imK0 * Pp00;
+     1053:  197:        P1_01 = imK0 * Pp01;
+     1053:  198:        P1_10 = (-K1 * Pp00) + Pp10;
+     1053:  199:        P1_11 = (-K1 * Pp01) + Pp11;
+        -:  200:    }
+        -:  201:
+        -:  202:    /* --- UPDATE 2: Radar (H=I_2x2, 2x2 inverse) --- */
+     1866:  203:    float32_t x2_0 = x1_0;
+     1866:  204:    float32_t x2_1 = x1_1;
+     1866:  205:    float32_t P2_00 = P1_00;
+     1866:  206:    float32_t P2_01 = P1_01;
+     1866:  207:    float32_t P2_10 = P1_10;
+     1866:  208:    float32_t P2_11 = P1_11;
+        -:  209:
+     1866:  210:    if (r_ok != 0U) {
+branch  0 taken 1039 (fallthrough)
+branch  1 taken 827
+condition outcomes covered 2/2
+     1039:  211:        float32_t S00 = P1_00 + KALMAN_R_RADAR_D;
+     1039:  212:        float32_t S01 = P1_01;
+     1039:  213:        float32_t S10 = P1_10;
+     1039:  214:        float32_t S11 = P1_11 + KALMAN_R_RADAR_V;
+        -:  215:
+     1039:  216:        float32_t det = (S00 * S11) - (S01 * S10);
+        -:  217:
+    1039*:  218:        if (FABSF(det) > 1e-9f) {
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1039
+branch  2 taken 1039 (fallthrough)
+branch  3 taken 0
+condition outcomes covered 1/2
+condition  0 not covered (true)
+condition outcomes covered 1/2
+condition  0 not covered (false)
+     1039:  219:            float32_t inv_det = 1.0f / det;
+     1039:  220:            float32_t Si00 =  S11 * inv_det;
+     1039:  221:            float32_t Si01 = -S01 * inv_det;
+     1039:  222:            float32_t Si10 = -S10 * inv_det;
+     1039:  223:            float32_t Si11 =  S00 * inv_det;
+        -:  224:
+     1039:  225:            float32_t K00 = (P1_00 * Si00) + (P1_01 * Si10);
+     1039:  226:            float32_t K01 = (P1_00 * Si01) + (P1_01 * Si11);
+     1039:  227:            float32_t K10 = (P1_10 * Si00) + (P1_11 * Si10);
+     1039:  228:            float32_t K11 = (P1_10 * Si01) + (P1_11 * Si11);
+        -:  229:
+     1039:  230:            float32_t inn0 = d_r  - x1_0;
+     1039:  231:            float32_t inn1 = vr_r - x1_1;
+        -:  232:
+     1039:  233:            x2_0 = x1_0 + (K00 * inn0) + (K01 * inn1);
+     1039:  234:            x2_1 = x1_1 + (K10 * inn0) + (K11 * inn1);
+        -:  235:
+     1039:  236:            float32_t imK00 = 1.0f - K00;
+     1039:  237:            float32_t imK11 = 1.0f - K11;
+        -:  238:
+     1039:  239:            P2_00 = (imK00 * P1_00) + ((-K01) * P1_10);
+     1039:  240:            P2_01 = (imK00 * P1_01) + ((-K01) * P1_11);
+     1039:  241:            P2_10 = ((-K10) * P1_00) + (imK11 * P1_10);
+     1039:  242:            P2_11 = ((-K10) * P1_01) + (imK11 * P1_11);
+        -:  243:        }
+        -:  244:    }
+        -:  245:
+        -:  246:    /* Persist state */
+     1866:  247:    s_kalman.x[0]    = x2_0;
+     1866:  248:    s_kalman.x[1]    = x2_1;
+     1866:  249:    s_kalman.P[0][0] = P2_00;
+     1866:  250:    s_kalman.P[0][1] = P2_01;
+     1866:  251:    s_kalman.P[1][0] = P2_10;
+     1866:  252:    s_kalman.P[1][1] = P2_11;
+        -:  253:
+        -:  254:    /* Confidence */
+     1866:  255:    if ((l_ok == 0U) && (r_ok == 0U)) {
+branch  0 taken 813 (fallthrough)
+branch  1 taken 1053
+branch  2 taken 226 (fallthrough)
+branch  3 taken 587
+condition outcomes covered 4/4
+      226:  256:        *out_conf = 0.0f;
+        -:  257:    } else {
+        -:  258:        float32_t base;
+     1640:  259:        if ((l_ok != 0U) && (r_ok != 0U)) {
+branch  0 taken 1053 (fallthrough)
+branch  1 taken 587
+branch  2 taken 452 (fallthrough)
+branch  3 taken 601
+condition outcomes covered 4/4
+      452:  260:            base = 1.0f;
+     1188:  261:        } else if (r_ok != 0U) {
+branch  0 taken 587 (fallthrough)
+branch  1 taken 601
+condition outcomes covered 2/2
+      587:  262:            base = 0.7f;
+        -:  263:        } else {
+      601:  264:            base = 0.5f;
+        -:  265:        }
+     1640:  266:        float32_t trace_P = P2_00 + P2_11;
+     1640:  267:        float32_t quality = 1.0f - (trace_P / 2.0f);
+    1640*:  268:        if (quality < 0.0f) { quality = 0.0f; }
+branch  0 taken 0 (fallthrough)
+branch  1 taken 1640
+condition outcomes covered 1/2
+condition  0 not covered (true)
+     1640:  269:        *out_conf = base * quality;
+        -:  270:    }
+        -:  271:
+     1866:  272:    *out_d = clampf(x2_0, DIST_MIN_OUTPUT, DIST_MAX_OUTPUT);
+call    0 returned 1866
+     1866:  273:    *out_v = clampf(x2_1, -MAX_REL_VEL,   MAX_REL_VEL);
+call    0 returned 1866
+     1866:  274:}
+        -:  275:
+        -:  276:/* --- Public API --- */
+        -:  277:
+function perception_init called 54 returned 100% blocks executed 100%
+       54:  278:void perception_init(void)
+        -:  279:{
+       54:  280:    lidar_state_reset(&s_lidar);
+call    0 returned 54
+       54:  281:    radar_state_reset(&s_radar);
+call    0 returned 54
+       54:  282:    kalman_state_reset(&s_kalman);
+call    0 returned 54
+       54:  283:}
+        -:  284:
+function perception_step called 1868 returned 100% blocks executed 100%
+     1868:  285:void perception_step(const raw_sensor_input_t *in, perception_output_t *out)
+        -:  286:{
+        -:  287:    uint8_t   l_fault;
+        -:  288:    uint8_t   r_fault;
+        -:  289:    float32_t fused_d;
+        -:  290:    float32_t fused_v;
+        -:  291:    float32_t conf;
+        -:  292:
+     1868:  293:    out->fault_flag = 0U;
+        -:  294:
+     1868:  295:    if (isfinite(in->v_ego) != 0) {
+branch  0 taken 1866 (fallthrough)
+branch  1 taken 2
+condition outcomes covered 2/2
+     1866:  296:        out->v_ego = in->v_ego;
+        -:  297:    } else {
+        2:  298:        out->v_ego       = 0.0f;
+        2:  299:        out->fault_flag |= AEB_FAULT_CAN_TO;
+        -:  300:    }
+        -:  301:
+        -:  302:    /* CAN timeout: hold last Kalman estimate, flag all faults */
+     1868:  303:    if (in->can_timeout != 0U) {
+branch  0 taken 2 (fallthrough)
+branch  1 taken 1866
+condition outcomes covered 2/2
+        2:  304:        out->fault_flag = AEB_FAULT_LIDAR | AEB_FAULT_RADAR | AEB_FAULT_CAN_TO;
+        2:  305:        out->distance   = clampf(s_kalman.x[0], DIST_MIN_OUTPUT, DIST_MAX_OUTPUT);
+call    0 returned 2
+        2:  306:        out->v_rel      = clampf(s_kalman.x[1], -MAX_REL_VEL, MAX_REL_VEL);
+call    0 returned 2
+        2:  307:        out->confidence = 0.0f;
+        2:  308:        return;
+        -:  309:    }
+        -:  310:
+        -:  311:    /* Sensor fault detection */
+     1866:  312:    l_fault = lidar_fault_detect(in->lidar_d);
+call    0 returned 1866
+     1866:  313:    r_fault = radar_fault_detect(in->radar_d, in->radar_vr);
+call    0 returned 1866
+        -:  314:
+     1866:  315:    if (l_fault != 0U) { out->fault_flag |= AEB_FAULT_LIDAR; }
+branch  0 taken 804 (fallthrough)
+branch  1 taken 1062
+condition outcomes covered 2/2
+     1866:  316:    if (r_fault != 0U) { out->fault_flag |= AEB_FAULT_RADAR; }
+branch  0 taken 816 (fallthrough)
+branch  1 taken 1050
+condition outcomes covered 2/2
+        -:  317:
+        -:  318:    /* Kalman fusion (runs even if both faulty for dead-reckoning) */
+     1866:  319:    kalman_fusion(in->lidar_d, in->radar_d, in->radar_vr,
+     1866:  320:                  l_fault, r_fault, in->fi,
+call    0 returned 1866
+        -:  321:                  &fused_d, &fused_v, &conf);
+        -:  322:
+        -:  323:    /* Fault injection propagation (NFR-SAF-005) */
+     1866:  324:    if (in->fi != 0U) {
+branch  0 taken 3 (fallthrough)
+branch  1 taken 1863
+condition outcomes covered 2/2
+        3:  325:        out->fault_flag |= AEB_FAULT_LIDAR | AEB_FAULT_RADAR;
+        -:  326:    }
+        -:  327:
+     1866:  328:    out->distance   = fused_d;
+     1866:  329:    out->v_rel      = fused_v;
+     1866:  330:    out->confidence = conf;
+        -:  331:}

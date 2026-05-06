@@ -1,0 +1,1 @@
+genhtml reports/vv_perception/coverage_html/coverage_perception.info --branch-coverage --title 'Perception Coverage' --legend --output-directory reports/vv_perception/coverage_html

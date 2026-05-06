@@ -1,0 +1,42 @@
+=== AEB Perception Unit Tests ===
+
+[PASS] LiDAR: no fault before latch cycle
+[PASS] LiDAR: fault latches at cycle 3
+[PASS] LiDAR: counter resets on good frame before latch
+[PASS] Radar: fault latches at cycle 3
+[PASS] Radar: no fault on single bad relative velocity
+[PASS] CAN timeout: bit CAN_TO set
+[PASS] CAN timeout: bit LIDAR set
+[PASS] CAN timeout: bit RADAR set
+[PASS] CAN timeout: confidence = 0
+[PASS] Kalman: converges to 30 m within 50 cycles
+[PASS] Output: distance clamped to >= DIST_MIN_OUTPUT
+[PASS] Output: distance clamped to <= DIST_MAX_OUTPUT
+[PASS] Fault injection: LiDAR fault flag set
+[PASS] Fault injection: Radar fault flag set
+[PASS] Fault injection: confidence = 0.0 (both sensors disabled)
+[PASS] Confidence: both sensors >= one sensor
+[PASS] No faults on 20 cycles of good data
+[PASS] Output: rel_velocity clamped within [-MAX_REL_VEL, MAX_REL_VEL]
+[PASS] Ego velocity: direct passthrough
+[PASS] LiDAR: ROC > 10 m for 3 cycles latches fault
+[PASS] Radar: ROC > 10 m for 3 cycles latches fault
+[PASS] Init reset: fault latched before init
+[PASS] Init reset: no faults after init + good data
+[PASS] CAN timeout preserves ctr: no fault after 1 bad frame
+[PASS] CAN timeout preserves ctr: counter not corrupted by timeout
+[PASS] LiDAR counter saturation: fault active after 256 bad cycles
+[PASS] Radar counter saturation: fault active after 256 bad cycles
+[PASS] Radar-only: LiDAR fault flag set
+[PASS] Radar-only: Radar fault flag clear
+[PASS] Radar-only: confidence > 0 (base = 0.7 path)
+[PASS] Radar-only: confidence < 0.8 (below both-sensor ceiling)
+[PASS] Radar vel ROC: velocity jump > 2 m/s for 3 cycles latches fault
+[PASS] Radar ROC dec-d: small decrease (3 m) does NOT latch fault
+[PASS] Radar ROC dec-d: large decrease (20 m) latches fault after 3 cycles
+[PASS] Radar vel ROC dec-vr: decreasing velocity > 2 m/s latches fault
+[PASS] Radar negative vr in range: no fault for vr=-15 m/s (within limit)
+[PASS] Radar vel ROC: small decrease (0.5 m/s) does NOT latch fault
+[PASS] Radar neg-vr near dist-min: no range fault (d=1.0, vr=-20)
+
+=== Results: 38 passed, 0 failed ===
