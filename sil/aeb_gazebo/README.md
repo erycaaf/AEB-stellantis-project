@@ -49,15 +49,85 @@ graph LR
 
 | Scenario | Ego speed | Target speed | Initial gap | Description |
 |----------|-----------|--------------|-------------|-------------|
-| `ccrs_20`     | 20 km/h | 0 km/h  | 100 m | Car-to-Car Rear Stationary |
-| `ccrs_30`     | 30 km/h | 0 km/h  | 100 m | |
-| `ccrs_40`     | 40 km/h | 0 km/h  | 100 m | |
-| `ccrs_50`     | 50 km/h | 0 km/h  | 100 m | |
-| `ccrm`        | 50 km/h | 20 km/h |  50 m | Car-to-Car Rear Moving |
-| `ccrb_d2_g12` | 50 km/h | 50 km/h |  12 m | Car-to-Car Rear Braking (decel = 2 m/s²) |
-| `ccrb_d6_g12` | 50 km/h | 50 km/h |  12 m | Car-to-Car Rear Braking (decel = 6 m/s²) |
-| `ccrb_d2_g40` | 50 km/h | 50 km/h |  40 m | Car-to-Car Rear Braking (decel = 2 m/s²) |
-| `ccrb_d6_g40` | 50 km/h | 50 km/h |  40 m | Car-to-Car Rear Braking (decel = 6 m/s²) |
+| `ccrs_20`        | 20 km/h | 0 km/h  | 100 m | Car-to-Car Rear Stationary |
+| `ccrs_30`        | 30 km/h | 0 km/h  | 100 m | |
+| `ccrs_40`        | 40 km/h | 0 km/h  | 100 m | |
+| `ccrs_50`        | 50 km/h | 0 km/h  | 100 m | |
+| `ccrm`           | 50 km/h | 20 km/h |  50 m | Car-to-Car Rear Moving |
+| `ccrb_d2_g12`    | 50 km/h | 50 km/h |  12 m | Car-to-Car Rear Braking (decel = 2 m/s²) |
+| `ccrb_d6_g12`    | 50 km/h | 50 km/h |  12 m | Car-to-Car Rear Braking (decel = 6 m/s²) |
+| `ccrb_d2_g40`    | 50 km/h | 50 km/h |  40 m | Car-to-Car Rear Braking (decel = 2 m/s²) |
+| `ccrb_d6_g40`    | 50 km/h | 50 km/h |  40 m | Car-to-Car Rear Braking (decel = 6 m/s²) |
+| `uds_diagnostic` |  0 km/h | 0 km/h  | 100 m | Stationary harness for the UDS diagnostic panel — no motion, no AEB activity. |
+
+---
+
+## UDS Diagnostics (runtime)
+
+The Zephyr ECU answers UDS services (ISO 14229) over CAN — IDs
+`0x7DF` (request) and `0x7E8` (response) — completing FR-UDS-005
+end-to-end. The SIL exposes those services via HTTP on the `api`
+container and via a side panel in the `dashboard`.
+
+### REST endpoints (`api`, port `:8000`)
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/uds/health`          | GET  | Connection state with `canbus` |
+| `/uds/read_did/{did}`  | GET  | `ReadDataByIdentifier` (0x22). Accepts `0xF101` or `61697` |
+| `/uds/snapshot`        | GET  | Reads `0xF100` + `0xF101` + `0xF102` in one call |
+| `/uds/clear_dtc`       | POST | `ClearDiagnosticInformation` (0x14) — clears all DTCs |
+| `/uds/routine_control` | POST | `RoutineControl` (0x31). Body: `{"rid": 769, "value": 0\|1}` |
+
+DIDs supported by the ECU (see `include/aeb_uds.h`):
+
+| DID      | Content              | Decoding |
+|----------|----------------------|----------|
+| `0xF100` | TTC (seconds)        | uint16 little-endian, scale 1/100 |
+| `0xF101` | FSM state            | uint8 raw (0 OFF .. 6 POST_BRAKE) |
+| `0xF102` | Brake pressure (%)   | uint16 little-endian, scale 1/10 |
+
+Known RID: `0x0301` (AEB enable/disable; value `0` disables, `1` enables).
+
+### Dashboard panel
+
+The **UDS** button on the scenario bar (top of the Gazebo iframe)
+opens a side panel that polls `/uds/snapshot` at 5 Hz, displays all
+three DIDs live, and exposes two controls:
+
+- **Clear DTCs (0x14)** — emits `ClearDiagnosticInformation`.
+- **AEB enabled / DISABLED** — toggle via `RoutineControl` on RID `0x0301`.
+
+The panel keeps a colour-coded log of the last 30 actions (green for
+success, red for UDS or HTTP errors).
+
+### Recommended demo flow
+
+```bash
+# After docker compose up, in the dashboard:
+#   1. Pick the 'uds_diagnostic' scenario and click Start.
+#   2. Click the UDS button to open the side panel.
+#   3. Observe FSM = STANDBY and brake = 0%.
+#   4. Click "AEB: enabled" to disable; watch the log row and the
+#      next reads reflect the change.
+```
+
+### Reusable Python client
+
+For external testing or scripting, import the client directly:
+
+```python
+from uds_client import UDSClient, DID_FSM_STATE, RID_AEB_CONTROL
+
+client = UDSClient(host="localhost", port=29536)  # if mapped in compose
+print(client.read_did(DID_FSM_STATE))
+client.routine_control(RID_AEB_CONTROL, value=0)
+```
+
+Unit tests live at
+[`sil/docker/api/tests/test_uds_client.py`](../docker/api/tests/test_uds_client.py)
+and cover encoding/decoding, negative responses, timeouts, and
+concurrent serialisation. Run with `pytest` from `sil/docker/api/`.
 
 ---
 

@@ -29,6 +29,7 @@ Parameters:
 import rclpy
 from rclpy.node import Node
 from nav_msgs.msg import Odometry
+from std_msgs.msg import Int32
 import math
 import time
 import random
@@ -99,9 +100,21 @@ class PerceptionNode(Node):
         self.last_fusion_time = None
         self.fault_counter = 0
 
+        # Driver AEB-enable bit broadcast in CAN 0x101. Default 1 (AEB on);
+        # the API publishes 0 to /aeb/driver_aeb_enable when starting a
+        # `disable_aeb: true` scenario. The production C ECU's FSM
+        # Priority-1 reads `state->driver.aeb_enabled`, which is overwritten
+        # from this CAN frame every cycle — so toggling this bit at the
+        # source is the only way to keep AEB off across cycles. (UDS
+        # RoutineControl 0x0301 writes to state->uds.aeb_enabled, a
+        # separate field not consumed by the FSM.)
+        self.driver_aeb_enable = 1
+
         # ── ROS 2 subscriptions (from Gazebo) ─────────────────────────────
         self.create_subscription(Odometry, '/aeb/ego/odom', self.ego_odom_cb, 10)
         self.create_subscription(Odometry, '/aeb/target/odom', self.target_odom_cb, 10)
+        self.create_subscription(Int32, '/aeb/driver_aeb_enable',
+                                 self.aeb_enable_cb, 10)
 
         # ── Timers ────────────────────────────────────────────────────────
         self.create_timer(0.01, self.publish_ego_vehicle)     # 10 ms
@@ -237,13 +250,20 @@ class PerceptionNode(Node):
         )
         self._can_send(CAN_ID_EGO_VEHICLE, data)
 
+    def aeb_enable_cb(self, msg):
+        """Latched override for the AEB-enable bit broadcast in CAN 0x101.
+        Set by the API when the scenario YAML has `disable_aeb: true`."""
+        self.driver_aeb_enable = 1 if msg.data else 0
+        self.get_logger().info(
+            f'driver_aeb_enable set to {self.driver_aeb_enable}')
+
     def publish_driver_input(self):
         if not self.odom_ready:
             return
         data = encode_driver_input(
             brake_pct=0,
             accel_pct=0,
-            aeb_enable=1,
+            aeb_enable=self.driver_aeb_enable,
             override=0,
         )
         self._can_send(CAN_ID_DRIVER_INPUT, data)

@@ -2,19 +2,27 @@
 Scenario Control REST API
 =========================
 FastAPI server that bridges HTTP requests to ROS 2 services/topics
-for controlling AEB simulation scenarios.
+for controlling AEB simulation scenarios, plus UDS diagnostics over
+the SIL's TCP CAN relay.
 
 Runs inside a container with ROS 2 sourced.
 
 Endpoints:
-  GET  /scenarios          — list available scenarios
-  POST /scenarios/start    — start/restart a scenario by name
-  POST /scenarios/stop     — pause the simulation
-  POST /scenarios/restart  — restart the current scenario
-  GET  /status             — current scenario status
+  GET  /scenarios            — list available scenarios
+  POST /scenarios/start      — start/restart a scenario by name
+  POST /scenarios/stop       — pause the simulation
+  POST /scenarios/restart    — restart the current scenario
+  GET  /status               — current scenario status
+  GET  /live                 — live telemetry snapshot
+
+  GET  /uds/health           — UDS connection status
+  GET  /uds/read_did/{did}   — ReadDataByIdentifier (0x22)
+  GET  /uds/snapshot         — read all three DIDs in one call
+  POST /uds/clear_dtc        — ClearDiagnosticInformation (0x14)
+  POST /uds/routine_control  — RoutineControl (0x31), e.g. AEB enable
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import yaml
@@ -29,6 +37,11 @@ try:
 except Exception as _e:  # noqa: BLE001 — log but degrade gracefully
     print(f"[api] docker SDK unavailable ({_e!r}) — ECU restart disabled", flush=True)
     _docker_client = None
+
+from api.uds_client import (
+    UDSClient, UDSError, UDSTimeout,
+    DID_TTC, DID_FSM_STATE, DID_BRAKE_PRESS, RID_AEB_CONTROL,
+)
 
 app = FastAPI(title="AEB Scenario Control", version="1.0")
 
@@ -190,6 +203,27 @@ def start_scenario(req: StartRequest):
     time.sleep(0.5)
     restart_aeb_ecu()
 
+    # AEB enable bit handling for the scenario:
+    #   1) Toggle perception_node's CAN 0x101 broadcast (via ROS topic)
+    #      so the production C `state->driver.aeb_enabled` field — which
+    #      `aeb_core.c` overwrites from CAN every cycle — actually carries
+    #      the right value for the run.
+    #   2) Also fire the UDS RoutineControl as a defensive belt-and-suspenders
+    #      (writes to state->uds.aeb_enabled; cosmetic since the FSM reads
+    #      the driver field, but keeps the UDS panel display consistent).
+    aeb_enable_value = 0 if cfg.get("disable_aeb") else 1
+    ros2_pub("/aeb/driver_aeb_enable", "std_msgs/msg/Int32",
+             f'{{data: {aeb_enable_value}}}')
+    if cfg.get("disable_aeb"):
+        try:
+            client = _get_uds_client()
+            client.routine_control(RID_AEB_CONTROL, value=0)
+            print(f"[api] disable_aeb=true for {req.scenario} — AEB disabled via "
+                  f"perception 0x101 + UDS RoutineControl", flush=True)
+        except (UDSError, UDSTimeout, ConnectionError, OSError) as e:
+            print(f"[api] could not disable AEB via UDS: {e!r}", flush=True)
+            _reset_uds_client()
+
     with lock:
         current_scenario["status"] = "running"
 
@@ -258,3 +292,158 @@ def get_live_data():
             "time": 0, "distance": 0, "speed_kmh": 0,
             "brake_pct": 0, "fsm_state": "OFF", "ttc": 10.0
         }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  UDS Diagnostics  (FR-UDS-001..005)
+# ═══════════════════════════════════════════════════════════════════════════
+
+CANBUS_HOST = os.environ.get("CAN_TCP_HOST", "canbus")
+CANBUS_PORT = int(os.environ.get("CAN_TCP_PORT", "29536"))
+
+_uds_client = None
+_uds_lock   = threading.Lock()
+
+
+def _get_uds_client():
+    """Lazy-construct the UDS client on first use so the api container
+    starts even when canbus is still coming up. Reconnects after a
+    drop on the next call."""
+    global _uds_client
+    with _uds_lock:
+        if _uds_client is None:
+            try:
+                _uds_client = UDSClient(
+                    host=CANBUS_HOST, port=CANBUS_PORT, response_timeout=0.5
+                )
+            except ConnectionError as e:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"UDS client cannot reach canbus: {e}",
+                )
+        return _uds_client
+
+
+def _reset_uds_client():
+    """Drop the client so the next call rebuilds it (after a transport error)."""
+    global _uds_client
+    with _uds_lock:
+        if _uds_client is not None:
+            try:
+                _uds_client.close()
+            except Exception:
+                pass
+            _uds_client = None
+
+
+def _parse_did(did_str: str) -> int:
+    """Accept '0xF101', 'F101', or '61697'."""
+    s = did_str.strip()
+    try:
+        return int(s, 16) if s.lower().startswith("0x") or any(
+            c in s.lower() for c in "abcdef"
+        ) else int(s)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"invalid DID: {did_str!r} (expected 0xF101 or 61697)"
+        )
+
+
+class RoutineControlRequest(BaseModel):
+    rid: int
+    value: int
+
+
+@app.get("/uds/health")
+def uds_health():
+    """Report whether the UDS client is connected to canbus."""
+    return {
+        "host":      CANBUS_HOST,
+        "port":      CANBUS_PORT,
+        "connected": _uds_client is not None,
+    }
+
+
+@app.get("/uds/read_did/{did}")
+def uds_read_did(did: str):
+    """ReadDataByIdentifier (0x22). DIDs supported by the ECU:
+        0xF100  TTC value (s)
+        0xF101  FSM state
+        0xF102  Brake pressure (%)
+    """
+    did_val = _parse_did(did)
+    client = _get_uds_client()
+    try:
+        return client.read_did(did_val)
+    except UDSTimeout as e:
+        _reset_uds_client()
+        raise HTTPException(status_code=504, detail=str(e))
+    except UDSError as e:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "message": str(e),
+                "sid":     e.sid,
+                "nrc":     e.nrc,
+            },
+        )
+
+
+@app.get("/uds/snapshot")
+def uds_snapshot():
+    """Convenience endpoint — read all three live DIDs in one call.
+    Used by the dashboard's UDS panel for periodic polling."""
+    client = _get_uds_client()
+    out = {}
+    for label, did in (("ttc", DID_TTC),
+                       ("fsm", DID_FSM_STATE),
+                       ("brake", DID_BRAKE_PRESS)):
+        try:
+            out[label] = client.read_did(did)
+        except UDSTimeout as e:
+            _reset_uds_client()
+            out[label] = {"error": "timeout", "detail": str(e)}
+        except UDSError as e:
+            out[label] = {
+                "error": "uds_error",
+                "detail": str(e),
+                "sid":    e.sid,
+                "nrc":    e.nrc,
+            }
+    return out
+
+
+@app.post("/uds/clear_dtc")
+def uds_clear_dtc():
+    """ClearDiagnosticInformation (0x14) — clears all DTCs."""
+    client = _get_uds_client()
+    try:
+        return client.clear_dtc()
+    except UDSTimeout as e:
+        _reset_uds_client()
+        raise HTTPException(status_code=504, detail=str(e))
+    except UDSError as e:
+        raise HTTPException(
+            status_code=502,
+            detail={"message": str(e), "sid": e.sid, "nrc": e.nrc},
+        )
+
+
+@app.post("/uds/routine_control")
+def uds_routine_control(req: RoutineControlRequest):
+    """RoutineControl (0x31). For AEB enable/disable use RID 0x0301
+    with value 0 (disable) or 1 (enable)."""
+    client = _get_uds_client()
+    try:
+        return client.routine_control(req.rid, req.value)
+    except UDSTimeout as e:
+        _reset_uds_client()
+        raise HTTPException(status_code=504, detail=str(e))
+    except UDSError as e:
+        raise HTTPException(
+            status_code=502,
+            detail={"message": str(e), "sid": e.sid, "nrc": e.nrc},
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
