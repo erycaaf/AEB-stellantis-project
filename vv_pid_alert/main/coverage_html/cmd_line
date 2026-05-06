@@ -1,0 +1,1 @@
+genhtml reports/vv_pid_alert/coverage_html/coverage_pid_alert.info --branch-coverage --title 'PID + Alert Coverage' --legend --output-directory reports/vv_pid_alert/coverage_html

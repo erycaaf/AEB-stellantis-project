@@ -1,0 +1,20 @@
+MC/DC Coverage Summary — PID + Alert
+Generated: 2026-05-06T16:30:37+00:00
+Toolchain: gcc-14 (Ubuntu 14.2.0-4ubuntu2~24.04.1) 14.2.0
+==============================================
+
+-- aeb_pid.c --
+File 'src/execution/aeb_pid.c'
+Lines executed:95.35% of 43
+Branches executed:91.67% of 24
+Taken at least once:79.17% of 24
+Condition outcomes covered:70.83% of 24
+Lines executed:95.35% of 43
+
+-- aeb_alert.c --
+File 'src/execution/aeb_alert.c'
+Lines executed:7.14% of 42
+Branches executed:15.38% of 13
+Taken at least once:7.69% of 13
+Condition outcomes covered:12.50% of 8
+Lines executed:7.14% of 42

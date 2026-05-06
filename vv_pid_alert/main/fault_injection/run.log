@@ -1,0 +1,95 @@
+========================================
+  AEB PID — Fault Injection Tests
+  (ASIL-D Robustness — ISO 26262-6 §9.4.2)
+========================================
+
+[FAULT-A1] a_ego = NaN (faulty accelerometer)
+[01] pid_brake_pct_stays_in_0_100_no_NaN_propagation_ PASS
+[02] pid_brake_bar_stays_in_0_10_no_NaN_propagation_ PASS
+
+[FAULT-A2] a_ego = +Infinity (saturated sensor)
+[03] pid_brake_pct_stays_in_0_100_with_a_ego_Inf PASS
+[04] pid_brake_bar_stays_in_0_10_with_a_ego_Inf PASS
+
+[FAULT-A3] a_ego = -Infinity (sensor stuck low)
+[05] pid_brake_pct_stays_in_0_100_with_a_ego_Inf PASS
+[06] pid_brake_bar_stays_in_0_10_with_a_ego_Inf PASS
+
+[FAULT-A4] decel_target = NaN (corrupted FSM output)
+[07] pid_brake_pct_stays_in_0_100_with_decel_target_NaN PASS
+
+[FAULT-B1] a_ego = 100 m/s^2 (impossible but finite)
+[08] pid_brake_pct_clamped_to_0_100_under_extreme_a_ego PASS
+
+[FAULT-B2] decel_target = 1000 m/s^2 (impossible command)
+[09] pid_brake_pct_saturates_at_100_under_extreme_demand PASS
+[10] pid_brake_pct_never_exceeds_BRAKE_OUT_MAX PASS
+
+[FAULT-B3] a_ego = FLT_MAX (numerical overflow test)
+[11] pid_brake_pct_stays_in_0_100_with_a_ego_FLT_MAX PASS
+
+[FAULT-C1] fsm_state = 99 (invalid state)
+[12] pid_invalid_fsm_state_produces_zero_braking_fail_safe_ PASS
+[13] pid_invalid_fsm_state_produces_zero_pressure PASS
+
+[FAULT-C2] fsm_state = 255 (UINT8_MAX, bit-flip scenario)
+[14] pid_fsm_state_255_produces_zero_braking_fail_safe_ PASS
+
+[FAULT-D1] integrator reset after invalid-state excursion
+[15] pid_precondition_integrator_accumulated_braking_output PASS
+[16] pid_invalid_state_forces_reset_brake_pct_drops_to_0 PASS
+[17] pid_no_stale_integrator_carry_over_after_invalid_state_excursion PASS
+
+[FAULT-D2] jerk limit holds even with extreme target change
+[18] pid_jerk_limiter_holds_even_under_spike_input_FR_BRK_004_ PASS
+
+========================================
+========================================
+========================================
+  AEB Alert — Fault Injection Tests
+  (ASIL-D Robustness — ISO 26262-6 §9.4.2)
+========================================
+
+[FAULT-A1] alert_map(7) — one past valid range
+[19] alert_fsm_state_7_ALERT_NONE_silent_default_ PASS
+[20] alert_fsm_state_7_alert_active_0 PASS
+[21] alert_fsm_state_7_BUZZER_SILENT PASS
+
+[FAULT-A2] alert_map(99) — grossly out of range
+[22] alert_fsm_state_99_ALERT_NONE_silent_default_ PASS
+[23] alert_fsm_state_99_alert_active_0 PASS
+
+[FAULT-A3] alert_map(255) — UINT8_MAX (bit-flip scenario)
+[24] alert_fsm_state_255_ALERT_NONE_silent_default_ PASS
+[25] alert_fsm_state_255_alert_active_0 PASS
+[26] alert_fsm_state_255_BUZZER_SILENT PASS
+
+[FAULT-B1] override_detect(NaN, 0)
+[27] alert_override_detect_returns_valid_0_1_even_with_NaN_input PASS
+
+[FAULT-B2] override_detect(+Inf, 0)
+[28] alert_override_detect_Inf_treats_as_override PASS
+
+[FAULT-B3] override_detect(-Inf, 0)
+[29] alert_override_detect_Inf_treats_as_override PASS
+
+[FAULT-C1] override_detect(1e20, 0)
+[30] alert_huge_positive_angle_override PASS
+
+[FAULT-C2] override_detect(-1e20, 0)
+[31] alert_huge_negative_angle_override PASS
+
+[FAULT-C3] override_detect at exact 5.0 deg boundary
+[32] alert_steering_5_0_exact_threshold_no_override PASS
+[33] alert_steering_5_0_exact_threshold_no_override PASS
+[34] alert_steering_5_01_just_above_override_active PASS
+
+[FAULT-D1] override_detect(0, 2) — unexpected pedal value
+[35] alert_brake_pedal_2_triggers_override_safe_default_ PASS
+
+[FAULT-D2] override_detect(0, 255) — corrupted pedal signal
+[36] alert_brake_pedal_255_triggers_override_safe_default_ PASS
+
+========================================
+========================================
+Results: 36 / 36 passed
