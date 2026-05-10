@@ -190,30 +190,3 @@ jobs:
           name: vv-can-reports-run${{ github.run_number }}
           path: reports/vv_can/
           retention-days: 30
-
-  publish-pages:
-    needs: vv-can
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main')
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    concurrency:
-      group: gh-pages-deploy
-      cancel-in-progress: false
-    steps:
-      - name: Download reports
-        uses: actions/download-artifact@v4
-        with:
-          name: vv-can-reports-run${{ github.run_number }}
-          path: site/
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
-          destination_dir: vv_can/${{ github.ref_name }}
-          keep_files: true
-          user_name: 'github-actions[bot]'
-          user_email: '41898282+github-actions[bot]@users.noreply.github.com'
-          commit_message: 'docs(vv-can): publish reports from run #${{ github.run_number }} (${{ github.ref_name }})'

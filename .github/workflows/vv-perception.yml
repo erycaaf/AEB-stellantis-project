@@ -230,38 +230,3 @@ jobs:
           name: vv-perception-reports-run${{ github.run_number }}
           path: reports/vv_perception/
           retention-days: 30
-
-  # ───────────────────────────────────────────────────────────────────────
-  # Publish HTML reports to GitHub Pages on push to development/main only.
-  # Each module workflow publishes its own subdirectory under vv_<module>/
-  # on the gh-pages branch; keep_files: true preserves the others.
-  # ───────────────────────────────────────────────────────────────────────
-  publish-pages:
-    needs: vv-perception
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main')
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    # Serialise every gh-pages push across ALL workflows in the repo
-    # (vv-uds, vv-perception, vv-<other>, publish-index, ...) to avoid
-    # non-fast-forward races. Shared string, no ref suffix.
-    concurrency:
-      group: gh-pages-deploy
-      cancel-in-progress: false
-    steps:
-      - name: Download reports
-        uses: actions/download-artifact@v4
-        with:
-          name: vv-perception-reports-run${{ github.run_number }}
-          path: site/
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
-          destination_dir: vv_perception/${{ github.ref_name }}
-          keep_files: true
-          user_name: 'github-actions[bot]'
-          user_email: '41898282+github-actions[bot]@users.noreply.github.com'
-          commit_message: 'docs(vv-perception): publish reports from run #${{ github.run_number }} (${{ github.ref_name }})'

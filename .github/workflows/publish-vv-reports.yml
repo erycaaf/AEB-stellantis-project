@@ -1,0 +1,151 @@
+name: Publish V&V reports
+
+# Aggregator that publishes the per-module HTML reports to GitHub Pages
+# in a single deploy after ALL five module V&V workflows have completed
+# for the same commit. Prior design ran a publish-pages job inside each
+# of the V&V workflows; with five concurrent push triggers, GitHub
+# Actions' "1 running + 1 queued in concurrency group" rule cancelled
+# 3 of 5 publish jobs, leaving stale reports on Pages.
+#
+# This workflow listens for completion of any of the five V&V workflows.
+# Each invocation checks whether all five sibling workflows have
+# completed successfully on the same SHA. The last one to complete
+# performs the deploy; earlier invocations exit silently. Net result:
+# exactly one Pages deploy per push, with all five module artefacts.
+#
+# The publish-index.yml workflow continues to deploy the root
+# docs/index.html landing page; this aggregator deploys the per-module
+# subdirectories under it.
+
+on:
+  workflow_run:
+    workflows:
+      - "CAN V&V"
+      - "Decision V&V"
+      - "Perception V&V"
+      - "PID + Alert V&V"
+      - "UDS V&V"
+    types: [completed]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: gh-pages-deploy
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Aggregate and publish to gh-pages
+    runs-on: ubuntu-24.04
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      (github.event.workflow_run.head_branch == 'development' ||
+       github.event.workflow_run.head_branch == 'main')
+    steps:
+      - name: Gate — wait until all 5 V&V workflows complete for this SHA
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -e
+          workflows=("CAN V&V" "Decision V&V" "Perception V&V" "PID + Alert V&V" "UDS V&V")
+          all_done=true
+          all_success=true
+          for wf in "${workflows[@]}"; do
+            row=$(gh run list \
+                --workflow "$wf" \
+                --commit "$SHA" \
+                --limit 1 \
+                --json status,conclusion,databaseId \
+                --jq '.[0] // {}')
+            status=$(echo "$row"     | jq -r '.status     // "unknown"')
+            concl=$(echo  "$row"     | jq -r '.conclusion // ""')
+            id=$(echo     "$row"     | jq -r '.databaseId // 0')
+            echo "  $wf: status=$status, conclusion=$concl, run=$id"
+            if [ "$status" != "completed" ]; then
+              all_done=false
+            elif [ "$concl" != "success" ]; then
+              # Completed but not successful — don't deploy, but don't keep waiting either.
+              all_success=false
+            fi
+          done
+
+          if [ "$all_done" != "true" ]; then
+            echo "Not all sibling workflows have completed yet. Exiting silently."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$all_success" != "true" ]; then
+            echo "All workflows completed but at least one failed. Skipping deploy so reports stay aligned."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "All 5 V&V workflows complete & successful for SHA $SHA — proceeding with deploy."
+          echo "go=true" >> "$GITHUB_OUTPUT"
+
+      - name: Stage site directory
+        if: steps.gate.outputs.go == 'true'
+        run: mkdir -p site
+
+      - name: Download artefacts from each V&V run
+        if: steps.gate.outputs.go == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -e
+          # Map: workflow name → site subdirectory + artefact-name prefix
+          declare -A site_dir=(
+            ["CAN V&V"]="vv_can"
+            ["Decision V&V"]="vv_decision"
+            ["Perception V&V"]="vv_perception"
+            ["PID + Alert V&V"]="vv_pid_alert"
+            ["UDS V&V"]="vv_uds"
+          )
+          declare -A art_prefix=(
+            ["CAN V&V"]="vv-can-reports-run"
+            ["Decision V&V"]="vv-decision-reports-run"
+            ["Perception V&V"]="vv-perception-reports-run"
+            ["PID + Alert V&V"]="vv-pid-alert-reports-run"
+            ["UDS V&V"]="vv-uds-reports-run"
+          )
+
+          for wf in "${!site_dir[@]}"; do
+            module="${site_dir[$wf]}"
+            prefix="${art_prefix[$wf]}"
+
+            row=$(gh run list \
+                --workflow "$wf" \
+                --commit "$SHA" \
+                --limit 1 \
+                --json databaseId,number \
+                --jq '.[0]')
+            run_id=$(echo "$row"     | jq -r '.databaseId')
+            run_number=$(echo "$row" | jq -r '.number')
+
+            artefact_name="${prefix}${run_number}"
+            target="site/${module}"
+            mkdir -p "$target"
+
+            echo "=== $wf (run #$run_number, id=$run_id) → ${target} ==="
+            if ! gh run download "$run_id" -n "$artefact_name" -D "$target"; then
+              echo "  ! gh run download failed for ${artefact_name}; report missing for this push."
+            fi
+          done
+
+          echo "--- Final site/ tree ---"
+          ls -lR site/ | head -60
+
+      - name: Deploy aggregated reports to gh-pages
+        if: steps.gate.outputs.go == 'true'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          keep_files: true
+          user_name: 'github-actions[bot]'
+          user_email: '41898282+github-actions[bot]@users.noreply.github.com'
+          commit_message: 'docs(vv): publish all V&V reports for ${{ github.event.workflow_run.head_branch }}@${{ github.event.workflow_run.head_sha }}'
