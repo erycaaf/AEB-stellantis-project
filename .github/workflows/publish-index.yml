@@ -1,10 +1,10 @@
 name: Publish V&V index page
 
 # Deploys docs/index.html to the root of the gh-pages branch whenever it
-# changes on development or main. Per-module workflows (vv-uds.yml,
-# vv-pid.yml, etc.) deploy their HTML reports to subdirectories of the
-# same gh-pages branch using keep_files: true, so this index page sits
-# at the root and links into them.
+# changes on development or main. The per-module HTML reports are
+# published by publish-vv-reports.yml into subdirectories of the same
+# gh-pages branch (vv_<module>/<branch>/), using keep_files: true so
+# this index page sits at the root and links into them.
 
 on:
   push:
