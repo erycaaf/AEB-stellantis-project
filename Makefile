@@ -1,5 +1,8 @@
 # Makefile — AEB Stellantis Project (host build)
 #
+# This file is in every vv-*.yml `paths:` filter; bumping a comment
+# here re-triggers all five V&V workflows + publish-vv-reports.yml.
+#
 # Targets (build & test):
 #   make build             — compile all modules (zero-warning gate)
 #   make test              — build and run all unit tests
