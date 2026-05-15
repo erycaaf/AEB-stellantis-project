@@ -8,8 +8,9 @@ name: Decision V&V
 # (fix/decision-review-followup) closed all V&V findings; any new
 # regression is now treated as a CI failure, mirroring vv-uds.
 #
-# Reports are published as workflow artefacts on every run and to
-# GitHub Pages on push to development/main under
+# Reports are published as workflow artefacts on every run, and to
+# GitHub Pages by publish-vv-reports.yml after every triggered V&V
+# workflow on the SHA completes successfully. Live URL:
 # https://erycaaf.github.io/AEB-stellantis-project/vv_decision/<branch>/.
 
 on:
@@ -239,33 +240,3 @@ jobs:
           name: vv-decision-reports-run${{ github.run_number }}
           path: reports/vv_decision/
           retention-days: 30
-
-  # Per-module workflows publish their own subdirectory under vv_<module>/
-  # on gh-pages; keep_files: true preserves the others.
-  publish-pages:
-    needs: vv-decision
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main')
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    # Shared group across all gh-pages deploys to avoid non-fast-forward races.
-    concurrency:
-      group: gh-pages-deploy
-      cancel-in-progress: false
-    steps:
-      - name: Download reports
-        uses: actions/download-artifact@v4
-        with:
-          name: vv-decision-reports-run${{ github.run_number }}
-          path: site/
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
-          destination_dir: vv_decision/${{ github.ref_name }}
-          keep_files: true
-          user_name: 'github-actions[bot]'
-          user_email: '41898282+github-actions[bot]@users.noreply.github.com'
-          commit_message: 'docs(vv-decision): publish reports from run #${{ github.run_number }} (${{ github.ref_name }})'

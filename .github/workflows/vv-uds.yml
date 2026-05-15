@@ -11,9 +11,9 @@ name: UDS V&V
 #
 # Reports are published in two layers:
 #   1. Workflow Artifacts on every run (PR or push), retention 30 days.
-#   2. GitHub Pages (gh-pages branch) on push to development/main —
-#      navigable HTML reports under
-#      https://erycaaf.github.io/AEB-stellantis-project/vv_uds/<branch>/.
+#   2. GitHub Pages — published by publish-vv-reports.yml after every
+#      triggered V&V workflow on the SHA completes successfully.
+#      Live URL: https://erycaaf.github.io/AEB-stellantis-project/vv_uds/<branch>/.
 
 on:
   pull_request:
@@ -202,38 +202,3 @@ jobs:
           name: vv-uds-reports-run${{ github.run_number }}
           path: reports/vv_uds/
           retention-days: 30
-
-  # ───────────────────────────────────────────────────────────────────────
-  # Publish HTML reports to GitHub Pages on push to development/main only.
-  # Each module workflow publishes its own subdirectory under vv_<module>/
-  # on the gh-pages branch; keep_files: true preserves the others.
-  # ───────────────────────────────────────────────────────────────────────
-  publish-pages:
-    needs: vv-uds
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/development' || github.ref == 'refs/heads/main')
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    # Serialise every gh-pages push across ALL workflows in the repo
-    # (vv-uds, vv-<other>, publish-index, ...) to avoid non-fast-forward
-    # races. Shared string, no ref suffix.
-    concurrency:
-      group: gh-pages-deploy
-      cancel-in-progress: false
-    steps:
-      - name: Download reports
-        uses: actions/download-artifact@v4
-        with:
-          name: vv-uds-reports-run${{ github.run_number }}
-          path: site/
-
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
-          destination_dir: vv_uds/${{ github.ref_name }}
-          keep_files: true
-          user_name: 'github-actions[bot]'
-          user_email: '41898282+github-actions[bot]@users.noreply.github.com'
-          commit_message: 'docs(vv-uds): publish reports from run #${{ github.run_number }} (${{ github.ref_name }})'
